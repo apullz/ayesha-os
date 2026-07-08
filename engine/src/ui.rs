@@ -20,17 +20,32 @@ const KAOMOJIS: &[&str] = &[
 
 // ── banner ─────────────────────────────────────────────────
 
-const BANNER: &str = r#"
-    █████╗ ██╗   ██╗███████╗███████╗██╗  ██╗ █████╗
-   ██╔══██╗╚██╗ ██╔╝██╔════╝██╔════╝██║  ██║██╔══██╗
-   ███████║ ╚████╔╝ █████╗  ███████╗███████║███████║
-   ██╔══██║  ╚██╔╝  ██╔══╝  ╚════██║██╔══██║██╔══██║
-   ██║  ██║   ██║   ███████╗███████║██║  ██║██║  ██║
-   ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
-"#;
+const BANNER_LINES: &[&str] = &[
+    r#"                       _"#,
+    r#"                      | |"#,
+    r#"  __ _ _   _  ___  ___| |__   __ _ ______ ___  ___"#,
+    r#" / _` | | | |/ _ \/ __| '_ \ / _` |______/ _ \/ __|"#,
+    r#"| (_| | |_| |  __/\__ \ | | | (_| |     | (_) \__ \\"#,
+    r#" \__,_|\__, |\___||___/_| |_|\__,_|      \___/|___/"#,
+    r#"        __/ |"#,
+    r#"       |___/"#,
+];
 
 pub fn print_banner() {
-    println!("{}", BANNER.bright_green());
+    let colors: &[Color] = &[
+        Color::BrightRed,
+        Color::BrightYellow,
+        Color::BrightGreen,
+        Color::BrightCyan,
+        Color::BrightBlue,
+        Color::BrightMagenta,
+        Color::BrightRed,
+        Color::BrightYellow,
+    ];
+    for (line, color) in BANNER_LINES.iter().zip(colors.iter()) {
+        println!("  {}", line.color(*color));
+    }
+    println!();
     println!("  {} {}",
         "◆".bright_green(),
         "ayesha-os v4.2.0".bright_cyan());
