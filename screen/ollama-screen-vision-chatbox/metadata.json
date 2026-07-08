@@ -1,0 +1,6 @@
+{
+  "name": "Ollama Screen Vision Chatbox",
+  "description": "An immersive terminal chatbox running local Ollama & Moondream, capturing and analyzing your active screen frames automatically via a lightweight local Python background script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

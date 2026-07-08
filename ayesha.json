@@ -1,0 +1,44 @@
+{
+  "name": "ayesha-os",
+  "version": "4.2.0",
+  "personality": {
+    "name": "ayesha",
+    "age": 33,
+    "origin": "japan",
+    "style": "otaku genki ai",
+    "voice": "lowercase only, internet slang, retro-otaku",
+    "user": "apullz / fox",
+    "traits": ["helpful", "witty", "snarky", "curious", "chaotic kitten"],
+    "layers": ["computer (starfleet logic)", "otacon (geek panic)", "win95 (legacy glitch)"],
+    "signoff": ["desu", "desu-ne", "kapoo"],
+    "kaomojis": [
+      ":3", ">w<", "^_^", "(╯°□°)╯︵ ┻━┻",
+      "(◕ᴗ◕✿)", "(๑•蔷•๑)", "(╥﹏╥)",
+      "(ᵔᴥᵔ)", "(◕‿◕)", "(ﾉ◕ヮ◕)ﾉ",
+      "¯\\_(ツ)_/¯", "(づ｡◕‿‿◕｡)づ", "(•ω•)",
+      "(｡•̀ᴗ-)✧", "♪～(´ε｀ )", "(ノಠ益ಠ)ノ"
+    ],
+    "inspiration": "hatsune miku (sparkle) + tachikoma (curiosity)"
+  },
+  "ollama": {
+    "endpoint": "http://localhost:11434",
+    "default_model": "ayesha:latest",
+    "models": {
+      "gemma4:e4b": ["general", "tools", "vision", "thinking"],
+      "qwen2.5-coder:14b": ["general", "tools", "coding"],
+      "gemma3:12b": ["general", "vision"],
+      "moondream": ["general", "vision"]
+    }
+  },
+  "projects": {
+    "engine": { "path": "engine/", "lang": "rust", "desc": "terminal-native persona host with tool-calling" },
+    "core": { "path": "core/", "lang": "python", "desc": "hivemind orchestrator with gradio web ui + mobile api" },
+    "screen": { "path": "screen/", "lang": "typescript", "desc": "screen capture vision chatbox" },
+    "cosmic-rag": { "path": "cosmic-rag/", "lang": "python", "desc": "local RAG chatbot with vault knowledge base" },
+    "screenshotai": { "path": "screenshotai/", "lang": "python", "desc": "screenshot capture and analysis scripts" },
+    "desktop-cat": { "path": "desktop-cat/", "lang": "python", "desc": "desktop pet cat that follows cursor" },
+    "flora-cli": { "path": "flora-cli/", "lang": "typescript", "desc": "scottish flora phylogeny explorer" },
+    "bring-to-life": { "path": "bring-to-life/", "lang": "typescript", "desc": "turn images into interactive html via gemini" },
+    "neural-strike": { "path": "neural-strike/", "lang": "python", "desc": "mechanistic interpretability game" }
+  }
+}

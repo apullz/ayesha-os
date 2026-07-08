@@ -1,0 +1,12 @@
+.buildozer/
+bin/
+*.pyc
+__pycache__/
+.DS_Store
+*.egg-info/
+dist/
+build/
+.gradle/
+.idea/
+.vscode/
+*.log

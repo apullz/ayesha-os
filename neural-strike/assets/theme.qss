@@ -1,0 +1,325 @@
+/* NEURAL-STRIKE: Dark Cyberpunk Theme */
+
+/* Main Window */
+QMainWindow {
+    background-color: #0a0a0f;
+}
+
+QWidget {
+    background-color: #0a0a0f;
+    color: #e0e0e0;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+}
+
+/* Panels */
+QFrame {
+    background-color: #12121a;
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+}
+
+/* Title Bar */
+QLabel#title {
+    color: #00f0ff;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 8px;
+}
+
+QLabel#subtitle {
+    color: #808090;
+    font-size: 11px;
+    padding: 4px;
+}
+
+/* Scanner Panel */
+QTextEdit#scanner {
+    background-color: #0a0a0f;
+    color: #00ff88;
+    border: 1px solid #00f0ff;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: "Consolas", monospace;
+    font-size: 11px;
+    selection-background-color: #00f0ff;
+    selection-color: #0a0a0f;
+}
+
+/* Feature Inspector */
+QLabel#feature_id {
+    color: #00f0ff;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QLabel#feature_explanation {
+    color: #e0e0e0;
+    font-size: 11px;
+    padding: 8px;
+    background-color: #1a1a2e;
+    border-radius: 4px;
+}
+
+/* Sliders */
+QSlider::groove:horizontal {
+    border: 1px solid #1a1a2e;
+    height: 8px;
+    background: #12121a;
+    border-radius: 4px;
+}
+
+QSlider::handle:horizontal {
+    background: #00f0ff;
+    border: 2px solid #00f0ff;
+    width: 16px;
+    height: 16px;
+    margin: -4px 0;
+    border-radius: 8px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #00ffaa;
+    border-color: #00ffaa;
+}
+
+QSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #00f0ff, stop:1 #ff00aa);
+    border-radius: 4px;
+}
+
+/* Buttons */
+QPushButton {
+    background-color: #1a1a2e;
+    color: #00f0ff;
+    border: 1px solid #00f0ff;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-weight: bold;
+    min-width: 80px;
+}
+
+QPushButton:hover {
+    background-color: #00f0ff;
+    color: #0a0a0f;
+}
+
+QPushButton:pressed {
+    background-color: #ff00aa;
+    border-color: #ff00aa;
+    color: #0a0a0f;
+}
+
+QPushButton#danger {
+    border-color: #ff0040;
+    color: #ff0040;
+}
+
+QPushButton#danger:hover {
+    background-color: #ff0040;
+    color: #0a0a0f;
+}
+
+QPushButton#success {
+    border-color: #00ff88;
+    color: #00ff88;
+}
+
+QPushButton#success:hover {
+    background-color: #00ff88;
+    color: #0a0a0f;
+}
+
+/* Spin Box */
+QSpinBox {
+    background-color: #12121a;
+    color: #00f0ff;
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QSpinBox::up-button, QSpinBox::down-button {
+    background-color: #1a1a2e;
+    border: none;
+    width: 20px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #00f0ff;
+}
+
+/* Combo Box */
+QComboBox {
+    background-color: #12121a;
+    color: #00f0ff;
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #12121a;
+    color: #00f0ff;
+    border: 1px solid #00f0ff;
+    selection-background-color: #00f0ff;
+    selection-color: #0a0a0f;
+}
+
+/* Scroll Bar */
+QScrollBar:vertical {
+    background-color: #0a0a0f;
+    width: 12px;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #1a1a2e;
+    border-radius: 6px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #00f0ff;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    background-color: #0a0a0f;
+    height: 12px;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #1a1a2e;
+    border-radius: 6px;
+    min-width: 30px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #00f0ff;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* Status Bar */
+QStatusBar {
+    background-color: #12121a;
+    color: #808090;
+    border-top: 1px solid #1a1a2e;
+}
+
+/* Tool Tip */
+QToolTip {
+    background-color: #1a1a2e;
+    color: #00f0ff;
+    border: 1px solid #00f0ff;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+/* Tab Widget */
+QTabWidget::pane {
+    border: 1px solid #1a1a2e;
+    background-color: #0a0a0f;
+}
+
+QTabBar::tab {
+    background-color: #12121a;
+    color: #808090;
+    border: 1px solid #1a1a2e;
+    padding: 8px 16px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #1a1a2e;
+    color: #00f0ff;
+    border-bottom-color: #00f0ff;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #1a1a2e;
+    color: #00f0ff;
+}
+
+/* Group Box */
+QGroupBox {
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    font-weight: bold;
+    color: #00f0ff;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px;
+}
+
+/* Line Edit */
+QLineEdit {
+    background-color: #12121a;
+    color: #00f0ff;
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+    padding: 6px 8px;
+    selection-background-color: #00f0ff;
+    selection-color: #0a0a0f;
+}
+
+QLineEdit:focus {
+    border-color: #00f0ff;
+}
+
+/* List Widget */
+QListWidget {
+    background-color: #0a0a0f;
+    color: #e0e0e0;
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+}
+
+QListWidget::item {
+    padding: 4px 8px;
+}
+
+QListWidget::item:selected {
+    background-color: #1a1a2e;
+    color: #00f0ff;
+}
+
+QListWidget::item:hover {
+    background-color: #12121a;
+}
+
+/* Progress Bar */
+QProgressBar {
+    background-color: #12121a;
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+    text-align: center;
+    color: #00f0ff;
+}
+
+QProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #00f0ff, stop:1 #ff00aa);
+    border-radius: 3px;
+}
+
+/* CRT Scanline Overlay (applied via QPainter) */
+/* See effects.py for implementation */

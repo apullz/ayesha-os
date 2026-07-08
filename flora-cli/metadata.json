@@ -1,0 +1,6 @@
+{
+  "name": "Scottish Flora Phylogeny Terminal",
+  "description": "An interactive, retro-botanical terminal CLI and evolution tree viewer for exploring the evolutionary lineage and history of native Scottish plant families, genera, and species.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
