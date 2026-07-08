@@ -46,7 +46,7 @@ class AyeshaCompanionTerminal:
         self.setup_ui()
         
         # Test Connection to Ollama Node (Runs in background)
-        self.append_system_log("Microsoft Windows Terminal [Version 10.0.22631.3737]\n(c) Microsoft Corporation. All rights reserved.\n\n✨ Oh My Posh shell theme 'Ayesha-Hacker' loaded successfully.")
+        self.append_system_log("ayesha companion terminal v4.0\n(c) ayesha-os. all rights reversed.\n\n✨ Oh My Posh shell theme 'Ayesha-Hacker' loaded successfully.")
         self.append_system_log(f"⚡ Testing handshake to Ollama target on {self.ollama_host}...")
         
         threading.Thread(target=self.probe_local_ollama, daemon=True).start()

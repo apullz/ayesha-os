@@ -405,12 +405,12 @@ if __name__ == "__main__":
     import uvicorn
     
     print("🌸 AYESHA MOBILE API SERVER")
-    print("Starting on http://0.0.0.0:8001")
+    print("Starting on http://127.0.0.1:8001")
     print("Docs: http://localhost:8001/docs")
     
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8001,
         log_level="info"
     )
