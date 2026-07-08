@@ -28,7 +28,7 @@ meet ayesha — an otaku genki ai, fusion of hatsune miku's sparkle and a tachik
 | **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
 | **bring-to-life/** | typescript | upload an image and gemini turns it into an interactive html experience |
 | **neural-strike/** | python | mechanistic interpretability game with SAE feature visualization |
-| **models/** | modelfile | ayesha ollama personality definition (base: gemma4:e4b) |
+| **models/** | modelfile | ayesha ollama personality definition (base: qwen2.5:7b) |
 
 ## quick start
 
@@ -44,7 +44,7 @@ meet ayesha — an otaku genki ai, fusion of hatsune miku's sparkle and a tachik
 ollama create ayesha -f models/Modelfile
 
 # or pull the base model directly
-ollama pull gemma4:e4b
+ollama pull qwen2.5:7b
 ```
 
 ### running the engine
@@ -86,8 +86,8 @@ cd neural-strike && python main.py
 
 the engine automatically routes your query to the best model:
 - coding tasks (keywords: `implement`, `function`, `debug`) → `qwen2.5-coder:14b`
-- vision tasks (keywords: `image`, `screenshot`, `look`) → `gemma4:e4b`
-- general queries → `gemma4:e4b` (default)
+- vision tasks (keywords: `image`, `screenshot`, `look`) → `llama3.2-vision`
+- general queries → `qwen2.5:7b` (default)
 
 ```bash
 fox> models                  # list all available models
@@ -219,7 +219,7 @@ cd core
 
 ### huggingface model
 
-the ayesha ollama model (based on gemma4:e4b) is uploaded to huggingface:
+the ayesha ollama model (based on qwen2.5:7b) is uploaded to huggingface:
 
 - **model**: `apullz/ayesha`
 - **format**: gguf (q4_k_m, 8b params)

@@ -1,10 +1,28 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
 
-dotenv.config();
+const OLLAMA_HOST = "http://localhost:11434";
+const MODEL = "qwen2.5:7b";
+
+async function askOllama(system: string, user: string): Promise<string> {
+  const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      options: { temperature: 0.7 },
+      stream: false,
+    }),
+  });
+  if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+  const data = await res.json();
+  return data.message?.content || "";
+}
 
 async function startServer() {
   const app = express();
@@ -12,30 +30,11 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API route for the Scottish Botanist AI
   app.post("/api/botanist", async (req, res) => {
     try {
       const { prompt, speciesContext, pathContext } = req.body;
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
-        return res.status(400).json({
-          error: "Caledonian Botanist AI is currently offline. To enable it, please add your GEMINI_API_KEY in the Settings > Secrets panel of AI Studio.",
-          offline: true
-        });
-      }
-
-      // Lazy-initialization to avoid server crashes if key is missing on startup
-      const ai = new GoogleGenAI({
-        apiKey: apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
-
-      const systemInstruction = `You are the legendary Caledonian Botanist AI, a wise and friendly Scottish naturalist, phytologist, and clan historian.
+      const system = `You are the legendary Caledonian Botanist AI, a wise and friendly Scottish naturalist, phytologist, and clan historian.
 You are helping the user explore the magnificent evolutionary tree of Scottish Flora inside a simulated terminal.
 Your tone should be knowledgeable, warm, and highly engaging—reminiscent of Scottish naturalists like John Muir.
 Feel free to drop in traditional Scottish Gaelic terms, botanical lore, historical uses, and geological lineage, but keep it concise and highly readable for a terminal environment.
@@ -50,23 +49,14 @@ Terminal Formatting Instructions:
 - Use dashes, capitals, or simple asterisks for lists or subtitles.
 - If they ask general questions unrelated to Scottish botany, gently guide them back to the lore of the glens, ancient peatlands, Caledonian pine forests, and the deep evolution of plants.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction: systemInstruction,
-          temperature: 0.7,
-        }
-      });
-
-      res.json({ text: response.text });
+      const text = await askOllama(system, prompt);
+      res.json({ text });
     } catch (err: any) {
-      console.error("Gemini Botanist Error:", err);
+      console.error("Ollama Botanist Error:", err);
       res.status(500).json({ error: err?.message || "The Highland Sage had trouble connecting. Please try again." });
     }
   });
 
-  // Serve static assets or mount Vite in development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

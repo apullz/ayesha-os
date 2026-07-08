@@ -24,9 +24,9 @@
     "endpoint": "http://localhost:11434",
     "default_model": "ayesha:latest",
     "models": {
-      "gemma4:e4b": ["general", "tools", "vision", "thinking"],
+      "qwen2.5:7b": ["general", "tools", "thinking"],
       "qwen2.5-coder:14b": ["general", "tools", "coding"],
-      "gemma3:12b": ["general", "vision"],
+      "llama3.2-vision": ["general", "vision"],
       "moondream": ["general", "vision"]
     }
   },

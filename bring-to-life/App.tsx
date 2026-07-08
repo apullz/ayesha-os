@@ -7,7 +7,7 @@ import { Hero } from './components/Hero';
 import { InputArea } from './components/InputArea';
 import { LivePreview } from './components/LivePreview';
 import { CreationHistory, Creation } from './components/CreationHistory';
-import { bringToLife } from './services/gemini';
+import { bringToLife } from './services/ollama';
 import { ArrowUpTrayIcon } from '@heroicons/react/24/solid';
 
 const App: React.FC = () => {
@@ -19,7 +19,7 @@ const App: React.FC = () => {
   // Load history from local storage or fetch examples on mount
   useEffect(() => {
     const initHistory = async () => {
-      const saved = localStorage.getItem('gemini_app_history');
+      const saved = localStorage.getItem('bring_to_life_history');
       let loadedHistory: Creation[] = [];
 
       if (saved) {
@@ -71,7 +71,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (history.length > 0) {
         try {
-            localStorage.setItem('gemini_app_history', JSON.stringify(history));
+            localStorage.setItem('bring_to_life_history', JSON.stringify(history));
         } catch (e) {
             console.warn("Local storage full or error saving history", e);
         }

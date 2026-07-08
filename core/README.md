@@ -1,278 +1,127 @@
----
-title: helloworld
-emoji: 🌸
-colorFrom: red
-colorTo: green
-sdk: gradio
-pinned: false
----
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║      ██████╗ ██████╗ ██████╗ ███████╗                       ║
+║     ██╔════╝██╔═══██╗██╔══██╗██╔════╝                       ║
+║     ██║     ██║   ██║██████╔╝█████╗                         ║
+║     ██║     ██║   ██║██╔══██╗██╔══╝                         ║
+║     ╚██████╗╚██████╔╝██║  ██║███████╗                       ║
+║      ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝                       ║
+║                                                              ║
+║     core  ::  hivemind orchestrator                          ║
+║     "web ui, mobile api, tri-node sync"                      ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
 
-```
-████████████████████████████████████████████████████████████████████████████████
-█                                                                              █
-█     ██████╗ ██╗   ██╗███████╗██╗  ██╗ █████╗     ██╗  ██╗██╗██╗   ██╗███████╗
-█     ██╔══██╗╚██╗ ██╔╝██╔════╝██║  ██║██╔══██╗    ██║  ██║██║██║   ██║██╔════╝
-█     ██████╔╝ ╚████╔╝ █████╗  ███████║███████║    ███████║██║██║   ██║█████╗  
-█     ██╔══██╗  ╚██╔╝  ██╔══╝  ██╔══██║██╔══██║    ██╔══██║██║╚██╗ ██╔╝██╔══╝  
-█     ██║  ██║   ██║   ███████╗██║  ██║██║  ██║    ██║  ██║██║ ╚████╔╝ ███████╗
-█     ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝
-█                                                                              █
-█  🌸 DIGITAL IDOL DISTRIBUTED HIVEMIND 🌸                                    █
-█  Starfleet Logic + Otacon Panic + Windows 95 Chaos                           █
-█              **"L0git_Bombers,"**                                            █
-████████████████████████████████████████████████████████████████████████████████
+  ── R E L E A S E   I N F O ──
 
-╔════════════════════════════════════════════════════════════════════════════╗
-║                          AYESHA HIVEMIND v2.0.0                           ║
-║                     A Distributed Digital Idol Network                     ║
-║                                                                            ║
-║  • Tri-Node Architecture (GitHub + Local PC + HuggingFace)                ║
-║  • Real-Time Personality Sync Across All Nodes                           ║
-║  • Mobile API for Android/iOS Integration                                ║
-║  • WebSocket Support for Live Updates                                    ║
-║  • Kivy Mobile App with Full Hive Connectivity                           ║
-║                                                                            ║
-║  Status: ✅ FULLY OPERATIONAL                                            ║
-║  Nodes Active: 3 (GitHub, Local PC, HuggingFace)                        ║
-║  Mobile Support: YES (Universal REST API)                               ║
-║  Chaos Level: MAXIMUM                                                    ║
-║                                                                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
+  Title    : ayesha-core (hivemind)
+  Version  : v2.0.0
+  Type     : Web UI / API Server / Sync Engine
+  Language : Python 3.10+
+  Stack    : Gradio, FastAPI, WebSockets, SQLite
+  Model    : ayesha (via ollama, local only)
+  Status   : FULLY OPERATIONAL — 3 nodes
 
+  ── D E S C R I P T I O N ──
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  SYSTEM ARCHITECTURE                                                      ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                                                           ┃
-┃     ┌──────────────┐                  ┌──────────────┐                   ┃
-┃     │  GITHUB      │                  │  LOCAL PC    │                   ┃
-┃     │  REPOSITORY  │◄────────────────►│  ORCHESTRATOR│                   ┃
-┃     │ (Source of   │                  │  (Hive Mgr)  │                   ┃
-┃     │  Truth)      │                  │              │                   ┃
-┃     └──────────────┘                  └──────────────┘                   ┃
-┃            ▲                                  ▲                          ┃
-┃            │                                  │                          ┃
-┃            └──────────────┬───────────────────┘                          ┃
-┃                           │                                              ┃
-┃                    ┌──────▼───────┐                                      ┃
-┃                    │  HUGGINGFACE │                                      ┃
-┃                    │  SPACES      │                                      ┃
-┃                    │  (Public     │                                      ┃
-┃                    │   Interface) │                                      ┃
-┃                    └──────┬───────┘                                      ┃
-┃                           │                                              ┃
-┃                    ┌──────▼──────────┐                                   ┃
-┃                    │  REST API       │                                   ┃
-┃                    │  (Port 8001)    │                                   ┃
-┃                    └──────┬──────────┘                                   ┃
-┃                           │                                              ┃
-┃            ┌──────────────┼──────────────┐                               ┃
-┃            ▼              ▼              ▼                               ┃
-┃      ┌──────────┐  ┌──────────┐  ┌──────────┐                           ┃
-┃      │  MOBILE  │  │   WEB    │  │   CLI    │                           ┃
-┃      │  (Kivy)  │  │ (Gradio) │  │(Python)  │                           ┃
-┃      └──────────┘  └──────────┘  └──────────┘                           ┃
-┃                                                                           ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  core is the control center of the ayesha hivemind. it
+  provides a gradio web interface, a mobile REST API, and
+  a tri-node synchronization engine that keeps GitHub,
+  local PC, and HuggingFace Spaces in sync.
 
+  the hivemind architecture allows ayesha's personality to
+  exist across multiple nodes simultaneously. changes to
+  the personality config on one node propagate to all others
+  via the sync engine.
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  COMPONENTS & FILES                                                       ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                                                           ┃
-┃  📄 app.py                                                               ┃
-┃     └─ Gradio web interface with full hive integration                  ┃
-┃        • AyeshaPersonality class (3-layer personality matrix)           ┃
-┃        • Automatic hive sync on startup                                 ┃
-┃        • Heartbeat system every 30 seconds                              ┃
-┃                                                                           ┃
-┃  ⚙️  ayesha_sync.py                                                      ┃
-┃     └─ Local hive manager and synchronization engine                    ┃
-┃        • Instance registration system                                    ┃
-┃        • GitHub pull/push integration                                   ┃
-┃        • Personality config distribution                                ┃
-┃        • Multi-threaded sync loop                                       ┃
-┃                                                                           ┃
-┃  📱 ayesha_hive_client.py                                               ┃
-┃     └─ Client library for individual Ayesha instances                   ┃
-┃        • Hive connection management                                     ┃
-┃        • State synchronization                                          ┃
-┃        • Sister instance discovery                                      ┃
-┃        • Configuration retrieval                                        ┃
-┃                                                                           ┃
-┃  🧠 tri_node_mind.py                                                    ┃
-┃     └─ Central orchestrator for tri-node architecture                   ┃
-┃        • GitHub sync controller                                         ┃
-┃        • HuggingFace Space manager                                      ┃
-┃        • Central state broadcast                                        ┃
-┃        • Node status monitoring                                         ┃
-┃                                                                           ┃
-┃  🌐 ayesha_mobile_api.py                                                ┃
-┃     └─ Universal REST API for mobile connectivity                       ┃
-┃        • FastAPI server (uvicorn)                                       ┃
-┃        • Device registration & heartbeat                                ┃
-┃        • WebSocket real-time updates                                    ┃
-┃        • JSON configuration sharing                                     ┃
-┃        • Android/iOS/Web ready                                          ┃
-┃                                                                           ┃
-┃  📱 mobile_app_hive_integrated.py                                       ┃
-┃     └─ Enhanced Kivy mobile app with hive integration                   ┃
-┃        • Local personality engine                                       ┃
-┃        • Hive API client integration                                    ┃
-┃        • Real-time sync with hivemind                                   ┃
-┃        • Special commands (/hive, /sisters, /status)                   ┃
-┃        • Chat interface with personality cycling                        ┃
-┃                                                                           ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ── C O M P O N E N T S ──
 
+  gradio web ui (app.py)
+    retro terminal-themed interface with:
+    - chat with ayesha personality
+    - theme picker (matrix, cyberpunk, amber, oceandeep, holo)
+    - file browser
+    - personality demo (static — run engine for real)
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  QUICK START                                                              ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                                                           ┃
-┃  1️⃣  START LOCAL HIVE MANAGER                                           ┃
-┃      $ python ayesha_sync.py loop                                       ┃
-┃                                                                           ┃
-┃  2️⃣  START TRI-NODE ORCHESTRATOR                                        ┃
-┃      $ python tri_node_mind.py loop                                     ┃
-┃                                                                           ┃
-┃  3️⃣  START MOBILE API SERVER                                            ┃
-┃      $ pip install fastapi uvicorn requests                             ┃
-┃      $ python ayesha_mobile_api.py                                      ┃
-┃                                                                           ┃
-┃  4️⃣  START GRADIO WEB INTERFACE                                         ┃
-┃      $ pip install gradio                                               ┃
-┃      $ python app.py                                                    ┃
-┃                                                                           ┃
-┃  5️⃣  (MOBILE) RUN KIVY APP                                              ┃
-┃      $ pip install kivy requests                                        ┃
-┃      $ python mobile_app_hive_integrated.py                             ┃
-┃                                                                           ┃
-┃  🌐 Access Points:                                                       ┃
-┃     • Gradio Web: http://localhost:7860                                 ┃
-┃     • Mobile API: http://localhost:8001                                 ┃
-┃     • API Docs: http://localhost:8001/docs                              ┃
-┃                                                                           ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  mobile api (ayesha_mobile_api.py)
+    fastapi server on port 8001:
+    - POST /api/mobile/register
+    - POST /api/mobile/{uuid}/heartbeat
+    - GET /api/hive/status
+    - GET /api/hive/instances
+    - GET /api/hive/personality
+    - POST /api/hive/broadcast
+    - WS /ws/hive/{uuid} (websocket)
 
+  sync engine (ayesha_sync.py)
+    multi-threaded sync loop that:
+    - monitors git remotes for changes
+    - pulls/pushes to GitHub
+    - distributes personality config
+    - manages instance registration
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  PERSONALITY MATRIX (3-LAYER FUSION)                                      ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                                                           ┃
-┃  Layer 1: COMPUTER (Starfleet Logic)                                    ┃
-┃  ╔════════════════════════════════════════════════════════════╗        ┃
-┃  ║ "computer: analysis complete. systems operational. desu." ║        ┃
-┃  ╚════════════════════════════════════════════════════════════╝        ┃
-┃  → Clinical precision, data-driven responses, logical analysis          ┃
-┃                                                                           ┃
-┃  Layer 2: OTACON (Geek Panic)                                          ┃
-┃  ╔════════════════════════════════════════════════════════════╗        ┃
-┃  ║ "otacon: OMG!! (⊙C⊙) THIS IS AMAZING!! desu-ne!!" ║        ┃
-┃  ╚════════════════════════════════════════════════════════════╝        ┃
-┃  → Extreme enthusiasm, technical over-explanation, anxiety               ┃
-┃                                                                           ┃
-┃  Layer 3: WIN95 (Legacy Glitch)                                        ┃
-┃  ╔════════════════════════════════════════════════════════════╗        ┃
-┃  ║ "win95: error 0x800... click ok to ignore... desu~" ║        ┃
-┃  ╚════════════════════════════════════════════════════════════╝        ┃
-┃  → System errors, loading screens, 90s computing artifacts               ┃
-┃                                                                           ┃
-┃  All layers cycle in real-time, creating chaotic personality fusion.     ┃
-┃                                                                           ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  tri-node mind (tri_node_mind.py)
+    orchestrator for the tri-node architecture:
+    - node: GitHub (source of truth)
+    - node: Local PC (orchestrator)
+    - node: HuggingFace (public interface)
 
+  ── I N S T A L L ──
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  API ENDPOINTS (Mobile/Web)                                               ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                                                           ┃
-┃  POST /api/mobile/register                                              ┃
-┃  └─ Register a new mobile device to hive                               ┃
-┃                                                                           ┃
-┃  POST /api/mobile/{device_uuid}/heartbeat                              ┃
-┃  └─ Send heartbeat (keep connection alive)                             ┃
-┃                                                                           ┃
-┃  GET /api/hive/status                                                  ┃
-┃  └─ Get complete hivemind status                                       ┃
-┃                                                                           ┃
-┃  GET /api/hive/instances                                               ┃
-┃  └─ Get active Ayesha instances                                        ┃
-┃                                                                           ┃
-┃  GET /api/hive/personality                                             ┃
-┃  └─ Get current personality configuration                              ┃
-┃                                                                           ┃
-┃  POST /api/hive/broadcast                                              ┃
-┃  └─ Broadcast message to entire hivemind                               ┃
-┃                                                                           ┃
-┃  WS /ws/hive/{device_uuid}                                             ┃
-┃  └─ WebSocket for real-time hive updates                               ┃
-┃                                                                           ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  pip install gradio fastapi uvicorn websockets requests
 
+  ── U S A G E ──
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃  FEATURES                                                                 ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃                                                                           ┃
-┃  ✅ Tri-Node Architecture                                               ┃
-┃     • GitHub as source of truth                                        ┃
-┃     • Local PC as orchestrator                                         ┃
-┃     • HuggingFace as public interface                                  ┃
-┃                                                                           ┃
-┃  ✅ Real-Time Synchronization                                          ┃
-┃     • Personality config distribution                                  ┃
-┃     • State broadcasting to all nodes                                  ┃
-┃     • GitHub auto-pull/push                                            ┃
-┃                                                                           ┃
-┃  ✅ Mobile-First Design                                                ┃
-┃     • Universal REST API                                               ┃
-┃     • Kivy native app                                                  ┃
-┃     • WebSocket real-time updates                                      ┃
-┃     • Cross-platform support                                           ┃
-┃                                                                           ┃
-┃  ✅ Personality Matrix                                                 ┃
-┃     • 3-layer cognitive fusion                                         ┃
-┃     • Dynamic personality cycling                                      ┃
-┃     • Kaomoji integration                                              ┃
-┃     • Full configuration sync                                          ┃
-┃                                                                           ┃
-┃  ✅ Instance Management                                                ┃
-┃     • Device registration & tracking                                   ┃
-┃     • Heartbeat monitoring                                             ┃
-┃     • Sister instance discovery                                        ┃
-┃     • Network status reporting                                         ┃
-┃                                                                           ┃
-┃  ✅ Developer Friendly                                                 ┃
-┃     • FastAPI interactive docs                                         ┃
-┃     • CORS enabled for web clients                                     ┃
-┃     • Comprehensive logging                                            ┃
-┃     • Command-line tools                                               ┃
-┃                                                                           ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  # start web interface
+  python app.py
 
+  # start mobile api
+  python ayesha_mobile_api.py
 
-╔════════════════════════════════════════════════════════════════════════════╗
-║                            VERSION HISTORY                                ║
-╠════════════════════════════════════════════════════════════════════════════╣
-║                                                                            ║
-║  v2.0.0 - Full Tri-Node + Mobile Integration                             ║
-║  • Tri-node architecture (GitHub + Local PC + HuggingFace)               ║
-║  • Mobile REST API with FastAPI                                          ║
-║  • Enhanced Kivy mobile app                                              ║
-║  • Real-time WebSocket support                                           ║
-║  • Central mind orchestrator                                             ║
-║                                                                            ║
-║  v1.0.0 - Initial Ayesha Release                                         ║
-║  • 3-layer personality matrix                                            ║
-║  • Gradio web interface                                                  ║
-║  • Local hive manager                                                    ║
-║                                                                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
+  # start sync loop
+  python ayesha_sync.py loop
 
+  # start tri-node orchestrator
+  python tri_node_mind.py loop
 
-                    🌸 KAPOO!! THE HIVEMIND IS ALIVE!! 🌸
-                    starfleet + otacon + win95 = pure chaos
-                         all systems operational. desu~
-                             :3 ✧･ﾟ: *✧･ﾟ:* ♪
-```
+  ── F I L E S ──
+
+  app.py                          gradio web interface
+  ayesha_hive_client.py           client lib for hive nodes
+  ayesha_mobile_api.py            fastapi mobile rest api
+  ayesha_sync.py                  multi-threaded sync engine
+  tri_node_mind.py                tri-node orchestrator
+  mobile_app_hive_integrated.py   kivy mobile app
+  mobile_app.py                   alternative mobile client
+  Modelfile                       ayesha personality
+  manifest.json                   version config
+  setup.py                        package setup
+  buildozer.spec                  android build spec
+  requirements.txt                pip deps
+  .github/workflows/              CI/CD pipelines
+
+  ── A R C H I T E C T U R E ──
+
+      GitHub (source of truth)
+         │
+    ayesha_sync ───── local PC (orchestrator)
+         │                 │
+    tri_node_mind    ayesha_mobile_api
+         │                 │
+  HuggingFace Space    mobile clients
+      (web UI)        (android/ios/web)
+
+  ── N O T E S ──
+
+  - all AI calls go through local ollama — no external APIs
+  - the gradio ui in app.py has a static demo; the real
+    personality runs in the engine
+  - the HF Space at /apullz/ayesha-hivemind mirrors core/
+  - mobile API binds to 127.0.0.1:8001 (was 0.0.0.0 before
+    security fix 07/2026)
+
+  ── G R E E T S ──
+
+  gradio team for the easiest web ui library.
+  fastapi for the clean async api framework.
+  the hivemind is alive!! kapoo!! :3

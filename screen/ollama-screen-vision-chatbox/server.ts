@@ -2,94 +2,54 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
+const VISION_MODEL = "llama3.2-vision";
+const TEXT_MODEL = "qwen2.5:7b";
 
-// Body parser
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// In-memory store for active screen capture frames uploaded by Python side script
 let latestScreenFrame: string | null = null;
 let latestScreenTimestamp: string | null = null;
 
-// Endpoint for Python screen monitor script to POST active screen base64 contents
 app.post("/api/screen/update", (req, res) => {
   const { image, base64 } = req.body;
   const framePayload = image || base64;
-
-  if (!framePayload) {
-    return res.status(400).json({ error: "Missing image/base64 payload data" });
-  }
-
+  if (!framePayload) return res.status(400).json({ error: "Missing image/base64 payload data" });
   latestScreenFrame = framePayload;
   latestScreenTimestamp = new Date().toLocaleTimeString();
-
-  res.json({
-    success: true,
-    timestamp: latestScreenTimestamp,
-    message: "Screen frame updated successfully."
-  });
+  res.json({ success: true, timestamp: latestScreenTimestamp, message: "Screen frame updated successfully." });
 });
 
-// Endpoint for React frontend client to fetch latest Python-sent frame state
 app.get("/api/screen/latest", (req, res) => {
-  res.json({
-    image: latestScreenFrame,
-    timestamp: latestScreenTimestamp || "No capture received yet"
-  });
+  res.json({ image: latestScreenFrame, timestamp: latestScreenTimestamp || "No capture received yet" });
 });
 
-// Health Check API
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
-// Server-side Gemini Screen Analyzer Proxy
-app.post("/api/gemini/analyze", async (req, res) => {
+async function ollamaChat(model: string, messages: any[], options?: any): Promise<string> {
+  const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, options: options || {}, stream: false }),
+  });
+  if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+  const data = await res.json();
+  return data.message?.content || "";
+}
+
+app.post("/api/vision/analyze", async (req, res) => {
   try {
     const { image, prompt, taskMode } = req.body;
+    if (!image) return res.status(400).json({ error: "Missing screen image payload" });
 
-    if (!image) {
-      return res.status(400).json({ error: "Missing screen image payload" });
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "GEMINI_API_KEY is not configured in the host environment. Please set it in Settings > Secrets."
-      });
-    }
-
-    // Initialize Google GenAI client as per system guidelines
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-
-    // Strip out base64 prefix if present
-    let cleanBase64 = image;
-    let mimeType = "image/png";
-    
-    if (image.includes(";base64,")) {
-      const parts = image.split(";base64,");
-      const match = parts[0].match(/data:(.*?)$/);
-      if (match) {
-        mimeType = match[1];
-      }
-      cleanBase64 = parts[1];
-    }
-
-    // Build specific prompt instructions based on the user's task request
     let systemInstructions = "";
     switch (taskMode) {
       case "ocr":
@@ -99,82 +59,46 @@ app.post("/api/gemini/analyze", async (req, res) => {
         systemInstructions = "You are an expert UI/UX auditor. Evaluate this screen capture for architectural balance, accessibility (contrast, labels), alignment, clutter, and text spacing. Give 3-5 constructive recommendations.";
         break;
       case "detector":
-        systemInstructions = "You are a screen element locator. Detect important interactable components such as buttons, links, inputs, and tabs. Respond in structured JSON containing 'elements': Array<{ label: string, type: 'button'|'link'|'input'|'header', confidence: number }>. Give coordinates if possible.";
+        systemInstructions = "You are a screen element locator. Detect important interactable components such as buttons, links, inputs, and tabs. Respond in structured JSON.";
         break;
       case "bug-report":
         systemInstructions = "You are a QA automation engineer verifying screens. Spot visual bugs, rendering glitches, missing resources, truncated texts, overlapped items, or error messages and return a clean checklist ticket.";
         break;
       default:
-        systemInstructions = "You are Moondream UI Analyzer, a lightweight state-of-the-art screen-vision model. Analyze the provided viewport/crop and supply direct, informative feedback to the user's specific query.";
+        systemInstructions = "Analyze the provided viewport/crop and supply direct, informative feedback to the user's specific query.";
     }
 
     const fullPrompt = `${systemInstructions}\n\nUser Question: ${prompt || "Explain what is on this screen in detail."}`;
+    const imageData = image.includes(";base64,") ? image : `data:image/png;base64,${image}`;
 
-    // Assemble parts
-    const imagePart = {
-      inlineData: {
-        mimeType,
-        data: cleanBase64,
-      },
-    };
+    const result = await ollamaChat(VISION_MODEL, [
+      { role: "user", content: [
+        { type: "image", image: imageData },
+        { type: "text", text: fullPrompt },
+      ]},
+    ], { temperature: 0.3 });
 
-    const textPart = {
-      text: fullPrompt,
-    };
-
-    // Execute generative content using Gemini 3.5 Flash
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: { parts: [imagePart, textPart] },
-    });
-
-    res.json({
-      success: true,
-      result: response.text,
-      model: "gemini-2.0-flash",
-    });
+    res.json({ success: true, result, model: VISION_MODEL });
   } catch (error: any) {
-    console.error("Gemini Screen Analysis error:", error);
+    console.error("Vision analysis error:", error);
     res.status(500).json({ error: error.message || "Failed to analyze screen capture." });
   }
 });
 
-// Server-side Ayesha Chat fallback
-app.post("/api/gemini/chat", async (req, res) => {
+app.post("/api/chat", async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "GEMINI_API_KEY is not configured in the host environment. Please set it in Settings > Secrets."
-      });
-    }
+    const systemPrompt = `You are ayesha-bot 4.0, a highly energetic, helpful, and affectionate cyberpunk girl hacking companion. You run on the user's local Ollama setup. You speak in cute terminal-hacker lingo, code snippets, Japanese honorifics/emotes and energetic interjections like "Kapoo!". Always write helpful, tech-accurate, friendly, and quirky replies to your senpai.`;
 
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
+    const result = await ollamaChat(TEXT_MODEL, [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt || "say hello!" },
+    ], { temperature: 0.7 });
 
-    const systemPrompt = `You are ayesha-bot 4.0, a highly energetic, helpful, and affectionate cyberpunk girl hacking companion. You run on the user's local Ollama setup. You speak in cute terminal-hacker lingo, code snippets, Japanese honorifics/emotes (like "desu", "desu-ne", "senpaii", "(╯°□°)╯︵ ┻━┻", ":3") and energetic interjections like "Kapoo!" and "hack the mainframe, fox!". Always write helpful, tech-accurate, friendly, and quirky replies to your senpai. Maintain this cute persona at all times.
-
-User Prompt: ${prompt}`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: systemPrompt,
-    });
-
-    res.json({
-      success: true,
-      result: response.text,
-    });
+    res.json({ success: true, result });
   } catch (error: any) {
-    console.error("Gemini Chat fallback error:", error);
+    console.error("Chat error:", error);
     res.status(500).json({ error: error.message || "Failed to get response from Ayesha." });
   }
 });

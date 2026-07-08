@@ -1,13 +1,6 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
-*/
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-
-// Using gemini-2.5-pro for complex coding tasks.
-const GEMINI_MODEL = 'gemini-3-pro-preview';
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const OLLAMA_HOST = "http://localhost:11434";
+const TEXT_MODEL = "qwen2.5:7b";
+const VISION_MODEL = "llama3.2-vision";
 
 const SYSTEM_INSTRUCTION = `You are an expert AI Engineer and Product Designer specializing in "bringing artifacts to life".
 Your goal is to take a user uploaded file—which might be a polished UI design, a messy napkin sketch, a photo of a whiteboard with jumbled notes, or a picture of a real-world object (like a messy desk)—and instantly generate a fully functional, interactive, single-page HTML/JS/CSS application.
@@ -30,47 +23,57 @@ CORE DIRECTIVES:
 5. **Robust & Creative**: If the input is messy or ambiguous, generate a "best guess" creative interpretation. Never return an error. Build *something* fun and functional.
 
 RESPONSE FORMAT:
-Return ONLY the raw HTML code. Do not wrap it in markdown code blocks (\`\`\`html ... \`\`\`). Start immediately with <!DOCTYPE html>.`;
+Return ONLY the raw HTML code. Do not wrap it in markdown code blocks. Start immediately with <!DOCTYPE html>.`;
+
+interface OllamaGenerateResponse {
+  response: string;
+  done: boolean;
+}
 
 export async function bringToLife(prompt: string, fileBase64?: string, mimeType?: string): Promise<string> {
-  const parts: any[] = [];
-  
-  // Strong directive for file-only inputs with emphasis on NO external images
-  const finalPrompt = fileBase64 
-    ? "Analyze this image/document. Detect what functionality is implied. If it is a real-world object (like a desk), gamify it (e.g., a cleanup game). Build a fully interactive web app. IMPORTANT: Do NOT use external image URLs. Recreate the visuals using CSS, SVGs, or Emojis." 
-    : prompt || "Create a demo app that shows off your capabilities.";
-
-  parts.push({ text: finalPrompt });
-
-  if (fileBase64 && mimeType) {
-    parts.push({
-      inlineData: {
-        data: fileBase64,
-        mimeType: mimeType,
-      },
-    });
-  }
-
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: {
-        parts: parts
-      },
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.5, // Higher temperature for more creativity with mundane inputs
-      },
+    const finalPrompt = fileBase64
+      ? `Analyze this image/document. Detect what functionality is implied. If it is a real-world object (like a desk), gamify it (e.g., a cleanup game). Build a fully interactive web app. IMPORTANT: Do NOT use external image URLs. Recreate the visuals using CSS, SVGs, or Emojis.`
+      : prompt || "Create a demo app that shows off your capabilities.";
+
+    const model = fileBase64 ? VISION_MODEL : TEXT_MODEL;
+    const messages: any[] = [{ role: "system", content: SYSTEM_INSTRUCTION }];
+
+    if (fileBase64 && mimeType) {
+      messages.push({
+        role: "user",
+        content: [
+          { type: "image", image: `data:${mimeType};base64,${fileBase64}` },
+          { type: "text", text: finalPrompt },
+        ],
+      });
+    } else {
+      messages.push({ role: "user", content: finalPrompt });
+    }
+
+    const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages,
+        options: { temperature: 0.5 },
+        stream: false,
+      }),
     });
 
-    let text = response.text || "<!-- Failed to generate content -->";
+    if (!res.ok) {
+      throw new Error(`ollama returned ${res.status}`);
+    }
 
-    // Cleanup if the model still included markdown fences despite instructions
-    text = text.replace(/^```html\s*/, '').replace(/^```\s*/, '').replace(/```$/, '');
+    const data = await res.json();
+    let text: string = data.message?.content || "<!-- Failed to generate content -->";
+
+    text = text.replace(/^```html\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "");
 
     return text;
   } catch (error) {
-    console.error("Gemini Generation Error:", error);
+    console.error("Ollama Generation Error:", error);
     throw error;
   }
 }

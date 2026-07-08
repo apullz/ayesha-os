@@ -37,3 +37,7 @@ Thumbs.db
 *.dll
 *.pdb
 *.o
+
+# HF repo clones (gitignored — pushed separately by sync-all.ps1)
+_hf-model/
+_hf-space/

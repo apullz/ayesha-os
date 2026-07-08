@@ -60,14 +60,13 @@ impl ModelRegistry {
     fn known_models() -> Vec<ModelProfile> {
         vec![
             ModelProfile {
-                name: "gemma4:e4b".into(),
+                name: "qwen2.5:7b".into(),
                 capabilities: vec![
                     Capability::General,
                     Capability::Tools,
-                    Capability::Vision,
                     Capability::Thinking,
                 ],
-                context_length: 8192,
+                context_length: 32768,
             },
             ModelProfile {
                 name: "qwen2.5-coder:14b".into(),
@@ -79,7 +78,7 @@ impl ModelRegistry {
                 context_length: 32768,
             },
             ModelProfile {
-                name: "gemma3:12b".into(),
+                name: "llama3.2-vision".into(),
                 capabilities: vec![Capability::General, Capability::Vision],
                 context_length: 8192,
             },
@@ -129,12 +128,11 @@ impl ModelRegistry {
         if lower.contains("vision") || lower.contains("moondream") || lower.contains("llava") {
             caps.push(Capability::Vision);
         }
-        if lower.contains("gemma4") || lower.contains("ayesha") {
-            caps.push(Capability::Vision);
+        if lower.contains("ayesha") {
             caps.push(Capability::Tools);
             caps.push(Capability::Thinking);
         }
-        if lower.contains("gemma3") {
+        if lower.contains("gemma") || lower.contains("llava") {
             caps.push(Capability::Vision);
         }
         if lower.contains("deepseek") || lower.contains("r1") {

@@ -306,24 +306,10 @@ ${foundSpecies.asciiArt || ""}
         return { output: "\x1b[31mask: What would you like to ask the Caledonian Botanist? Example: ask Tell me about rowan saining rituals.\x1b[0m" };
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
-        return {
-          output: `
-\x1b[33mCaledonian Botanist AI is currently offline.\x1b[0m
-To enable it in your local terminal, please set your \x1b[1mGEMINI_API_KEY\x1b[0m environment variable.
-Example:
-  \x1b[36mexport GEMINI_API_KEY="your_api_key_here"\x1b[0m
-Or create a \x1b[36m.env\x1b[0m file in this folder with:
-  \x1b[36mGEMINI_API_KEY=your_api_key_here\x1b[0m
-`
-        };
-      }
-
       console.log("\x1b[33mThe Caledonian Botanist Sage is cogitating...\x1b[0m");
 
       try {
-        const systemInstruction = `You are the legendary Caledonian Botanist AI, a wise and friendly Scottish naturalist, phytologist, and clan historian.
+        const system = `You are the legendary Caledonian Botanist AI, a wise and friendly Scottish naturalist, phytologist, and clan historian.
 You are helping the user explore the magnificent evolutionary tree of Scottish Flora inside a terminal application.
 Your tone should be knowledgeable, warm, and highly engaging—reminiscent of Scottish naturalists like John Muir.
 Feel free to drop in traditional Scottish Gaelic terms, botanical lore, historical uses, and geological lineage, but keep it concise and highly readable for a terminal environment.
@@ -338,42 +324,23 @@ Terminal Formatting Instructions:
 - Use dashes, capitals, or simple asterisks for lists or subtitles.
 - If they ask general questions unrelated to Scottish botany, gently guide them back to the lore of the glens, ancient peatlands, Caledonian pine forests, and the deep evolution of plants.`;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
+        const res = await fetch("http://localhost:11434/api/chat", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: question,
-                  },
-                ],
-              },
+            model: "qwen2.5:7b",
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: question },
             ],
-            systemInstruction: {
-              parts: [
-                {
-                  text: systemInstruction,
-                },
-              ],
-            },
-            generationConfig: {
-              temperature: 0.7,
-            },
+            options: { temperature: 0.7 },
+            stream: false,
           }),
         });
 
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`API Error (HTTP ${response.status}): ${errText}`);
-        }
-
-        const data = (await response.json()) as any;
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "The sage was silent.";
+        if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+        const data = await res.json();
+        const text = data.message?.content || "The sage was silent.";
 
         return { output: `\n\x1b[1;33mTHE CALEDONIAN BOTANIST SAGE COGITATES:\x1b[0m\n\n${text}\n` };
       } catch (err: any) {

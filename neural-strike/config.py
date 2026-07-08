@@ -7,15 +7,8 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 EXPORTS_DIR = os.path.join(DATA_DIR, "exports")
 DB_PATH = os.path.join(DATA_DIR, "neural_strike.db")
 
-# Neuronpedia API
-NEURONPEDIA_BASE = "https://www.neuronpedia.org"
-NEURONPEDIA_API = f"{NEURONPEDIA_BASE}/api"
+# Model config (local-only — pre-download data to data/exports/)
 MODEL_ID = "gemma-2-2b"
-SAE_ID = "gemmascope-transcoder-16k"
-
-# S3 Exports
-NEURONPEDIA_S3 = "https://neuronpedia-datasets.s3.us-east-1.amazonaws.com"
-EXPORTS_PREFIX = f"{NEURONPEDIA_S3}/v1/{MODEL_ID}"
 
 # Visualization
 WINDOW_WIDTH = 1400

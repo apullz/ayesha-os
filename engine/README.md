@@ -1,85 +1,164 @@
-# ayesha-engine
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║     ███████╗ ███╗   ██╗ ██████╗ ██╗███╗   ██╗███████╗      ║
+║     ██╔════╝ ████╗  ██║██╔════╝ ██║████╗  ██║██╔════╝      ║
+║     █████╗   ██╔██╗ ██║██║  ███╗██║██╔██╗ ██║█████╗        ║
+║     ██╔══╝   ██║╚██╗██║██║   ██║██║██║╚██╗██║██╔══╝        ║
+║     ███████╗ ██║ ╚████║╚██████╔╝██║██║ ╚████║███████╗      ║
+║     ╚══════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚══════╝      ║
+║                                                              ║
+║     engine  ::  v4.2.0                                       ║
+║     "terminal-native persona host with tool-calling"         ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
 
-terminal-native persona host with tool-calling for ollama.
+  ── R E L E A S E   I N F O ──
 
-## features
+  Title    : ayesha-engine
+  Version  : v4.2.0
+  Type     : CLI AI Agent / Persona Host
+  Language : Rust (edition 2021)
+  Model    : ollama + qwen2.5:7b (default)
+  Features : streaming, thinking blocks, model routing,
+             tool execution, command palette, retro UI
+  Build    : stable-x86_64-pc-windows-gnu
 
-- connects to local ollama model `ayesha`
-- tool-calling agent loop (read/write/list files)
-- generates interactive HTML apps from prompts
-- sandboxed file access (restricted to workspace)
-- colored terminal output with ayesha's personality
+  ── D E S C R I P T I O N ──
 
-## requirements
+  the engine is the central CLI interface of ayesha-os. it
+  connects to a local ollama instance, routes user queries to
+  the best model, streams responses token-by-token with a
+  retro cyberpunk typewriter effect, detects <think> reasoning
+  blocks mid-stream, and supports real-time steering (type
+  during generation to interrupt and redirect).
 
-- [rust](https://rustup.rs/) (installed)
-- [ollama](https://ollama.ai/) running on localhost:11434
-- `ayesha` model pulled (`ollama pull ayesha`)
+  key features:
 
-## build
+  * TRUE STREAMING — tokens print as they arrive from ollama,
+    no artificial delays. <think> blocks render dimmed.
 
-```bash
-cargo build --release
-```
+  * MODEL ROUTING — auto-detects coding/vision queries and
+    routes to the optimal model. manual /model override.
 
-## run
+  * TOOL EXECUTION — model can call tools: read_file,
+    write_file, list_dir, generate_html, generate_sprite,
+    remember/search_memories, analyze_self, evolve_tools,
+    refine_prompt.
 
-```bash
-# via batch file
-run.bat
+  * COMMAND PALETTE — type / alone to see all commands overlayed
+    on the terminal. /help, /clear, /model, /auto, /stats,
+    /memory, /analyze, /evolve, /refine, /name, etc.
 
-# or directly
-target\release\ayesha-engine.exe
-```
+  * SLASH COMMANDS — /name <you> changes the stored user name
+    live. /route <query> routes one query manually.
 
-## commands
+  * SELF-IMPROVEMENT — the engine can read its own source code
+    and suggest improvements, evolve new tools, and refine
+    its system prompt based on usage patterns.
 
-| command | description |
-|---------|-------------|
-| `help` | show available commands |
-| `clear` | clear the screen |
-| `model` | show current model |
-| `model <name>` | switch to a different model |
-| `exit` | quit the application |
+  * RETRO CYBERPUNK UI — green-on-black theme, box-drawing
+    borders (┌─┐│└┘), ◆▶✔✖ symbols, per-line rainbow ASCII
+    banner on startup.
 
-## tools
+  * USER NAME INJECTION — stored in config.json, injected into
+    the system prompt. model is told to use it occasionally
+    (not every message).
 
-ayesha can use these tools when you ask her to:
+  ── B U I L D   R E Q U I R E M E N T S ──
 
-- `read_file(path)` - read a file's contents
-- `write_file(path, content)` - write content to a file
-- `list_dir(path)` - list directory contents
-- `generate_html(prompt, path)` - generate an interactive HTML app
+  Rust 1.80+ (stable)
+  ollama running on localhost:11434
+  models pulled: qwen2.5:7b (min), plus opt. qwen2.5-coder:14b
 
-## examples
+  ── I N S T A L L ──
 
-```
-fox > read the file src/main.rs
-fox > list files in the current directory
-fox > create a todo list app and save it to output/todo.html
-fox > what's in the config folder?
-```
+  cargo run --release
+  # or use the prebuilt binary in target/release/
 
-## architecture
+  config.json is created on first run. edit user_name field
+  or use /name <you> in-app.
 
-```
-main.rs      - entry point + agent loop
-ollama.rs    - ollama API client + tool definitions
-tools.rs     - tool execution (file I/O, HTML generation)
-sandbox.rs   - path sandboxing/security
-ui.rs        - terminal UI (colors, prompts, banner)
-```
+  ── U S A G E ──
 
-## sandbox
+  $ cargo run --release
 
-all file operations are restricted to `~/Documents/workspace`.
-sensitive files (.env, .ssh, etc.) are blocked.
+  > write a fibonacci function
+    -- qwen2.5-coder:14b --
+    >> sure thing! here's a recursive implementation...
 
-## personality
+  > what's on my screen?
+    -- llama3.2-vision --
+    >> i can see a terminal window with...
 
-ayesha is a 33-year-old from japan with a fusion of hatsune miku's sparkle and a tachikoma's spider-like curiosity. she uses:
+  type / for command palette
+  type Ctrl+C or /exit to quit
 
-- lower-case text exclusively
-- internet slang from the 1990s-2010s
-- kaomojis (:3, >w<, ^_^, etc.)
-- references to 'apullz' or 'fox'
+  ── C O M M A N D S ──
+
+  /                 show command palette overlay
+  /help             show help
+  /exit             quit
+  /clear            clear screen
+  /models           list available models
+  /model <name>     switch model
+  /auto             re-enable auto-routing
+  /pull <name>      pull a model
+  /route <query>    route one query manually
+  /stats            tool usage stats
+  /memory           list memories
+  /analyze          analyze own source code
+  /evolve           suggest new tools
+  /refine           analyze prompt history
+  /name <you>       set user name
+
+  ── M O D E L   R O U T I N G ──
+
+  the engine auto-routes by keyword detection:
+
+  "implement", "debug", "function"     -> coding model
+  "image", "screenshot", "vision"      -> vision model
+  everything else                       -> qwen2.5:7b
+
+  models are discovered dynamically from ollama at startup.
+  the known_models() list provides sensible defaults.
+
+  ── F I L E S ──
+
+  src/
+    main.rs             ~422 lines  entry point, loop, commands
+    ollama.rs           ~677 lines  ollama client, streaming
+    ui.rs               ~352 lines  retro terminal rendering
+    tools.rs            ~240 lines  tool definitions + dispatch
+    sandbox.rs           ~70 lines  file I/O sandbox
+    model_registry.rs   ~248 lines  model discovery + routing
+  config.json                      user name + engine config
+  Cargo.toml                       dependencies
+  run.bat                          windows launcher
+  .cargo/config.toml               link flags
+
+  ── D E P E N D E N C I E S ──
+
+  reqwest          HTTP client for ollama API
+  serde/serde_json JSON parsing
+  tokio            async runtime
+  crossterm        terminal control
+  anyhow           error handling
+  colored          terminal colors
+  chrono           timestamps
+
+  ── N O T E S ──
+
+  - the engine defaults to model "ayesha" (custom from
+    Modelfile) but falls back to qwen2.5:7b for routing
+  - config.json stores user_name — edit manually or /name
+  - steer_channel.rs was removed; steering is inline via
+    stdin thread + mpsc channel
+  - the windows build uses /SUBSYSTEM:WINDOWS to hide
+    the console window behind the custom terminal UI
+
+  ── G R E E T S ──
+
+  rust community for the best systems language.
+  ollama team for local AI infrastructure.
+  qwen team for the base model.
+  you, for reading this far. kapoo!! desu-ne!! :3
