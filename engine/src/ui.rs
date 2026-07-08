@@ -1,9 +1,13 @@
 use colored::*;
 use std::io::{stdout, Write};
-use std::time::Duration;
 
-// ── retro DOS color scheme ─────────────────────────────────
-// :: cyan   >> green   OK green   !! red   ;; yellow
+// ── retro cyberpunk color scheme ────────────────────────────
+// primary:   bright_green  (matrix green)
+// secondary: bright_yellow (amber terminal)
+// accent:    bright_cyan
+// error:     bright_red
+// dim:       bright_black
+// thinking:  bright_black (dimmed)
 
 const KAOMOJIS: &[&str] = &[
     "(╯°□°)╯︵ ┻━┻", "(◕ᴗ◕✿)", "(๑•蔷•๑)", "(╥﹏╥)",
@@ -17,30 +21,28 @@ const KAOMOJIS: &[&str] = &[
 // ── banner ─────────────────────────────────────────────────
 
 const BANNER: &str = r#"
-                       _
-                      | |
-  __ _ _   _  ___  ___| |__   __ _ ______ ___  ___
- / _` | | | |/ _ \/ __| '_ \ / _` |______/ _ \/ __|
-| (_| | |_| |  __/\__ \ | | | (_| |     | (_) \__ \
- \__,_|\__, |\___||___/_| |_|\__,_|      \___/|___/
-        __/ |
-       |___/
+    █████╗ ██╗   ██╗███████╗███████╗██╗  ██╗ █████╗
+   ██╔══██╗╚██╗ ██╔╝██╔════╝██╔════╝██║  ██║██╔══██╗
+   ███████║ ╚████╔╝ █████╗  ███████╗███████║███████║
+   ██╔══██║  ╚██╔╝  ██╔══╝  ╚════██║██╔══██║██╔══██║
+   ██║  ██║   ██║   ███████╗███████║██║  ██║██║  ██║
+   ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
 "#;
 
 pub fn print_banner() {
-    for line in BANNER.lines() {
-        println!("  {}", line.bright_cyan());
-    }
-    println!();
-    println!("  {} {}", "ayesha-os".bright_cyan().bold(), "v4.2.0".bright_black());
-    println!("  {}", "(๑蔷蔷๑)".bright_magenta());
-    println!();
-    println!("  {}", "type 'help' for commands, 'exit' to quit".bright_black());
-    println!("  {}", "──────────────────────────────────────────────".bright_black());
+    println!("{}", BANNER.bright_green());
+    println!("  {} {}",
+        "◆".bright_green(),
+        "ayesha-os v4.2.0".bright_cyan());
+    println!("  {} {}",
+        "  system online".bright_black(),
+        "(๑蔷๑)".bright_magenta());
+    println!("  {}",
+        "──────────────────────────────────────────────".bright_black());
     println!();
 }
 
-// ── tool call / result (flash instantly, no typewriter) ───
+// ── tool call / result ────────────────────────────────────
 
 pub fn show_tool_call(name: &str, args: &str) {
     let truncated = if args.len() > 80 {
@@ -48,7 +50,10 @@ pub fn show_tool_call(name: &str, args: &str) {
     } else {
         args.to_string()
     };
-    println!("  {} {} {}", ">>".bright_green().bold(), name.bright_cyan(), truncated.bright_black());
+    println!("  {} {} {}",
+        "▶".bright_green().bold(),
+        name.bright_yellow(),
+        truncated.bright_black());
 }
 
 pub fn show_tool_ok(name: &str, msg: &str) {
@@ -58,95 +63,216 @@ pub fn show_tool_ok(name: &str, msg: &str) {
     } else {
         first.to_string()
     };
-    println!("  {} {} {}", "OK".bright_green().bold(), name.bright_cyan(), truncated.bright_black());
+    println!("  {} {} {}",
+        "✔".bright_green().bold(),
+        name.bright_yellow(),
+        truncated.bright_black());
     for line in msg.lines().skip(1).take(5) {
-        println!("  {} {}", "  ".bright_black(), line.bright_black());
+        println!("  {} {}",
+            "│".bright_black(),
+            line.bright_black());
     }
     if msg.lines().count() > 6 {
-        println!("  {} {}", "  ".bright_black(), format!("+{} more lines", msg.lines().count() - 6).bright_black());
+        println!("  {} {} {}",
+            "│".bright_black(),
+            "+".bright_black(),
+            format!("{} more lines", msg.lines().count() - 6).bright_black());
     }
 }
 
 pub fn show_tool_err(name: &str, msg: &str) {
-    println!("  {} {} {}", "!!".bright_red().bold(), name.bright_cyan(), msg.bright_red());
+    println!("  {} {} {}",
+        "✖".bright_red().bold(),
+        name.bright_yellow(),
+        msg.bright_red());
 }
 
 // ── system messages ───────────────────────────────────────
 
 pub fn show_system(msg: &str) {
-    println!("  {} {}", "::".bright_cyan(), msg.bright_cyan());
+    println!("  {} {}",
+        "◆".bright_cyan(),
+        msg.bright_cyan());
 }
 
 pub fn show_error(msg: &str) {
-    println!("  {} {}", "!!".bright_red(), msg.bright_red());
+    println!("  {} {}",
+        "✖".bright_red(),
+        msg.bright_red());
 }
 
 pub fn show_processing() {
-    print!("  {} {}", "::".bright_cyan(), "processing...".bright_black());
+    print!("  {} {}",
+        "◆".bright_cyan(),
+        "processing...".bright_black());
     stdout().flush().ok();
 }
 
 pub fn hide_processing() {
     print!("\r");
-    for _ in 0..40 {
-        print!(" ");
-    }
+    for _ in 0..40 { print!(" "); }
     print!("\r");
     stdout().flush().ok();
 }
 
 pub fn show_routing(model: &str) {
-    println!("  {}", format!("-- {} --", model).bright_black());
+    println!("  {} {} {}",
+        "─".bright_black().repeat(3),
+        model.bright_black(),
+        "─".bright_black().repeat(3));
 }
 
 pub fn show_interrupted() {
-    println!("  {}", "-- interrupted --".bright_yellow().bold());
-}
-
-pub fn show_skipped() {
-    // prints nothing, just a visual cue that we skipped
+    println!("  {}",
+        "⏹  interrupted".bright_yellow().bold());
 }
 
 // ── prompt ─────────────────────────────────────────────────
 
 pub fn prompt_line() {
-    print!("  {} ", "fox>".bright_green().bold());
+    print!("  {} ",
+        "$".bright_green().bold());
     stdout().flush().ok();
+}
+
+// ── command palette overlay ───────────────────────────────
+
+pub fn draw_command_overlay(filter: Option<&str>) {
+    let cmds = [
+        ("help",    "show this help"),
+        ("exit",    "quit ayesha-os"),
+        ("clear",   "clear screen"),
+        ("models",  "list available models"),
+        ("model",   "switch model: /model <name>"),
+        ("auto",    "re-enable auto-routing"),
+        ("route",   "route a query: /route <query>"),
+        ("pull",    "pull model: /pull <name>"),
+        ("name",    "set your name: /name <you>"),
+        ("stats",   "tool usage statistics"),
+        ("memory",  "list stored memories"),
+        ("analyze", "analyze own source code"),
+        ("evolve",  "suggest new tools"),
+        ("refine",  "analyze prompt history"),
+    ];
+
+    let filtered: Vec<&(&str, &str)> = match filter {
+        Some(f) if !f.is_empty() => {
+            let lower = f.to_lowercase();
+            cmds.iter().filter(|(name, _)| {
+                name.starts_with(&lower) || name.contains(&lower)
+            }).collect()
+        }
+        _ => cmds.iter().collect(),
+    };
+
+    let box_w = 54;
+
+    println!();
+    println!("  {}",
+        "┌──────────────────────────────────────────────────┐".bright_green());
+    let header = if let Some(f) = filter {
+        if f.is_empty() {
+            "  ◆  command palette".to_string()
+        } else {
+            format!("  ◆  command palette  /{}", f)
+        }
+    } else {
+        "  ◆  command palette".to_string()
+    };
+    println!("  │  {}",
+        format!("{:<47}│", header.bright_cyan()).bright_green());
+
+    if filtered.is_empty() {
+        println!("  │  {}",
+            format!("{:<47}│",
+                format!("  no match for '/{}'", filter.unwrap_or("")).bright_black().italic()
+            ).bright_green());
+    } else {
+        println!("  │{}",
+            format!("{:<48}│",
+                "─".repeat(box_w - 4).bright_black()
+            ).bright_green());
+        let display = if filtered.len() > 10 { &filtered[..10] } else { &filtered };
+        for (cmd, desc) in display {
+            let line = format!("  │  /{:<10} {:<31}│", cmd, desc);
+            println!("{}", line.bright_green());
+        }
+        println!("  │{}",
+            format!("{:<48}│",
+                "─".repeat(box_w - 4).bright_black()
+            ).bright_green());
+    }
+    println!("  {}",
+        "└──────────────────────────────────────────────────┘".bright_green());
+    println!();
 }
 
 // ── help ───────────────────────────────────────────────────
 
 pub fn print_help() {
     println!();
-    println!("  {}", ":: commands ::".bright_cyan());
+    println!("  {}",
+        "┌─ commands ─────────────────────────────────┐".bright_green());
+    println!("  {}",
+        "│                                           │".bright_green());
+    let help_cmds = [
+        ("help",    "show this message"),
+        ("exit",    "quit ayesha-os"),
+        ("clear",   "clear screen"),
+        ("models",  "list available models"),
+        ("model",   "switch model: model <name>"),
+        ("auto",    "re-enable auto-routing"),
+        ("pull",    "pull model: pull <name>"),
+    ];
+    for (cmd, desc) in &help_cmds {
+        println!("  {} {:<14} {}",
+            "│".bright_green(),
+            cmd.bright_cyan(),
+            format!("{:<27}{}", desc.bright_black(), "│").bright_black());
+    }
+    println!("  {}",
+        "│                                           │".bright_green());
+    println!("  {}",
+        "├─ self-improvement ────────────────────────┤".bright_green());
+    let si_cmds = [
+        ("stats",   "tool usage statistics"),
+        ("memory",  "list stored memories"),
+        ("analyze", "analyze own source code"),
+        ("evolve",  "suggest new tools"),
+        ("refine",  "analyze prompt history"),
+    ];
+    for (cmd, desc) in &si_cmds {
+        println!("  {} {:<14} {}",
+            "│".bright_green(),
+            cmd.bright_cyan(),
+            format!("{:<27}{}", desc.bright_black(), "│").bright_black());
+    }
+    println!("  {}",
+        "└───────────────────────────────────────────┘".bright_green());
     println!();
-    println!("    {:<18}{}", "help".bright_cyan(), "show this message".bright_black());
-    println!("    {:<18}{}", "exit".bright_cyan(), "quit ayesha-os".bright_black());
-    println!("    {:<18}{}", "clear".bright_cyan(), "clear screen".bright_black());
-    println!("    {:<18}{}", "models".bright_cyan(), "list available models".bright_black());
-    println!("    {:<18}{}", "model <name>".bright_cyan(), "switch model manually".bright_black());
-    println!("    {:<18}{}", "auto".bright_cyan(), "re-enable auto-routing".bright_black());
-    println!("    {:<18}{}", "pull <name>".bright_cyan(), "pull model from ollama".bright_black());
-    println!();
-    println!("  {}", ":: self-improvement ::".bright_cyan());
-    println!();
-    println!("    {:<18}{}", "stats".bright_cyan(), "tool usage statistics".bright_black());
-    println!("    {:<18}{}", "memory".bright_cyan(), "list stored memories".bright_black());
-    println!("    {:<18}{}", "analyze".bright_cyan(), "analyze own source code".bright_black());
-    println!("    {:<18}{}", "evolve".bright_cyan(), "suggest new tools".bright_black());
-    println!("    {:<18}{}", "refine".bright_cyan(), "analyze prompt history".bright_black());
-    println!();
-    println!("  {}", ":: tools (auto-called by model) ::".bright_cyan());
-    println!();
-    println!("    {:<20}{}", "read_file".bright_cyan(), "read any file on disk".bright_black());
-    println!("    {:<20}{}", "write_file".bright_cyan(), "create or overwrite files".bright_black());
-    println!("    {:<20}{}", "list_dir".bright_cyan(), "browse directories".bright_black());
-    println!("    {:<20}{}", "generate_html".bright_cyan(), "render html to file".bright_black());
-    println!("    {:<20}{}", "generate_sprite".bright_cyan(), "create pixel art characters".bright_black());
-    println!("    {:<20}{}", "remember".bright_cyan(), "store a memory".bright_black());
-    println!("    {:<20}{}", "search_memories".bright_cyan(), "search stored memories".bright_black());
-    println!("    {:<20}{}", "analyze_self".bright_cyan(), "ai code review".bright_black());
-    println!("    {:<20}{}", "evolve_tools".bright_cyan(), "suggest new tools".bright_black());
+    println!("  {}",
+        "┌─ tools (auto-called by model) ────────────┐".bright_green());
+    println!("  {}",
+        "│                                           │".bright_green());
+    let tool_cmds = [
+        ("read_file",       "read any file on disk"),
+        ("write_file",      "create or overwrite files"),
+        ("list_dir",        "browse directories"),
+        ("generate_html",   "render html to file"),
+        ("generate_sprite", "create pixel art characters"),
+        ("remember",        "store a memory"),
+        ("search_memories", "search stored memories"),
+        ("analyze_self",    "ai code review"),
+        ("evolve_tools",    "suggest new tools"),
+    ];
+    for (cmd, desc) in &tool_cmds {
+        println!("  {} {:<18} {}",
+            "│".bright_green(),
+            cmd.bright_cyan(),
+            format!("{:<23}{}", desc.bright_black(), "│").bright_black());
+    }
+    println!("  {}",
+        "└───────────────────────────────────────────┘".bright_green());
     println!();
 }
 
@@ -166,8 +292,8 @@ fn format_code_block(code: &str) -> String {
     for line in code.lines() {
         out.push_str(&format!(
             "  {} {}\n",
-            "│".bright_black(),
-            line.bright_white().on_bright_black()
+            "▐".bright_black(),
+            line.on_bright_black()
         ));
     }
     out
@@ -208,58 +334,4 @@ pub fn format_response(text: &str) -> String {
     }
 
     color_kaomojis(&out)
-}
-
-// ── typewriter effect ─────────────────────────────────────
-
-pub async fn typewrite_response(
-    text: &str,
-    steer_rx: &std::sync::mpsc::Receiver<String>,
-) -> Option<String> {
-    let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-
-    while i < len {
-        if chars[i] == '\x1b' && i + 1 < len && chars[i + 1] == '[' {
-            let start = i;
-            i += 2;
-            while i < len && !chars[i].is_ascii_alphabetic() {
-                i += 1;
-            }
-            if i < len {
-                i += 1;
-            }
-            let seq: String = chars[start..i].iter().collect();
-            print!("{}", seq);
-            stdout().flush().ok();
-            continue;
-        }
-
-        print!("{}", chars[i]);
-        stdout().flush().ok();
-
-        match steer_rx.try_recv() {
-            Ok(input) if !input.is_empty() => {
-                let rest: String = chars[i + 1..].iter().collect();
-                print!("{}", rest);
-                stdout().flush().ok();
-                println!();
-                return Some(input);
-            }
-            Ok(_) => {
-                let rest: String = chars[i + 1..].iter().collect();
-                print!("{}", rest);
-                stdout().flush().ok();
-                println!();
-                return None;
-            }
-            _ => {}
-        }
-
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        i += 1;
-    }
-
-    None
 }

@@ -1,18 +1,23 @@
 {
-  "user_name": null,
-  "sprite_width": 32,
-  "sprite_height": 32,
-  "pixel_size": 3,
   "dithering": true,
-  "subpixel_detail": true,
-  "states": ["idle", "walk_left", "walk_right", "hacking_active"],
   "palette": {
-    "skin": "#ffcc99",
+    "circuit": "#00ff00",
     "hair": "#ff00ff",
-    "shirt": "#00ffff",
     "pants": "#2b2b2b",
+    "shirt": "#00ffff",
     "shoes": "#000000",
-    "visor": "#00ffff",
-    "circuit": "#00ff00"
-  }
+    "skin": "#ffcc99",
+    "visor": "#00ffff"
+  },
+  "pixel_size": 3,
+  "sprite_height": 32,
+  "sprite_width": 32,
+  "states": [
+    "idle",
+    "walk_left",
+    "walk_right",
+    "hacking_active"
+  ],
+  "subpixel_detail": true,
+  "user_name": "fox"
 }

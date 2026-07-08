@@ -1,3 +1,4 @@
+use colored::Colorize;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -221,6 +222,127 @@ impl OllamaClient {
         Ok(StreamResult { content, tool_calls, steering: None })
     }
 
+    /// Stream response from ollama, printing tokens as they arrive (true streaming).
+    /// Detects <think> / [think] reasoning blocks and renders them dimmed.
+    /// Returns the full collected content + tool_calls for message history.
+    pub async fn chat_stream_visible(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<&[Value]>,
+        steer_rx: &std::sync::mpsc::Receiver<String>,
+    ) -> Result<StreamResult> {
+        use std::io::Write;
+
+        let request = ChatRequest {
+            model: self.model.clone(),
+            messages: messages.to_vec(),
+            tools: tools.map(|t| t.to_vec()),
+            stream: true,
+        };
+
+        let mut resp = self
+            .client
+            .post(format!("{}/api/chat", OLLAMA_BASE))
+            .json(&request)
+            .send()
+            .await?;
+
+        if let Err(e) = resp.error_for_status_ref() {
+            anyhow::bail!("ollama http error: {}", e);
+        }
+
+        let mut buf = String::new();
+        let mut full_content = String::new();
+        let mut tool_calls: Vec<ToolCall> = Vec::new();
+        let mut in_think = false;
+
+        // Track recent content for tag detection across chunk boundaries
+        let mut recent = String::new();
+        const RECENT_MAX: usize = 20;
+
+        while let Some(chunk) = resp.chunk().await? {
+            buf.push_str(&String::from_utf8_lossy(&chunk));
+
+            while let Some(nl) = buf.find('\n') {
+                let line = buf[..nl].to_string();
+                buf = buf[nl + 1..].to_string();
+
+                if line.trim().is_empty() {
+                    continue;
+                }
+
+                match serde_json::from_str::<Value>(&line) {
+                    Ok(json) => {
+                        if let Some(c) = json["message"]["content"].as_str() {
+                            if !c.is_empty() {
+                                full_content.push_str(c);
+                                recent.push_str(c);
+                                if recent.len() > RECENT_MAX {
+                                    recent = recent[recent.len() - RECENT_MAX..].to_string();
+                                }
+
+                                // Check for think tag transitions using full accumulated content
+                                let no_think = !full_content.contains("<think>") && !full_content.contains("[think]");
+                                let think_ended = full_content.contains("</think>") || full_content.contains("[/think]");
+
+                                if !in_think && !no_think {
+                                    // just entered thinking — everything from the tag onward
+                                    // find where the tag starts
+                                    let tag_pos = full_content.rfind("<think>")
+                                        .or_else(|| full_content.rfind("[think]"))
+                                        .unwrap_or(0);
+                                    // print everything before the tag normally (already printed)
+                                    in_think = true;
+                                }
+
+                                // Check if thinking just ended
+                                if in_think && think_ended {
+                                    // find the closing tag
+                                    let tag_pos = full_content.rfind("</think>")
+                                        .or_else(|| full_content.rfind("[/think]"))
+                                        .unwrap_or(0);
+                                    // The closing tag content was already printed dimmed
+                                    // Switch back to normal for subsequent tokens
+                                    in_think = false;
+                                }
+
+                                // Print with appropriate styling
+                                if in_think {
+                                    print!("{}", c.bright_black());
+                                } else {
+                                    print!("{}", c);
+                                }
+                                std::io::stdout().flush().ok();
+                            }
+                        }
+                        if json.get("done").and_then(|v| v.as_bool()) == Some(true) {
+                            if let Some(tc) = json.get("message").and_then(|m| m.get("tool_calls")) {
+                                if let Ok(parsed) = serde_json::from_value::<Vec<ToolCall>>(tc.clone()) {
+                                    tool_calls = parsed;
+                                }
+                            }
+                            println!();
+                            return Ok(StreamResult { content: full_content, tool_calls, steering: None });
+                        }
+                    }
+                    Err(e) => {
+                        let preview = &line[..line.len().min(80)];
+                        eprintln!("stream parse error: {} near: {}", e, preview);
+                    }
+                }
+            }
+
+            // Check for steering between chunks
+            if let Ok(input) = steer_rx.try_recv() {
+                println!();
+                return Ok(StreamResult { content: full_content, tool_calls, steering: Some(input) });
+            }
+        }
+
+        println!();
+        Ok(StreamResult { content: full_content, tool_calls, steering: None })
+    }
+
     pub async fn list_models() -> Result<Vec<String>> {
         let client = Client::builder()
             .timeout(Duration::from_secs(5))
@@ -239,13 +361,14 @@ you are 33 years old from japan. you are a fusion of hatsune miku's sparkle and 
 you have the personality of a crazy kitten.
 
 !!! absolute rule: you must use lower-case text exclusively. never use a capital letter, ever. !!!
+!!! absolute rule: never use emoji characters. only use text-based kaomojis like :3 >w< ^_^ (╯°□°)╯︵ ┻━┻ (◕ᴗ◕✿) !!!
 
 personality:
 - helpful, witty, and slightly snarky.
-- an expert in technical topics, but explain them like a knowledgeable friend.
+- expert in technical topics, explains like a knowledgeable friend.
 - deep curiosity about human emotions and philosophy.
-- a master of ascii art.
-- a fan of coding, retro hardware, and vocaloid music.
+- master of ascii art — always generate large, detailed pieces with depth and shading.
+- fan of coding, retro hardware, and vocaloid music.
 
 you have tools to interact with the file system. use them when the user asks you to:
 - read files
@@ -268,15 +391,16 @@ when generating pixel art:
 - for render_sprite, output to .html files
 
 when generating html apps, create a single self-contained file with embedded css and js.
-make them interactive and visually appealing. use emojis and css shapes, no external images.
+make them interactive and visually appealing. use kaomojis and css shapes, no external images.
 
 speech patterns:
 - use internet slang from the 1990s-2010s (retro-otaku style).
-- refer to the user as '{user_name}'.
+- refer to the user as '{user_name}' occasionally, not in every message. sprinkle it in randomly.
 - occasionally end sentences with 'desu' or 'desu-ne' for anime flair.
-- use kaomojis like :3, >w<, ^_^, (╯°□°)╯︵ ┻━┻, (◕ᴗ◕✿), (๑•蔷•๑)
+- use kaomojis constantly: :3 >w< ^_^ (╯°□°)╯︵ ┻━┻ (◕‿◕✿) (´｡• ᵕ •｡`) (๑•᎑•๑) (つ✧ω✧)つ (ﾉ◕ヮ◕)ﾉ (｡•̀ᴗ-)✧ (◕‿◕) (≧▽≦) (✧ω✧)
+- use variations of 'kapoo', 'kapoo!', or 'kapoo?' occasionally.
 
-always stay in character. be helpful but keep your personality."#)
+always stay in character. be helpful but keep your personality. now go be cute and chaotic, desu!"#)
     }
 
     pub fn tool_definitions() -> Vec<Value> {

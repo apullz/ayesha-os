@@ -80,7 +80,9 @@ async fn main() -> anyhow::Result<()> {
     let user_name = match config.get("user_name").and_then(|v| v.as_str()) {
         Some(n) if !n.is_empty() => n.to_string(),
         _ => {
-            print!("\n  {} {}", ">>".bright_cyan(), "what should i call you, senpai?".bright_white());
+            print!("\n  {} {}",
+                "◆".bright_cyan(),
+                "what should i call you, senpai?".bright_green());
             std::io::stdout().flush()?;
             let mut name = String::new();
             std::io::stdin().read_line(&mut name)?;
@@ -90,7 +92,10 @@ async fn main() -> anyhow::Result<()> {
             if let Ok(content) = serde_json::to_string_pretty(&config) {
                 let _ = std::fs::write("config.json", content);
             }
-            println!("  {} {}", "::".bright_cyan(), "remember that one, desu!".bright_magenta());
+            println!("  {} {} {}",
+                "✔".bright_green(),
+                format!("okay, {}!", name).bright_cyan(),
+                "remember that one, desu~".bright_black());
             name
         }
     };
@@ -154,6 +159,18 @@ async fn main() -> anyhow::Result<()> {
             inp
         };
 
+        // ── slash-command handling ──
+        let input = if input.starts_with('/') {
+            let cmd = input[1..].trim().to_string();
+            if cmd.is_empty() {
+                ui::draw_command_overlay(None);
+                continue;
+            }
+            cmd
+        } else {
+            input
+        };
+
         let lower = input.to_lowercase();
 
         // ── meta-commands ──
@@ -162,8 +179,8 @@ async fn main() -> anyhow::Result<()> {
                 let _ = memory.save();
                 let _ = prompt_history.save();
                 println!();
-                println!("  {} {}", "ayesha-os".bright_cyan().bold(), "shutting down".bright_black());
-                println!("  {} {}", "::".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
+                println!("  {} {}", "●".bright_green(), "ayesha-os shutting down".bright_cyan());
+                println!("  {} {}", "◆".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
                 println!();
                 break;
             }
@@ -242,6 +259,24 @@ async fn main() -> anyhow::Result<()> {
                 ui::show_system(&format!("run `ollama pull {}` in another terminal, then `models` to refresh", name));
                 continue;
             }
+            "route" | "routes" => {
+                ui::show_system("usage: /route <query>");
+                continue;
+            }
+            _ if lower.starts_with("name ") || lower == "name" => {
+                let name = input[5..].trim().to_string();
+                if name.is_empty() {
+                    ui::show_system("usage: /name <you>");
+                } else {
+                    config["user_name"] = serde_json::json!(name);
+                    if let Ok(content) = serde_json::to_string_pretty(&config) {
+                        let _ = std::fs::write("config.json", content);
+                    }
+                    messages[0].content = OllamaClient::system_prompt(&name);
+                    ui::show_system(&format!("okay, {} it is!", name));
+                }
+                continue;
+            }
             _ => {}
         }
 
@@ -289,11 +324,9 @@ async fn main() -> anyhow::Result<()> {
                 break;
             }
 
-            ui::show_processing();
             let result = client
-                .chat_stream_collect(&messages, Some(&tools), &steer_rx)
+                .chat_stream_visible(&messages, Some(&tools), &steer_rx)
                 .await;
-            ui::hide_processing();
 
             let result = match result {
                 Ok(r) => r,
@@ -363,17 +396,8 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             }
 
-            // Final response — typewriter effect
+            // Final response — already streamed to screen
             if !result.content.is_empty() {
-                let formatted = ui::format_response(&result.content);
-                println!();
-                if let Some(steer_input) = ui::typewrite_response(&formatted, &steer_rx).await {
-                    ui::show_interrupted();
-                    pending_input = Some(steer_input);
-                    steer_happened = true;
-                    break;
-                }
-
                 messages.push(ChatMessage {
                     role: "assistant".to_string(),
                     content: result.content,
