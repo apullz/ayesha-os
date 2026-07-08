@@ -17,6 +17,7 @@ use sandbox::Sandbox;
 use prompt_refinement::PromptHistory;
 use memory::MemoryStore;
 use model_registry::ModelRegistry;
+use serde_json;
 
 #[cfg(windows)]
 mod winapi {
@@ -67,6 +68,33 @@ async fn main() -> anyhow::Result<()> {
     let mut registry = ModelRegistry::new();
     registry.detect().await;
 
+    // Load config, prompt for user name
+    let config_path = std::path::Path::new("config.json");
+    let mut config: serde_json::Value = if config_path.exists() {
+        let content = std::fs::read_to_string(config_path).unwrap_or_default();
+        serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let user_name = match config.get("user_name").and_then(|v| v.as_str()) {
+        Some(n) if !n.is_empty() => n.to_string(),
+        _ => {
+            print!("\n  {} {}", ">>".bright_cyan(), "what should i call you, senpai?".bright_white());
+            std::io::stdout().flush()?;
+            let mut name = String::new();
+            std::io::stdin().read_line(&mut name)?;
+            let name = name.trim().to_string();
+            let name = if name.is_empty() { "user".to_string() } else { name };
+            config["user_name"] = serde_json::json!(name);
+            if let Ok(content) = serde_json::to_string_pretty(&config) {
+                let _ = std::fs::write("config.json", content);
+            }
+            println!("  {} {}", "::".bright_cyan(), "remember that one, desu!".bright_magenta());
+            name
+        }
+    };
+
     // Steering channel: stdin thread sends all input here
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
 
@@ -98,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
     let mut messages: Vec<ChatMessage> = vec![
         ChatMessage {
             role: "system".to_string(),
-            content: OllamaClient::system_prompt(),
+            content: OllamaClient::system_prompt(&user_name),
             tool_calls: None,
             tool_call_id: None,
         },
