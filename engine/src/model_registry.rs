@@ -60,10 +60,11 @@ impl ModelRegistry {
     fn known_models() -> Vec<ModelProfile> {
         vec![
             ModelProfile {
-                name: "qwen2.5:7b".into(),
+                name: "qwen2.5-coder:14b".into(),
                 capabilities: vec![
                     Capability::General,
                     Capability::Tools,
+                    Capability::Coding,
                     Capability::Thinking,
                 ],
                 context_length: 32768,
@@ -76,11 +77,6 @@ impl ModelRegistry {
                     Capability::Coding,
                 ],
                 context_length: 32768,
-            },
-            ModelProfile {
-                name: "llama3.2-vision".into(),
-                capabilities: vec![Capability::General, Capability::Vision],
-                context_length: 8192,
             },
             ModelProfile {
                 name: "llama3.2-vision".into(),

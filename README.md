@@ -21,14 +21,20 @@ meet ayesha — an otaku genki ai, fusion of hatsune miku's sparkle and a tachik
 |---------|------|-------------|
 | **engine/** | rust | terminal-native persona host with tool-calling, model routing, streaming, self-improvement |
 | **core/** | python | hivemind orchestrator with gradio web ui, fastapi mobile api, tri-node sync |
-| **screen/** | typescript | screen capture vision chatbox using ollama moondream + gemini fallback |
+| **tri_mind_sync/** | python | bidirectional sync engine (github, huggingface, local) |
+| **models/** | modelfile | ayesha ollama personality definition (base: qwen2.5-coder:14b) |
+
+### applets/
+
+| applet | lang | description |
+|--------|------|-------------|
+| **screen/** | typescript | screen capture vision chatbox using ollama |
 | **cosmic-rag/** | python | local RAG chatbot with vault knowledge base, 100% offline |
 | **screenshotai/** | python | capture and analyze screenshots via ollama vision models |
 | **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
 | **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
-| **bring-to-life/** | typescript | upload an image and gemini turns it into an interactive html experience |
+| **bring-to-life/** | typescript | upload an image and turns it into an interactive html experience |
 | **neural-strike/** | python | mechanistic interpretability game with SAE feature visualization |
-| **models/** | modelfile | ayesha ollama personality definition (base: qwen2.5:7b) |
 
 ## quick start
 
@@ -44,7 +50,7 @@ meet ayesha — an otaku genki ai, fusion of hatsune miku's sparkle and a tachik
 ollama create ayesha -f models/Modelfile
 
 # or pull the base model directly
-ollama pull qwen2.5:7b
+ollama pull qwen2.5-coder:14b
 ```
 
 ### running the engine
@@ -65,19 +71,19 @@ see each project's README for specific instructions. quick reference:
 cd core && python app.py
 
 # screen vision chatbox
-cd screen && npm install && npm run dev
+cd applets/screen/ollama-screen-vision-chatbox && npm install && npm run dev
 
 # local RAG chatbot
-cd cosmic-rag && python main.py
+cd applets/cosmic-rag && python main.py
 
 # desktop cat
-cd desktop-cat && python desktopcat.py
+cd applets/desktop-cat && python desktopcat.py
 
 # flora CLI
-cd flora-cli && npx tsx cli.ts
+cd applets/flora-cli && npx tsx cli.ts
 
 # neural-strike game
-cd neural-strike && python main.py
+cd applets/neural-strike && python main.py
 ```
 
 ## engine features
@@ -87,7 +93,7 @@ cd neural-strike && python main.py
 the engine automatically routes your query to the best model:
 - coding tasks (keywords: `implement`, `function`, `debug`) → `qwen2.5-coder:14b`
 - vision tasks (keywords: `image`, `screenshot`, `look`) → `llama3.2-vision`
-- general queries → `qwen2.5:7b` (default)
+- general queries → `qwen2.5-coder:14b` (default)
 
 ```bash
 fox> models                  # list all available models
@@ -162,36 +168,27 @@ the engine learns and improves over time:
 └──────┬───────┘     └────────┬─────────┘
        │                      │
        │              ┌───────▼─────────┐
-       │              │  screen          │
-       │              │  (vision chat)   │
+       │              │  tri_mind_sync  │
+       │              │  (sync engine)  │
        │              └───────┬─────────┘
        │                      │
        │              ┌───────▼─────────┐
-       ├──────────────┤  cosmic-rag     │
-       │              │  (RAG memory)   │
-       │              └───────┬─────────┘
-       │                      │
-       │              ┌───────▼─────────┐
-       └──────────────┤  screenshotai   │
-                      │  (screen cap)   │
-                      └─────────────────┘
-
-┌──────────────┐     ┌──────────────────┐
-│  desktop-cat │     │  flora-cli       │
-│  (desktop pet)│     │  (botany cli)   │
-└──────────────┘     └──────────────────┘
-
-┌──────────────┐     ┌──────────────────┐
-│  bring-to-life│     │  neural-strike   │
-│  (image→html)│     │  (sae viz game)  │
-└──────────────┘     └──────────────────┘
+       │              │  applets/       │
+       │              │  ├─ screen      │
+       │              │  ├─ cosmic-rag  │
+       │              │  ├─ desktop-cat │
+       │              │  ├─ flora-cli   │
+       │              │  ├─ bring-to-life│
+       │              │  ├─ neural-strike│
+       │              │  └─ screenshotai│
+       │              └─────────────────┘
 
 all projects share the same ayesha personality via:
-  📄 ayesha.json  (shared config)
-  🧠 ollama model (ayesha:latest from models/Modelfile)
+  ayesha.json  (shared config)
+  ollama model (ayesha:latest from models/Modelfile)
 ```
 
-all projects connect to the same **ollama** instance at `localhost:11434` and share the **ayesha** personality. the engine can launch other projects as subprocesses. the core web ui serves as the public face via huggingface spaces.
+all projects connect to the same **ollama** instance at `localhost:11434` and share the **ayesha** personality. the engine can launch applets as subprocesses. the core web ui serves as the public face via huggingface spaces.
 
 ## deployment
 
@@ -219,7 +216,7 @@ cd core
 
 ### huggingface model
 
-the ayesha ollama model (based on qwen2.5:7b) is uploaded to huggingface:
+the ayesha ollama model (based on qwen2.5-coder:14b) is uploaded to huggingface:
 
 - **model**: `apullz/ayesha`
 - **format**: gguf (q4_k_m, 8b params)

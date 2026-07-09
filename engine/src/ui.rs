@@ -150,6 +150,13 @@ pub fn prompt_line() {
     stdout().flush().ok();
 }
 
+pub fn launcher_prompt() {
+    print!("  {} {} ",
+        "\u{25b6}".bright_yellow().bold(),
+        "launch".bright_yellow());
+    stdout().flush().ok();
+}
+
 // ── command palette overlay ───────────────────────────────
 
 pub fn draw_command_overlay(filter: Option<&str>) {

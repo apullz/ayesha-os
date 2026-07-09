@@ -8,6 +8,7 @@ mod self_analysis;
 mod tool_evolution;
 mod prompt_refinement;
 mod model_registry;
+mod applet_manager;
 
 use std::io::Write;
 use colored::*;
@@ -17,6 +18,7 @@ use sandbox::Sandbox;
 use prompt_refinement::PromptHistory;
 use memory::MemoryStore;
 use model_registry::ModelRegistry;
+use applet_manager::AppletManager;
 use serde_json;
 
 #[cfg(windows)]
@@ -69,9 +71,13 @@ async fn main() -> anyhow::Result<()> {
     registry.detect().await;
 
     // Load config, prompt for user name
-    let config_path = std::path::Path::new("config.json");
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let config_path = exe_dir.join("config.json");
     let mut config: serde_json::Value = if config_path.exists() {
-        let content = std::fs::read_to_string(config_path).unwrap_or_default();
+        let content = std::fs::read_to_string(&config_path).unwrap_or_default();
         serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
     } else {
         serde_json::json!({})
@@ -90,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
             let name = if name.is_empty() { "user".to_string() } else { name };
             config["user_name"] = serde_json::json!(name);
             if let Ok(content) = serde_json::to_string_pretty(&config) {
-                let _ = std::fs::write("config.json", content);
+                let _ = std::fs::write(&config_path, content);
             }
             println!("  {} {} {}",
                 "✔".bright_green(),
@@ -100,27 +106,52 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Steering channel: stdin thread sends all input here
+    // Enable raw mode for Ctrl+M detection
+    let _ = crossterm::terminal::enable_raw_mode();
+
+    // Steering channel: crossterm event thread sends input here
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
 
     std::thread::spawn(move || {
-        let mut input = String::new();
+        use crossterm::event::{self, Event, KeyCode, KeyModifiers, KeyEventKind};
+        let mut input_buf = String::new();
         loop {
-            input.clear();
-            match std::io::stdin().read_line(&mut input) {
-                Ok(n) if n > 0 => {
-                    let trimmed = input.trim().to_string();
-                    if steer_tx.send(trimmed).is_err() {
-                        break;
+            match event::read() {
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                    match (key.code, key.modifiers) {
+                        (KeyCode::Char('m'), KeyModifiers::CONTROL) => {
+                            if steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
+                        }
+                        (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                            if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
+                        }
+                        (KeyCode::Enter, _) => {
+                            let line = input_buf.trim().to_string();
+                            if steer_tx.send(line).is_err() { break; }
+                            input_buf.clear();
+                            print!("\r\n");
+                            let _ = std::io::stdout().flush();
+                        }
+                        (KeyCode::Char(c), _) if c as u8 >= 32 => {
+                            input_buf.push(c);
+                            print!("{}", c);
+                            let _ = std::io::stdout().flush();
+                        }
+                        (KeyCode::Backspace, _) => {
+                            input_buf.pop();
+                            print!("\x08 \x08");
+                            let _ = std::io::stdout().flush();
+                        }
+                        _ => {}
                     }
                 }
-                Ok(_) => {
-                    // EOF on stdin
-                    break;
+                Ok(Event::Paste(s)) => {
+                    for c in s.chars() {
+                        if c as u8 >= 32 { input_buf.push(c); print!("{}", c); }
+                    }
+                    let _ = std::io::stdout().flush();
                 }
-                Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
+                _ => {}
             }
         }
     });
@@ -139,28 +170,97 @@ async fn main() -> anyhow::Result<()> {
 
     let tools = OllamaClient::tool_definitions();
     let mut current_model = "ayesha".to_string();
+    let mut manager = AppletManager::new();
 
     // Holds steering input that needs to be processed as the next user message
     let mut pending_input: Option<String> = None;
+
+    enum InputMode { Normal, Launcher }
+    let mut input_mode = InputMode::Normal;
 
     loop {
         // ── read user input ──
         let input = if let Some(p) = pending_input.take() {
             p
         } else {
-            ui::prompt_line();
+            match input_mode {
+                InputMode::Normal => ui::prompt_line(),
+                InputMode::Launcher => ui::launcher_prompt(),
+            }
             let inp = match steer_rx.recv() {
                 Ok(i) => i,
-                Err(_) => break, // stdin thread exited
+                Err(_) => break,
             };
+            // Ctrl+C → exit
+            if inp == "\0ctrl-c" {
+                break;
+            }
+            // Ctrl+M → toggle launcher mode
+            if inp == "\0ctrl-m" {
+                input_mode = InputMode::Launcher;
+                println!("\n{}", manager.list());
+                ui::show_system("type applet name to launch/stop, `back` to exit, `list` to refresh");
+                continue;
+            }
             if inp.is_empty() {
+                // In launcher mode, empty line exits
+                if matches!(input_mode, InputMode::Launcher) {
+                    input_mode = InputMode::Normal;
+                    print!("\x1B[2J\x1B[1;1H");
+                    std::io::stdout().flush().ok();
+                }
                 continue;
             }
             inp
         };
 
+        // ── handle launcher mode ──
+        if matches!(input_mode, InputMode::Launcher) {
+            match input.as_str() {
+                "back" | "exit" | "/back" => {
+                    input_mode = InputMode::Normal;
+                    print!("\x1B[2J\x1B[1;1H");
+                    std::io::stdout().flush().ok();
+                    continue;
+                }
+                "list" | "apps" => {
+                    println!("\n{}", manager.list());
+                    continue;
+                }
+                "stop" | "stop all" => {
+                    manager.stop_all();
+                    ui::show_system("stopped all applets");
+                    continue;
+                }
+                _ => {
+                    if let Some(name) = input.strip_prefix("stop ") {
+                        match manager.stop(name) {
+                            Ok(()) => ui::show_system(&format!("stopped {}", name)),
+                            Err(e) => ui::show_error(&e),
+                        }
+                    } else if manager.has(&input) {
+                        if manager.is_running(&input) {
+                            match manager.stop(&input) {
+                                Ok(()) => ui::show_system(&format!("stopped {}", input)),
+                                Err(e) => ui::show_error(&e),
+                            }
+                        } else {
+                            match manager.launch(&input) {
+                                Ok(()) => ui::show_system(&format!("launched {}", input)),
+                                Err(e) => ui::show_error(&e),
+                            }
+                        }
+                    } else {
+                        ui::show_error(&format!("unknown applet. type `list` to see available"));
+                    }
+                    continue;
+                }
+            }
+        }
+
         // ── slash-command handling ──
-        let input = if input.starts_with('/') {
+        let was_slash = input.starts_with('/');
+        let input = if was_slash {
             let cmd = input[1..].trim().to_string();
             if cmd.is_empty() {
                 ui::draw_command_overlay(None);
@@ -178,6 +278,8 @@ async fn main() -> anyhow::Result<()> {
             "exit" | "quit" | "q" => {
                 let _ = memory.save();
                 let _ = prompt_history.save();
+                manager.stop_all();
+                let _ = crossterm::terminal::disable_raw_mode();
                 println!();
                 println!("  {} {}", "●".bright_green(), "ayesha-os shutting down".bright_cyan());
                 println!("  {} {}", "◆".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
@@ -241,6 +343,34 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
+            "apps" | "applets" => {
+                println!("\n{}", manager.list());
+                continue;
+            }
+            _ if lower.starts_with("run ") => {
+                let name = input[4..].trim();
+                if manager.has(name) {
+                    if manager.is_running(name) {
+                        ui::show_system(&format!("{} is already running", name));
+                    } else {
+                        match manager.launch(name) {
+                            Ok(()) => ui::show_system(&format!("launched {}", name)),
+                            Err(e) => ui::show_error(&e),
+                        }
+                    }
+                } else {
+                    ui::show_error(&format!("unknown applet: {}", name));
+                }
+                continue;
+            }
+            _ if lower.starts_with("stop ") => {
+                let name = input[5..].trim();
+                match manager.stop(name) {
+                    Ok(()) => ui::show_system(&format!("stopped {}", name)),
+                    Err(e) => ui::show_error(&e),
+                }
+                continue;
+            }
             _ if lower.starts_with("model ") => {
                 let name = input[6..].trim();
                 match registry.set_model(name) {
@@ -270,14 +400,36 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     config["user_name"] = serde_json::json!(name);
                     if let Ok(content) = serde_json::to_string_pretty(&config) {
-                        let _ = std::fs::write("config.json", content);
+                        let _ = std::fs::write(&config_path, content);
                     }
                     messages[0].content = OllamaClient::system_prompt(&name);
                     ui::show_system(&format!("okay, {} it is!", name));
                 }
                 continue;
             }
-            _ => {}
+            _ => {
+                // If it was a slash command, check applet short names
+                if was_slash && manager.has(&input) {
+                    if manager.is_running(&input) {
+                        match manager.stop(&input) {
+                            Ok(()) => ui::show_system(&format!("stopped {}", input)),
+                            Err(e) => ui::show_error(&e),
+                        }
+                    } else {
+                        match manager.launch(&input) {
+                            Ok(()) => ui::show_system(&format!("launched {}", input)),
+                            Err(e) => ui::show_error(&e),
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+
+        // After match, if was_slash but no command matched, show error
+        if was_slash {
+            ui::show_error(&format!("unknown command: /{}. type /help", input));
+            continue;
         }
 
         // ── route (handle `route <query>` prefix) ──

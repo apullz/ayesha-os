@@ -61,7 +61,7 @@ git add -A
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
     git commit -m "sync $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
-    git push origin master
+    git push origin main
     Write-Host "  ✅ GitHub pushed" -ForegroundColor Green
 } else {
     Write-Host "  nothing to commit" -ForegroundColor DarkGray

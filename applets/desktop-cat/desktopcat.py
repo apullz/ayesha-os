@@ -15,8 +15,14 @@ SPRITE_SIZE = 32
 DISPLAY_SCALE = 1.5
 DISPLAY_SIZE = int(SPRITE_SIZE * DISPLAY_SCALE)
 
-screen_w = user32.GetSystemMetrics(0)
-screen_h = user32.GetSystemMetrics(1)
+SM_XVIRTUALSCREEN = 76
+SM_YVIRTUALSCREEN = 77
+SM_CXVIRTUALSCREEN = 78
+SM_CYVIRTUALSCREEN = 79
+screen_x = user32.GetSystemMetrics(SM_XVIRTUALSCREEN)
+screen_y = user32.GetSystemMetrics(SM_YVIRTUALSCREEN)
+screen_w = user32.GetSystemMetrics(SM_CXVIRTUALSCREEN)
+screen_h = user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 atlas = Image.open(os.path.join(script_dir, "oneko_sprite.png")).convert("RGBA")
@@ -142,8 +148,9 @@ root.attributes("-topmost", True)
 root.config(bg="magenta")
 root.attributes("-transparentcolor", "magenta")
 HEART_H = 24
-WINDOW_W = DISPLAY_SIZE + 200
-WINDOW_H = DISPLAY_SIZE + HEART_H + 200
+BORDER = 16
+WINDOW_W = DISPLAY_SIZE + BORDER * 2
+WINDOW_H = DISPLAY_SIZE + HEART_H + BORDER * 2
 root.geometry(f"{WINDOW_W}x{WINDOW_H}")
 
 GWL_EXSTYLE = -20
@@ -197,7 +204,7 @@ def get_cursor_pos():
 prev_mx, prev_my = get_cursor_pos()
 
 CAT_ORIGIN_X = WINDOW_W // 2
-CAT_ORIGIN_Y = HEART_H + DISPLAY_SIZE // 2 + 10
+CAT_ORIGIN_Y = HEART_H + BORDER + DISPLAY_SIZE // 2
 
 def reset_idle_animation():
     global idle_animation, idleAnimationFrame
@@ -260,13 +267,13 @@ def update():
         idle_time += 1
         if idle_time > 10 and random.random() < 0.005 and idle_animation is None:
             available = ["sleeping", "scratchSelf"]
-            if cat_x < 32:
+            if cat_x < screen_x + 32:
                 available.append("scratchWallW")
-            if cat_y < 32:
+            if cat_y < screen_y + 32:
                 available.append("scratchWallN")
-            if cat_x > screen_w - 32:
+            if cat_x > screen_x + screen_w - 32:
                 available.append("scratchWallE")
-            if cat_y > screen_h - 32:
+            if cat_y > screen_y + screen_h - 32:
                 available.append("scratchWallS")
             idle_animation = random.choice(available)
 
@@ -324,8 +331,8 @@ def update():
 
     cat_x -= (diffX / distance) * cat_speed
     cat_y -= (diffY / distance) * cat_speed
-    cat_x = max(16, min(cat_x, screen_w - 16))
-    cat_y = max(16, min(cat_y, screen_h - 16))
+    cat_x = max(screen_x + 16, min(cat_x, screen_x + screen_w - 16))
+    cat_y = max(screen_y + 16, min(cat_y, screen_y + screen_h - 16))
 
     frames = animations[current_anim]
     if len(frames) > 1 and anim_timer >= ANIM_FRAME_MS:

@@ -11,6 +11,13 @@ use crate::prompt_refinement::PromptHistory;
 
 const MAX_READ_SIZE: usize = 256 * 1024;
 
+fn chrono_like_ts() -> String {
+    let d = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("{}", d.as_secs())
+}
+
 pub struct ToolExecutor {
     sandbox: Sandbox,
     project_root: std::path::PathBuf,
@@ -41,6 +48,7 @@ impl ToolExecutor {
             "evolve_tools" => self.evolve_tools().await,
             "refine_prompt" => self.refine_prompt().await,
             "get_tool_stats" => self.get_tool_stats(),
+            "read_clipboard" => self.read_clipboard(args),
             _ => bail!("unknown tool: {}", name),
         }
     }
@@ -495,5 +503,48 @@ return only the html, nothing else."#,
             stats_text.join("\n"),
             history.prompt_version
         ))
+    }
+
+    fn read_clipboard(&self, _args: &Value) -> Result<String> {
+        let mut clipboard = arboard::Clipboard::new()
+            .map_err(|e| anyhow::anyhow!("clipboard access failed: {}", e))?;
+
+        match clipboard.get_text() {
+            Ok(text) => {
+                if text.is_empty() {
+                    Ok("clipboard is empty (no text content)".to_string())
+                } else {
+                    let truncated = if text.len() > 8000 {
+                        format!("{}... [truncated, {} chars total]", &text[..8000], text.len())
+                    } else {
+                        text
+                    };
+                    Ok(format!("clipboard text content:\n{}", truncated))
+                }
+            }
+            Err(_) => {
+                match clipboard.get_image() {
+                    Ok(img) => {
+                        let out_dir = self.project_root.join("assets");
+                        let _ = fs::create_dir_all(&out_dir);
+                        let filename = format!("clipboard_{}.png", chrono_like_ts());
+                        let out_path = out_dir.join(&filename);
+                        let raw: Vec<u8> = img.bytes.iter().copied().collect();
+                        let rgba_img = image::RgbaImage::from_raw(
+                            img.width as u32,
+                            img.height as u32,
+                            raw,
+                        ).ok_or_else(|| anyhow::anyhow!("failed to convert clipboard image"))?;
+                        rgba_img.save(&out_path)
+                            .map_err(|e| anyhow::anyhow!("failed to save clipboard image: {}", e))?;
+                        Ok(format!(
+                            "clipboard contains an image ({}x{}). saved to: {}",
+                            img.width, img.height, out_path.display()
+                        ))
+                    }
+                    Err(e) => Ok(format!("clipboard has no text or image content ({})", e))
+                }
+            }
+        }
     }
 }

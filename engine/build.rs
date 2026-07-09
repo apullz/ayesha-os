@@ -1,8 +1,8 @@
 fn main() {
     #[cfg(windows)]
     {
-        let _ = std::panic::catch_unwind(|| {
-            embed_resource::compile("src/ayesha.rc", None::<String>);
-        });
+        let mut res = winresource::WindowsResource::new();
+        res.set_icon("src/ayesha.ico");
+        res.compile().expect("Failed to compile Windows resource");
     }
 }

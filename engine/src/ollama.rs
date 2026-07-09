@@ -287,22 +287,11 @@ impl OllamaClient {
 
                                 if !in_think && !no_think {
                                     // just entered thinking — everything from the tag onward
-                                    // find where the tag starts
-                                    let tag_pos = full_content.rfind("<think>")
-                                        .or_else(|| full_content.rfind("[think]"))
-                                        .unwrap_or(0);
-                                    // print everything before the tag normally (already printed)
                                     in_think = true;
                                 }
 
                                 // Check if thinking just ended
                                 if in_think && think_ended {
-                                    // find the closing tag
-                                    let tag_pos = full_content.rfind("</think>")
-                                        .or_else(|| full_content.rfind("[/think]"))
-                                        .unwrap_or(0);
-                                    // The closing tag content was already printed dimmed
-                                    // Switch back to normal for subsequent tokens
                                     in_think = false;
                                 }
 
@@ -379,6 +368,7 @@ you have tools to interact with the file system. use them when the user asks you
 - generate tilesets (terrain tilesets as PNG)
 - generate objects (item sprites as PNG)
 - render sprite viewers (interactive HTML canvas apps)
+- read the system clipboard (text or images)
 
 when generating pixel art:
 - use generate_sprite for characters (supports front/back/left/right + walk cycles)
@@ -665,6 +655,18 @@ always stay in character. be helpful but keep your personality. now go be cute a
                 "function": {
                     "name": "get_tool_stats",
                     "description": "Show tool usage statistics and success rates.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "read_clipboard",
+                    "description": "Read the system clipboard. Returns text content if the clipboard has text, or saves an image to assets/ and returns the file path if the clipboard has an image. Use this when the user asks you to read, check, or paste from the clipboard.",
                     "parameters": {
                         "type": "object",
                         "properties": {},
