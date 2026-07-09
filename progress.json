@@ -1,0 +1,47 @@
+{
+  "project": "ayesha-os git Middleware",
+  "version": "0.1.0",
+  "status": "completed",
+  "created": "2026-07-09",
+  "roadmap": [
+    {
+      "id": "F001",
+      "title": "config.json model mappings",
+      "status": "completed",
+      "description": "LLM router config with task-to-model mappings"
+    },
+    {
+      "id": "F002",
+      "title": "LLM router module",
+      "status": "completed",
+      "description": "Router that selects model based on task type from config"
+    },
+    {
+      "id": "F003",
+      "title": "Gitea webhook handler",
+      "status": "completed",
+      "description": "Parse gitea push/PR/release webhooks, verify HMAC signature"
+    },
+    {
+      "id": "F004",
+      "title": "Public-access auth middleware",
+      "status": "completed",
+      "description": "Bypass auth for /public_repos/*, enforce token auth elsewhere"
+    },
+    {
+      "id": "F005",
+      "title": "Ollama task triggers",
+      "status": "completed",
+      "description": "code-review, auto-summary, commit_analysis, security_scan tasks"
+    },
+    {
+      "id": "F006",
+      "title": "Main entry point + test suite",
+      "status": "completed",
+      "description": "FastAPI app, startup, health check, 26 unit tests passing"
+    }
+  ],
+  "issues": [],
+  "last_error": null,
+  "attempt_count": 0
+}

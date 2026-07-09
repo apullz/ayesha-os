@@ -40,6 +40,7 @@
     "flora-cli": { "path": "applets/flora-cli/", "lang": "typescript", "desc": "scottish flora phylogeny explorer", "run": "npx tsx cli.ts" },
     "bring-to-life": { "path": "applets/bring-to-life/", "lang": "typescript", "desc": "turn images into interactive html", "run": "npm run dev", "port": 5174 },
     "neural-strike": { "path": "applets/neural-strike/", "lang": "python", "desc": "mechanistic interpretability game", "run": "python main.py" },
-    "models": { "path": "models/", "lang": "ollama", "desc": "ayesha personality modelfile" }
+    "models": { "path": "models/", "lang": "ollama", "desc": "ayesha personality modelfile" },
+    "git-middleware": { "path": "git_middleware/", "lang": "python", "desc": "gitea webhook + LLM task runner", "run": "python main.py", "port": 9000 }
   }
 }

@@ -1,0 +1,48 @@
+{
+  "ollama_endpoint": "http://localhost:11434",
+  "gitea_webhook_secret": "",
+  "auth_tokens": [],
+  "models": {
+    "quick_docs": {
+      "model": "qwen2.5:7b",
+      "description": "fast summaries, doc generation, commit messages",
+      "max_tokens": 2048,
+      "temperature": 0.3
+    },
+    "code_review": {
+      "model": "deepseek-coder:33b",
+      "description": "architectural analysis, deep code review, refactoring suggestions",
+      "max_tokens": 8192,
+      "temperature": 0.1
+    },
+    "auto_summary": {
+      "model": "qwen2.5:7b",
+      "description": "PR summaries, changelog generation, release notes",
+      "max_tokens": 2048,
+      "temperature": 0.4
+    },
+    "commit_analysis": {
+      "model": "qwen2.5:7b",
+      "description": "commit message validation, conventional commit enforcement",
+      "max_tokens": 1024,
+      "temperature": 0.2
+    },
+    "security_scan": {
+      "model": "deepseek-coder:33b",
+      "description": "vulnerability detection, dependency auditing, secrets scanning",
+      "max_tokens": 4096,
+      "temperature": 0.0
+    }
+  },
+  "task_triggers": {
+    "push": ["commit_analysis", "auto_summary"],
+    "pull_request": ["code_review", "auto_summary"],
+    "pull_request_approved": ["security_scan"],
+    "release": ["auto_summary"]
+  },
+  "public_repo_prefix": "/public_repos/",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 9000
+  }
+}
