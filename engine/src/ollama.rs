@@ -56,6 +56,8 @@ pub struct ChatRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Value>>,
     pub stream: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub think: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,6 +132,7 @@ impl OllamaClient {
             messages: messages.to_vec(),
             tools: tools.map(|t| t.to_vec()),
             stream: false,
+            think: false,
         };
 
         let resp = self.client
@@ -161,6 +164,7 @@ impl OllamaClient {
             messages: messages.to_vec(),
             tools: tools.map(|t| t.to_vec()),
             stream: true,
+            think: false,
         };
 
         let mut resp = self
@@ -206,7 +210,7 @@ impl OllamaClient {
                         }
                     }
                     Err(e) => {
-                        let preview = &line[..line.len().min(80)];
+                        let preview: String = line.chars().take(80).collect();
                         eprintln!("stream parse error: {} near: {}", e, preview);
                     }
                 }
@@ -238,6 +242,7 @@ impl OllamaClient {
             messages: messages.to_vec(),
             tools: tools.map(|t| t.to_vec()),
             stream: true,
+            think: false,
         };
 
         let mut resp = self
@@ -277,8 +282,9 @@ impl OllamaClient {
                             if !c.is_empty() {
                                 full_content.push_str(c);
                                 recent.push_str(c);
-                                if recent.len() > RECENT_MAX {
-                                    recent = recent[recent.len() - RECENT_MAX..].to_string();
+                                if recent.chars().count() > RECENT_MAX {
+                                    let cut = recent.chars().rev().take(RECENT_MAX).collect::<String>();
+                                    recent = cut;
                                 }
 
                                 // Check for think tag transitions using full accumulated content
@@ -315,7 +321,7 @@ impl OllamaClient {
                         }
                     }
                     Err(e) => {
-                        let preview = &line[..line.len().min(80)];
+                        let preview: String = line.chars().take(80).collect();
                         eprintln!("stream parse error: {} near: {}", e, preview);
                     }
                 }
@@ -674,6 +680,13 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     }
                 }
             }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "coding_agent",
+                    "description": "Perform coding operations like reading, writing, editing, analyzing, and modifying code in the codebase. Supports actions: read, write, edit, list, analyze, modify, suggest, execute_tool.",
+                }
+            })
         ]
     }
 }

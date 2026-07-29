@@ -16,7 +16,8 @@ ayesha-os/
 │   ├── flora-cli/       typescript — scottish flora phylogeny explorer
 │   ├── bring-to-life/   typescript — image to interactive html
 │   ├── neural-strike/   python — SAE interpretability game
-│   └── screenshotai/    python — screenshot capture + analysis
+│   ├── screenshotai/    python — screenshot capture + analysis
+│   └── poopy-tui/       python — discord terminal client (textual)
 ├── ayesha.json          central config (personality, projects, ollama models)
 └── ayesha.bat           shortcut to launch engine
 ```
@@ -67,6 +68,9 @@ cd applets/neural-strike && python main.py
 
 # screenshotai
 cd applets/screenshotai && python main.py
+
+# poopy-tui
+cd applets/poopy-tui && python main.py
 ```
 
 ## deployment
@@ -99,3 +103,4 @@ ollama create ayesha -f models/Modelfile
 - `applets/desktop-cat/desktopcat.py` expects `cat.png` sprite in same dir
 - python projects have no pyproject.toml — deps in requirements.txt only
 - typescript projects need `npm install` before first run
+- engine build requires `C:\msys64\mingw64\bin` in PATH for dlltool (gnu toolchain)

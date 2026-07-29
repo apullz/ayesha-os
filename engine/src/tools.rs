@@ -1,6 +1,6 @@
 use std::fs;
 use anyhow::{Result, bail};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::sandbox::Sandbox;
 use crate::ollama::OllamaClient;
@@ -8,6 +8,7 @@ use crate::memory::MemoryStore;
 use crate::self_analysis::SelfAnalyzer;
 use crate::tool_evolution::ToolEvolver;
 use crate::prompt_refinement::PromptHistory;
+use crate::applet_manager::AppletManager;
 
 const MAX_READ_SIZE: usize = 256 * 1024;
 
@@ -48,7 +49,7 @@ impl ToolExecutor {
             "evolve_tools" => self.evolve_tools().await,
             "refine_prompt" => self.refine_prompt().await,
             "get_tool_stats" => self.get_tool_stats(),
-            "read_clipboard" => self.read_clipboard(args),
+            "coding_agent" => self.coding_agent(args).await,
             _ => bail!("unknown tool: {}", name),
         }
     }
@@ -547,4 +548,24 @@ return only the html, nothing else."#,
             }
         }
     }
+    async fn coding_agent(&self, args: &Value) -> Result<String> {
+        // Import the coding_agent module
+        use crate::coding_agent::CodingAgent;
+        
+        // Create coding agent instance
+        let coding_agent = CodingAgent::new(
+            self.sandbox.clone(),
+            OllamaClient::new("ayesha"),
+            MemoryStore::load(),
+            SelfAnalyzer::new(self.project_root.clone()),
+            ToolEvolver::new(vec![]),
+            PromptHistory::load(),
+            AppletManager::new(),
+            self.project_root.clone()
+        );
+        
+        // Execute the coding agent
+        coding_agent.execute(args).await
+    }
+
 }

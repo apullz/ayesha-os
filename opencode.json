@@ -9,5 +9,13 @@
   "compaction": {
     "auto": true,
     "tail_turns": 5
-  }
+  },
+  "provider": {
+    "google": {
+      "options": {
+        "max_tokens": 16000
+      }
+    }
+  },
+  "model": "google/gemini-2.5-flash"
 }

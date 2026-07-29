@@ -1,3 +1,5 @@
 @echo off
-cd /d "C:\Users\apullz\Documents\ayesha-os\engine"
-target\release\ayesha-engine.exe %*
+cd /d "C:\ayesha-os\engine"
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
+set RUSTFLAGS=-Awarnings
+cargo run --release

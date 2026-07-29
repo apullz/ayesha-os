@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "terminal-native persona host with tool-calling for ollama"
 
+[[bin]]
+name = "ayesha-os"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }

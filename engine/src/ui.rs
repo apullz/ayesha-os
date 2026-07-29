@@ -245,6 +245,7 @@ pub fn print_help() {
         ("model",   "switch model: model <name>"),
         ("auto",    "re-enable auto-routing"),
         ("pull",    "pull model: pull <name>"),
+        ("sync",    "sync to github & hf"),
     ];
     for (cmd, desc) in &help_cmds {
         println!("  {} {:<14} {}",
@@ -296,6 +297,7 @@ pub fn print_help() {
     println!("  {}",
         "└───────────────────────────────────────────┘".bright_green());
     println!();
+    std::io::stdout().flush().ok();
 }
 
 // ── response formatting ───────────────────────────────────

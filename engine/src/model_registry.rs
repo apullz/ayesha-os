@@ -2,12 +2,19 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Backend {
+    Ollama,
+    Cloud { provider: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Capability {
     General,
     Coding,
     Vision,
     Tools,
     Thinking,
+    Agentic,
 }
 
 impl Capability {
@@ -18,6 +25,7 @@ impl Capability {
             Capability::Vision => "vision",
             Capability::Tools => "tools",
             Capability::Thinking => "thinking",
+            Capability::Agentic => "agentic",
         }
     }
 }
@@ -27,6 +35,12 @@ pub struct ModelProfile {
     pub name: String,
     pub capabilities: Vec<Capability>,
     pub context_length: u32,
+    #[serde(default = "default_backend")]
+    pub backend: Backend,
+}
+
+fn default_backend() -> Backend {
+    Backend::Ollama
 }
 
 pub struct ModelRegistry {
@@ -40,7 +54,7 @@ impl ModelRegistry {
         Self {
             models: Self::known_models(),
             active_index: 0,
-            auto_route: true,
+            auto_route: false,
         }
     }
 
@@ -55,6 +69,73 @@ impl ModelRegistry {
             }
             Err(_) => {}
         }
+        // Add cloud models
+        self.detect_cloud_models();
+        // Default to ayesha:latest if available
+        if let Some(idx) = self.models.iter().position(|m| m.name == "ayesha:latest") {
+            self.active_index = idx;
+        }
+    }
+
+    fn detect_cloud_models(&mut self) {
+        let cloud_models = Self::cloud_models();
+        for m in cloud_models {
+            if !self.models.iter().any(|e| e.name == m.name) {
+                self.models.push(m);
+            }
+        }
+    }
+
+    fn cloud_models() -> Vec<ModelProfile> {
+        vec![
+            ModelProfile {
+                name: "nvidia/nemotron-3-super:free".into(),
+                capabilities: vec![
+                    Capability::General,
+                    Capability::Coding,
+                    Capability::Tools,
+                    Capability::Agentic,
+                ],
+                context_length: 1_000_000,
+                backend: Backend::Cloud { provider: "openrouter".into() },
+            },
+            ModelProfile {
+                name: "meta-llama/llama-3.3-70b-instruct:free".into(),
+                capabilities: vec![
+                    Capability::General,
+                    Capability::Coding,
+                ],
+                context_length: 131_072,
+                backend: Backend::Cloud { provider: "openrouter".into() },
+            },
+            ModelProfile {
+                name: "deepseek/deepseek-r1:free".into(),
+                capabilities: vec![
+                    Capability::Thinking,
+                    Capability::Coding,
+                ],
+                context_length: 65_536,
+                backend: Backend::Cloud { provider: "openrouter".into() },
+            },
+            ModelProfile {
+                name: "qwen/qwen-2.5-coder-32b-instruct:free".into(),
+                capabilities: vec![
+                    Capability::Coding,
+                    Capability::Tools,
+                ],
+                context_length: 32_768,
+                backend: Backend::Cloud { provider: "openrouter".into() },
+            },
+            ModelProfile {
+                name: "opencode/big-pickle".into(),
+                capabilities: vec![
+                    Capability::Coding,
+                    Capability::Thinking,
+                ],
+                context_length: 200_000,
+                backend: Backend::Cloud { provider: "opencode".into() },
+            },
+        ]
     }
 
     fn known_models() -> Vec<ModelProfile> {
@@ -68,25 +149,19 @@ impl ModelRegistry {
                     Capability::Thinking,
                 ],
                 context_length: 32768,
-            },
-            ModelProfile {
-                name: "qwen2.5-coder:14b".into(),
-                capabilities: vec![
-                    Capability::General,
-                    Capability::Tools,
-                    Capability::Coding,
-                ],
-                context_length: 32768,
+                backend: Backend::Ollama,
             },
             ModelProfile {
                 name: "llama3.2-vision".into(),
                 capabilities: vec![Capability::General, Capability::Vision],
                 context_length: 8192,
+                backend: Backend::Ollama,
             },
             ModelProfile {
                 name: "moondream".into(),
                 capabilities: vec![Capability::General, Capability::Vision],
                 context_length: 4096,
+                backend: Backend::Ollama,
             },
         ]
     }
@@ -109,6 +184,7 @@ impl ModelRegistry {
                     capabilities: Self::infer_capabilities(&name),
                     context_length: 4096,
                     name,
+                    backend: Backend::Ollama,
                 }
             })
             .collect())
@@ -134,7 +210,27 @@ impl ModelRegistry {
         if lower.contains("deepseek") || lower.contains("r1") {
             caps.push(Capability::Thinking);
         }
+        if lower.contains("nemotron") {
+            caps.push(Capability::Agentic);
+            caps.push(Capability::Coding);
+        }
         caps
+    }
+
+    /// Check if a model uses a cloud backend
+    pub fn is_cloud_model(&self, name: &str) -> bool {
+        self.models.iter().any(|m| m.name == name && matches!(m.backend, Backend::Cloud { .. }))
+    }
+
+    /// Get the provider for a cloud model
+    pub fn cloud_provider(&self, name: &str) -> Option<String> {
+        self.models.iter().find(|m| m.name == name).and_then(|m| {
+            if let Backend::Cloud { ref provider } = m.backend {
+                Some(provider.clone())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn select_model(&self, query: &str) -> &ModelProfile {
@@ -219,22 +315,39 @@ impl ModelRegistry {
 
     pub fn list_models(&self) -> String {
         let mut out = String::from("available models:\n");
-        for (i, m) in self.models.iter().enumerate() {
+        let mut last_backend = "";
+        // Show local models first, then cloud
+        let mut sorted: Vec<(usize, &ModelProfile)> = self.models.iter().enumerate().collect();
+        sorted.sort_by_key(|(_, m)| matches!(m.backend, Backend::Cloud { .. }));
+        for (i, m) in sorted {
+            let backend_label = match &m.backend {
+                Backend::Ollama => "local",
+                Backend::Cloud { .. } => "cloud",
+            };
+            if backend_label != last_backend {
+                out.push_str(&format!("\n  ── {} ──\n", backend_label));
+                last_backend = backend_label;
+            }
             let caps: Vec<&str> = m.capabilities.iter().map(|c| c.label()).collect();
             let arrow = if i == self.active_index && !self.auto_route {
                 " << active"
             } else {
                 ""
             };
+            let provider_tag = match &m.backend {
+                Backend::Cloud { provider } => format!(" ({})", provider),
+                _ => String::new(),
+            };
             out.push_str(&format!(
-                "  {:<25} [{}]{}\n",
+                "  {:<40} [{}]{}{}\n",
                 m.name,
                 caps.join(", "),
+                provider_tag,
                 arrow
             ));
         }
         out.push_str(&format!(
-            "routing: {}\n",
+            "\nrouting: {}\n",
             if self.auto_route { "auto" } else { "manual" }
         ));
         out

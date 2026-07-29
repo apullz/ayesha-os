@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "last_full_sync": "2026-07-29T15:57:40.979551",
+  "nodes": {
+    "local": {
+      "connected": true,
+      "last_sync": "2026-07-29T15:57:37.279004"
+    },
+    "github": {
+      "connected": true,
+      "last_sync": "2026-07-29T15:57:38.178631"
+    },
+    "huggingface": {
+      "connected": true,
+      "last_sync": "2026-07-29T15:57:40.979544"
+    }
+  }
+}

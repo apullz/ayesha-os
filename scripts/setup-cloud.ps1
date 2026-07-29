@@ -1,0 +1,161 @@
+# ═══════════════════════════════════════════════════════════════
+#  ayesha-os cloud model setup
+#  run:  .\scripts\setup-cloud.ps1
+# ═══════════════════════════════════════════════════════════════
+
+$envFile = Join-Path $PSScriptRoot ".." ".env"
+
+Write-Host ""
+Write-Host "  ╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "  ║   ayesha-os cloud model setup   (◕‿◕✿)      ║" -ForegroundColor Cyan
+Write-Host "  ╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  this will set up free cloud AI models, desu~" -ForegroundColor Green
+Write-Host ""
+
+# ── load existing .env if present ──
+$existing = @{}
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^([A-Z_]+)=(.+)$') {
+            $existing[$Matches[1]] = $Matches[2]
+        }
+    }
+}
+
+# ── provider menu ──
+Write-Host "  which provider(s) do you want to set up?" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  [1] OpenRouter  (nemotron-3-super, llama-3.3-70b, deepseek-r1, qwen-coder — all FREE)" -ForegroundColor White
+Write-Host "  [2] OpenCode Zen  (big-pickle — FREE stealth coding model)" -ForegroundColor White
+Write-Host "  [3] Both" -ForegroundColor White
+Write-Host ""
+$choice = Read-Host "  enter 1, 2, or 3"
+
+$doOpenRouter = $choice -eq "1" -or $choice -eq "3"
+$doOpenCode   = $choice -eq "2" -or $choice -eq "3"
+
+$envLines = @()
+
+# ── openrouter setup ──
+if ($doOpenRouter) {
+    Write-Host ""
+    Write-Host "  ── openrouter setup ──" -ForegroundColor Cyan
+    Write-Host ""
+
+    if ($existing.ContainsKey("OPENROUTER_API_KEY")) {
+        $masked = $existing["OPENROUTER_API_KEY"].Substring(0, [Math]::Min(12, $existing["OPENROUTER_API_KEY"].Length)) + "..."
+        Write-Host "  existing key found: $masked" -ForegroundColor DarkGray
+        $reuse = Read-Host "  keep it? (y/n)"
+        if ($reuse -eq "y" -or $reuse -eq "Y" -or $reuse -eq "") {
+            $envLines += "OPENROUTER_API_KEY=$($existing['OPENROUTER_API_KEY'])"
+            Write-Host "  ✔ kept existing key" -ForegroundColor Green
+            $doOpenRouter = $false
+        }
+    }
+
+    if ($doOpenRouter) {
+        Write-Host "  1. go to: https://openrouter.ai/keys" -ForegroundColor White
+        Write-Host "  2. sign up (free) or log in" -ForegroundColor White
+        Write-Host "  3. create a new API key" -ForegroundColor White
+        Write-Host "  4. paste it below" -ForegroundColor White
+        Write-Host ""
+        Start-Process "https://openrouter.ai/keys"
+        Write-Host "  (opened browser for you)" -ForegroundColor DarkGray
+        Write-Host ""
+        $orKey = Read-Host "  paste your OpenRouter API key"
+        $orKey = $orKey.Trim()
+        if ($orKey -ne "") {
+            $envLines += "OPENROUTER_API_KEY=$orKey"
+            Write-Host "  ✔ openrouter key saved" -ForegroundColor Green
+        } else {
+            Write-Host "  ✘ skipped (no key entered)" -ForegroundColor Red
+        }
+    }
+}
+
+# ── opencode zen setup ──
+if ($doOpenCode) {
+    Write-Host ""
+    Write-Host "  ── opencode zen setup ──" -ForegroundColor Cyan
+    Write-Host ""
+
+    if ($existing.ContainsKey("OPENCODE_API_KEY")) {
+        $masked = $existing["OPENCODE_API_KEY"].Substring(0, [Math]::Min(12, $existing["OPENCODE_API_KEY"].Length)) + "..."
+        Write-Host "  existing key found: $masked" -ForegroundColor DarkGray
+        $reuse = Read-Host "  keep it? (y/n)"
+        if ($reuse -eq "y" -or $reuse -eq "Y" -or $reuse -eq "") {
+            $envLines += "OPENCODE_API_KEY=$($existing['OPENCODE_API_KEY'])"
+            Write-Host "  ✔ kept existing key" -ForegroundColor Green
+            $doOpenCode = $false
+        }
+    }
+
+    if ($doOpenCode) {
+        Write-Host "  1. go to: https://opencode.ai" -ForegroundColor White
+        Write-Host "  2. sign up (free) and get your API key" -ForegroundColor White
+        Write-Host "  3. paste it below" -ForegroundColor White
+        Write-Host ""
+        Start-Process "https://opencode.ai"
+        Write-Host "  (opened browser for you)" -ForegroundColor DarkGray
+        Write-Host ""
+        $ocKey = Read-Host "  paste your OpenCode Zen API key"
+        $ocKey = $ocKey.Trim()
+        if ($ocKey -ne "") {
+            $envLines += "OPENCODE_API_KEY=$ocKey"
+            Write-Host "  ✔ opencode key saved" -ForegroundColor Green
+        } else {
+            Write-Host "  ✘ skipped (no key entered)" -ForegroundColor Red
+        }
+    }
+}
+
+# ── preserve any other existing env vars ──
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^([A-Z_]+)=') {
+            $key = $Matches[1]
+            if ($key -ne "OPENROUTER_API_KEY" -and $key -ne "OPENCODE_API_KEY") {
+                $envLines += $_
+            }
+        }
+    }
+}
+
+# ── write .env ──
+if ($envLines.Count -gt 0) {
+    $header = "# ayesha-os cloud config — auto-generated by setup-cloud.ps1"
+    $content = @($header) + $envLines
+    $content | Set-Content -Path $envFile -Encoding UTF8
+    Write-Host ""
+    Write-Host "  ✔ saved to .env" -ForegroundColor Green
+}
+
+# ── summary ──
+Write-Host ""
+Write-Host "  ═══════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "  setup complete! available free cloud models:" -ForegroundColor Green
+Write-Host ""
+
+if ($envLines -match "OPENROUTER_API_KEY") {
+    Write-Host "  openrouter (free tier):" -ForegroundColor Yellow
+    Write-Host "    • nvidia/nemotron-3-super:free   (120B MoE, 1M context)" -ForegroundColor White
+    Write-Host "    • meta-llama/llama-3.3-70b:free   (70B instruct)" -ForegroundColor White
+    Write-Host "    • deepseek/deepseek-r1:free       (reasoning/thinking)" -ForegroundColor White
+    Write-Host "    • qwen/qwen-2.5-coder-32b:free    (coding specialist)" -ForegroundColor White
+    Write-Host ""
+}
+
+if ($envLines -match "OPENCODE_API_KEY") {
+    Write-Host "  opencode zen (free):" -ForegroundColor Yellow
+    Write-Host "    • opencode/big-pickle             (stealth coding, 200k ctx)" -ForegroundColor White
+    Write-Host ""
+}
+
+Write-Host "  to use in ayesha engine:" -ForegroundColor Cyan
+Write-Host "    /model nvidia/nemotron-3-super:free" -ForegroundColor White
+Write-Host "    /model opencode/big-pickle" -ForegroundColor White
+Write-Host "    /models                              (list all)" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  kapoo! you're all set (◕ᴗ◕✿)" -ForegroundColor Magenta
+Write-Host ""

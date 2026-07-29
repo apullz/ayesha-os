@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 
+#[derive(Clone)]
 pub struct Sandbox {
     root: PathBuf,
 }

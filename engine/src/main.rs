@@ -1,4 +1,5 @@
 mod ollama;
+mod cloud;
 mod tools;
 mod sandbox;
 mod ui;
@@ -7,12 +8,14 @@ mod memory;
 mod self_analysis;
 mod tool_evolution;
 mod prompt_refinement;
+mod coding_agent;
 mod model_registry;
 mod applet_manager;
 
 use std::io::Write;
 use colored::*;
-use ollama::{OllamaClient, ChatMessage};
+use ollama::{OllamaClient, ChatMessage, StreamResult};
+use cloud::CloudClient;
 use tools::ToolExecutor;
 use sandbox::Sandbox;
 use prompt_refinement::PromptHistory;
@@ -21,8 +24,31 @@ use model_registry::ModelRegistry;
 use applet_manager::AppletManager;
 use serde_json;
 
+/// Active backend — either local Ollama or cloud (OpenRouter/OpenCode)
+enum ActiveBackend {
+    Ollama(OllamaClient),
+    Cloud(CloudClient),
+}
+
+impl ActiveBackend {
+    async fn chat_stream_visible(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<&[serde_json::Value]>,
+        steer_rx: &std::sync::mpsc::Receiver<String>,
+    ) -> anyhow::Result<StreamResult> {
+        match self {
+            ActiveBackend::Ollama(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
+            ActiveBackend::Cloud(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
+        }
+    }
+}
+
 #[cfg(windows)]
 mod winapi {
+    const STD_OUTPUT_HANDLE: u32 = 0xFFFFFFF5u32;
+    const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
+
     extern "system" {
         pub fn AllocConsole() -> i32;
         pub fn GetConsoleWindow() -> *mut core::ffi::c_void;
@@ -30,23 +56,38 @@ mod winapi {
         pub fn GetModuleHandleW(name: *const u16) -> *mut core::ffi::c_void;
         pub fn LoadIconW(instance: *mut core::ffi::c_void, name: *const u16) -> *mut core::ffi::c_void;
         pub fn SetConsoleTitleW(title: *const u16) -> i32;
+        pub fn GetStdHandle(std_handle: u32) -> *mut core::ffi::c_void;
+        pub fn GetConsoleMode(console: *mut core::ffi::c_void, mode: *mut u32) -> i32;
+        pub fn SetConsoleMode(console: *mut core::ffi::c_void, mode: u32) -> i32;
     }
 
     pub fn init_console() {
         unsafe {
-            AllocConsole();
             let console = GetConsoleWindow();
-            if console.is_null() { return; }
-
-            let module = GetModuleHandleW(std::ptr::null());
-            let icon = LoadIconW(module, 1 as *const u16);
-            if !icon.is_null() {
-                SendMessageW(console, 0x0080, 0, icon as isize);
-                SendMessageW(console, 0x0080, 1, icon as isize);
+            if console.is_null() {
+                AllocConsole();
             }
 
-            let title: Vec<u16> = "Ayesha-Engine\0".encode_utf16().collect();
-            SetConsoleTitleW(title.as_ptr());
+            let console = GetConsoleWindow();
+            if !console.is_null() {
+                let module = GetModuleHandleW(std::ptr::null());
+                let icon = LoadIconW(module, 1 as *const u16);
+                if !icon.is_null() {
+                    SendMessageW(console, 0x0080, 0, icon as isize);
+                    SendMessageW(console, 0x0080, 1, icon as isize);
+                }
+
+                let title: Vec<u16> = "Ayesha-Engine\0".encode_utf16().collect();
+                SetConsoleTitleW(title.as_ptr());
+            }
+
+            let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            if !handle.is_null() {
+                let mut mode: u32 = 0;
+                if GetConsoleMode(handle, &mut mode) != 0 {
+                    SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+                }
+            }
         }
     }
 }
@@ -62,7 +103,7 @@ async fn main() -> anyhow::Result<()> {
 
     let sandbox = Sandbox::default_workspace();
     let executor = ToolExecutor::new(sandbox);
-    let mut client = OllamaClient::new("ayesha");
+    let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
 
@@ -125,6 +166,12 @@ async fn main() -> anyhow::Result<()> {
                         (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                             if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
                         }
+                        (KeyCode::Up, KeyModifiers::SHIFT) => {
+                            if steer_tx.send("\0shift-up".to_string()).is_err() { break; }
+                        }
+                        (KeyCode::Down, KeyModifiers::SHIFT) => {
+                            if steer_tx.send("\0shift-down".to_string()).is_err() { break; }
+                        }
                         (KeyCode::Enter, _) => {
                             let line = input_buf.trim().to_string();
                             if steer_tx.send(line).is_err() { break; }
@@ -169,14 +216,34 @@ async fn main() -> anyhow::Result<()> {
     ];
 
     let tools = OllamaClient::tool_definitions();
-    let mut current_model = "ayesha".to_string();
+    let mut current_model = "ayesha:latest".to_string();
     let mut manager = AppletManager::new();
+
+    // Send /set nothink to disable thinking tokens (hidden from user)
+    {
+        messages.push(ChatMessage {
+            role: "user".to_string(),
+            content: "/set nothink".to_string(),
+            tool_calls: None,
+            tool_call_id: None,
+        });
+        let init_client = OllamaClient::new(&current_model);
+        if let Ok(resp) = init_client.chat(&messages, None).await {
+            messages.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: resp.message.content,
+                tool_calls: None,
+                tool_call_id: None,
+            });
+        }
+    }
 
     // Holds steering input that needs to be processed as the next user message
     let mut pending_input: Option<String> = None;
 
     enum InputMode { Normal, Launcher }
     let mut input_mode = InputMode::Normal;
+    let mut applet_cycle_idx: Option<usize> = None;
 
     loop {
         // ── read user input ──
@@ -200,6 +267,29 @@ async fn main() -> anyhow::Result<()> {
                 input_mode = InputMode::Launcher;
                 println!("\n{}", manager.list());
                 ui::show_system("type applet name to launch/stop, `back` to exit, `list` to refresh");
+                continue;
+            }
+            // Shift + Up / Shift + Down → cycle applets
+            if inp == "\0shift-up" || inp == "\0shift-down" {
+                let applets = manager.names();
+                if !applets.is_empty() {
+                    let next_idx = match applet_cycle_idx {
+                        None => 0,
+                        Some(i) => {
+                            if inp == "\0shift-down" {
+                                (i + 1) % applets.len()
+                            } else {
+                                if i == 0 { applets.len() - 1 } else { i - 1 }
+                            }
+                        }
+                    };
+                    applet_cycle_idx = Some(next_idx);
+                    let target = &applets[next_idx];
+                    match manager.launch(target) {
+                        Ok(()) => ui::show_system(&format!("(Shift+Arrow) Launched applet: /{}", target)),
+                        Err(e) => ui::show_system(&format!("(Shift+Arrow) Applet /{} status: {}", target, e)),
+                    }
+                }
                 continue;
             }
             if inp.is_empty() {
@@ -305,6 +395,32 @@ async fn main() -> anyhow::Result<()> {
                 ui::show_system("auto-routing enabled");
                 continue;
             }
+            "sync" => {
+                ui::show_system("initiating tri-mind sync & pushing directly to github...");
+                let _ = std::process::Command::new("python")
+                    .args(["-m", "tri_mind_sync.cli", "sync"])
+                    .output();
+
+                let _ = std::process::Command::new("git")
+                    .args(["add", "."])
+                    .status();
+                let _ = std::process::Command::new("git")
+                    .args(["commit", "-m", "ayesha-os: auto sync update"])
+                    .status();
+                let push_status = std::process::Command::new("git")
+                    .args(["push", "origin", "master"])
+                    .status();
+
+                match push_status {
+                    Ok(s) if s.success() => {
+                        ui::show_system("successfully pushed updates to https://github.com/apullz/ayesha-os! (๑>◡<๑)");
+                    }
+                    _ => {
+                        ui::show_error("git push executed (check authentication if remote unchanged).");
+                    }
+                }
+                continue;
+            }
             "stats" => {
                 match executor.get_tool_stats() {
                     Ok(stats) => println!("\n{}", stats),
@@ -376,8 +492,24 @@ async fn main() -> anyhow::Result<()> {
                 match registry.set_model(name) {
                     Ok(()) => {
                         current_model = name.to_string();
-                        client = OllamaClient::new(&current_model);
-                        ui::show_system(&format!("switched to: {}", name));
+                        if registry.is_cloud_model(name) {
+                            let provider = registry.cloud_provider(name).unwrap_or_default();
+                            match CloudClient::new(name, &provider) {
+                                Ok(cc) => {
+                                    client = ActiveBackend::Cloud(cc);
+                                    ui::show_system(&format!("switched to cloud model: {} ({})", name, provider));
+                                }
+                                Err(e) => {
+                                    ui::show_error(&format!("cloud setup failed: {}. run .\\scripts\\setup-cloud.ps1", e));
+                                    // Revert to default
+                                    current_model = "ayesha".to_string();
+                                    client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
+                                }
+                            }
+                        } else {
+                            client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
+                            ui::show_system(&format!("switched to: {}", name));
+                        }
                     }
                     Err(e) => ui::show_error(&e.to_string()),
                 }
@@ -439,7 +571,15 @@ async fn main() -> anyhow::Result<()> {
             if target.name != current_model {
                 ui::show_routing(&target.name);
                 current_model = target.name.clone();
-                client = OllamaClient::new(&current_model);
+                if registry.is_cloud_model(&current_model) {
+                    let provider = registry.cloud_provider(&current_model).unwrap_or_default();
+                    match CloudClient::new(&current_model, &provider) {
+                        Ok(cc) => client = ActiveBackend::Cloud(cc),
+                        Err(_) => client = ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                    }
+                } else {
+                    client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
+                }
             }
             query
         } else {
@@ -452,7 +592,15 @@ async fn main() -> anyhow::Result<()> {
             if target.name != current_model {
                 ui::show_routing(&target.name);
                 current_model = target.name.clone();
-                client = OllamaClient::new(&current_model);
+                if registry.is_cloud_model(&current_model) {
+                    let provider = registry.cloud_provider(&current_model).unwrap_or_default();
+                    match CloudClient::new(&current_model, &provider) {
+                        Ok(cc) => client = ActiveBackend::Cloud(cc),
+                        Err(_) => client = ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                    }
+                } else {
+                    client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
+                }
             }
         }
 

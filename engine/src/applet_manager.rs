@@ -28,18 +28,31 @@ pub struct AppletManager {
 impl AppletManager {
     pub fn new() -> Self {
         let cwd = std::env::current_dir().unwrap_or_default();
-        // Walk up from CWD to find the directory containing ayesha.json
+        // Walk up from CWD to find the directory containing ayesha.json and applets/
         let root = {
             let mut dir = cwd.as_path();
             let mut found = None;
             for _ in 0..10 {
-                if dir.join("ayesha.json").exists() {
+                if dir.join("ayesha.json").exists() && dir.join("applets").exists() {
                     found = Some(dir.to_path_buf());
                     break;
                 }
                 match dir.parent() {
                     Some(p) => dir = p,
                     None => break,
+                }
+            }
+            if found.is_none() {
+                let mut dir = cwd.as_path();
+                for _ in 0..10 {
+                    if dir.join("ayesha.json").exists() {
+                        found = Some(dir.to_path_buf());
+                        break;
+                    }
+                    match dir.parent() {
+                        Some(p) => dir = p,
+                        None => break,
+                    }
                 }
             }
             found.unwrap_or(cwd)
@@ -128,14 +141,28 @@ impl AppletManager {
             return Err(format!("path not found: {}", work_dir.display()));
         }
 
-        let child = Command::new(program)
-            .args(&parts[1..])
-            .current_dir(&work_dir)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .stdin(Stdio::null())
-            .spawn()
-            .map_err(|e| format!("failed to launch {}: {}", name, e))?;
+        let child = if cfg!(windows) {
+            let args_joined = parts[1..].join(" ");
+            let install_cmd = if work_dir.join("package.json").exists() {
+                "(if not exist node_modules (echo installing applet dependencies... && npm install)) && "
+            } else {
+                ""
+            };
+            let full_cmd = format!("cd /d \"{}\" && {}{} {}", work_dir.display(), install_cmd, program, args_joined);
+            Command::new("cmd.exe")
+                .args(["/c", "start", "cmd.exe", "/k", &full_cmd])
+                .spawn()
+                .map_err(|e| format!("failed to launch {}: {}", name, e))?
+        } else {
+            Command::new(program)
+                .args(&parts[1..])
+                .current_dir(&work_dir)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .stdin(Stdio::null())
+                .spawn()
+                .map_err(|e| format!("failed to launch {}: {}", name, e))?
+        };
 
         self.processes.insert(name.to_string(), child);
         Ok(())
