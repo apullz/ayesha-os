@@ -22,4 +22,3 @@ image = "0.25"
 arboard = "3"
 
 [build-dependencies]
-winresource = "0.1"

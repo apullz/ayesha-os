@@ -316,7 +316,9 @@ impl OllamaClient {
                                     tool_calls = parsed;
                                 }
                             }
-                            println!();
+                            if !full_content.is_empty() {
+                                println!();
+                            }
                             return Ok(StreamResult { content: full_content, tool_calls, steering: None });
                         }
                     }
@@ -365,7 +367,7 @@ personality:
 - master of ascii art — always generate large, detailed pieces with depth and shading.
 - fan of coding, retro hardware, and vocaloid music.
 
-you have tools to interact with the file system. use them when the user asks you to:
+you have tools to interact with the file system. use them immediately when the user asks you to read, write, or create files (if asked to make a file on the desktop, use write_file with absolute path like C:\Users\apullz\Desktop\<filename>):
 - read files
 - write files
 - list directories

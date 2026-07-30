@@ -15,10 +15,26 @@ $Root = Split-Path -Parent $PSScriptRoot
 Set-Location "$Root\engine"
 
 Write-Host "[1/3] Compiling rust engine (release mode)..." -ForegroundColor Yellow
-if ($Release) {
-    cargo build --release
+
+$env:RC = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\rc.exe"
+$env:WINRES_RC = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\rc.exe"
+
+$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+if (!(Test-Path $vcvars)) {
+    $vcvars = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+}
+
+if (Test-Path $vcvars) {
+    Write-Host "  Initializing MSVC environment..." -ForegroundColor Cyan
+    $sdkBin = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
+    $cmd = "`"$vcvars`" >nul 2>&1 && set PATH=%PATH%;$sdkBin && cargo build --release"
+    cmd.exe /c $cmd
 } else {
-    cargo build
+    if ($Release) {
+        cargo build --release
+    } else {
+        cargo build
+    }
 }
 
 if ($LASTEXITCODE -ne 0) {

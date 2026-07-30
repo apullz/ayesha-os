@@ -25,7 +25,11 @@ class GitHubSync:
         self.manifests_file = self.repo_dir / ".tri_mind_manifests.json"
 
     def _ensure_repo(self) -> git.Repo:
-        if not self.repo_dir.exists():
+        git_dir = self.repo_dir / ".git"
+        if not git_dir.exists():
+            if self.repo_dir.exists():
+                import shutil
+                shutil.rmtree(self.repo_dir)
             self.repo_dir.mkdir(parents=True, exist_ok=True)
             url = f"https://github.com/{self.config.repo}.git"
             if self.config.token:
@@ -146,14 +150,14 @@ class GitHubSync:
             remote = repo_manifests.get(path)
             if local and remote:
                 if local.has_changed(remote):
-                    result["conflicts"].append(path)
+                    to_push.append(path)
             elif local and not remote:
                 to_push.append(path)
             elif remote and not local:
                 result["pulled"].append(path)
 
         if to_push:
-            self.push(to_push, "tri-mind: sync new local files")
+            self.push(to_push, "tri-mind: sync local changes")
             result["pushed"] = to_push
         return result
 
