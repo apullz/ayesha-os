@@ -1,4 +1,5 @@
 use std::fs;
+use std::cell::RefCell;
 use anyhow::{Result, bail};
 use serde_json::Value;
 
@@ -22,15 +23,16 @@ fn chrono_like_ts() -> String {
 pub struct ToolExecutor {
     sandbox: Sandbox,
     project_root: std::path::PathBuf,
+    applet_manager: RefCell<AppletManager>,
 }
 
 impl ToolExecutor {
-    pub fn new(sandbox: Sandbox) -> Self {
+    pub fn new(sandbox: Sandbox, applet_manager: AppletManager) -> Self {
         let project_root = std::env::current_exe()
             .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()))
             .unwrap_or_else(|| std::path::PathBuf::from("."));
-        Self { sandbox, project_root }
+        Self { sandbox, project_root, applet_manager: RefCell::new(applet_manager) }
     }
 
     pub async fn execute(&self, name: &str, args: &Value) -> Result<String> {
@@ -39,7 +41,10 @@ impl ToolExecutor {
             "write_file" => self.write_file(args).await,
             "list_dir" => self.list_dir(args).await,
             "generate_html" => self.generate_html(args).await,
-            "generate_pixel_art" => self.generate_pixel_art(args).await,
+            "generate_pixel_art" | "generate_sprite" | "generate_tileset" | "generate_object" | "render_sprite"
+                => self.generate_pixel_art(args).await,
+            "manage_applet" => self.manage_applet(args),
+            "read_clipboard" => self.read_clipboard(args),
             "remember" => self.remember(args),
             "list_memories" => self.list_memories(args),
             "search_memories" => self.search_memories(args),
@@ -548,6 +553,43 @@ return only the html, nothing else."#,
             }
         }
     }
+    fn manage_applet(&self, args: &Value) -> Result<String> {
+        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("list");
+        let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+
+        match action {
+            "list" => Ok(self.applet_manager.borrow().list()),
+            "launch" => {
+                if name.is_empty() {
+                    bail!("missing 'name' argument for launch action");
+                }
+                self.applet_manager.borrow_mut().launch(name).map_err(|e| anyhow::anyhow!(e))?;
+                Ok(format!("launched '{}' successfully", name))
+            }
+            "stop" => {
+                if name.is_empty() {
+                    bail!("missing 'name' argument for stop action");
+                }
+                self.applet_manager.borrow_mut().stop(name).map_err(|e| anyhow::anyhow!(e))?;
+                Ok(format!("stopped '{}' successfully", name))
+            }
+            "status" => {
+                if name.is_empty() {
+                    bail!("missing 'name' argument for status action");
+                }
+                let mgr = self.applet_manager.borrow();
+                if !mgr.has(name) {
+                    return Ok(format!("unknown applet: '{}'. use 'list' to see available applets", name));
+                }
+                let _running = mgr.is_running(name);
+                let entry = mgr.entries.get(name).unwrap();
+                let port_str = entry.port.map(|p| format!(" port {}", p)).unwrap_or_default();
+                Ok(format!("{}: {} ({}){}", name, entry.desc, entry.lang, port_str))
+            }
+            _ => bail!("unknown action: '{}'. valid actions: list, launch, stop, status", action),
+        }
+    }
+
     async fn coding_agent(&self, args: &Value) -> Result<String> {
         // Import the coding_agent module
         use crate::coding_agent::CodingAgent;

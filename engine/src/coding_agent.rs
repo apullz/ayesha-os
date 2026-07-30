@@ -343,21 +343,8 @@ impl CodingAgent {
     }
 
     /// Execute another tool through the coding agent
-    async fn execute_tool(&self, args: &Value) -> Result<String> {
-        let tool_name = args.get("tool")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Missing 'tool' argument"))?;
-        let _tool_args = args.get("args")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
-        
-        // This would normally delegate to the ToolExecutor
-        // For now, we'll return a placeholder
-        Ok(json!({
-            "tool": tool_name,
-            "status": "executed",
-            "result": "Tool execution delegated to main executor"
-        }).to_string())
+    async fn execute_tool(&self, _args: &Value) -> Result<String> {
+        Ok("tool calls are handled by the main agent loop — just call any tool directly from your response, and it will be executed automatically. no need to use coding_agent for tool delegation.".to_string())
     }
 }
 

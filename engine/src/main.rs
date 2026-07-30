@@ -30,6 +30,15 @@ enum ActiveBackend {
     Cloud(CloudClient),
 }
 
+/// Truncate tool results to prevent context overflow
+fn truncate_tool_result(result: &str, max_chars: usize) -> String {
+    if result.len() > max_chars {
+        format!("{}...\n(truncated: showing {} of {} chars)", &result[..max_chars], max_chars, result.len())
+    } else {
+        result.to_string()
+    }
+}
+
 impl ActiveBackend {
     async fn chat_stream_visible(
         &self,
@@ -102,7 +111,8 @@ async fn main() -> anyhow::Result<()> {
     winapi::init_console();
 
     let sandbox = Sandbox::default_workspace();
-    let executor = ToolExecutor::new(sandbox);
+    let mut manager = AppletManager::new();
+    let executor = ToolExecutor::new(sandbox, AppletManager::new());
     let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
@@ -217,7 +227,6 @@ async fn main() -> anyhow::Result<()> {
 
     let tools = OllamaClient::tool_definitions();
     let mut current_model = "ayesha:latest".to_string();
-    let mut manager = AppletManager::new();
 
     // Send /set nothink to disable thinking tokens (hidden from user)
     {
@@ -684,6 +693,9 @@ async fn main() -> anyhow::Result<()> {
                     } else {
                         ui::show_tool_ok(name, &tool_result);
                     }
+
+                    // Truncate large results to protect context window
+                    let tool_result = truncate_tool_result(&tool_result, 8192);
 
                     messages.push(ChatMessage {
                         role: "tool".to_string(),
