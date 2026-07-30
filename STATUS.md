@@ -12,60 +12,66 @@
 
   ── P R O J E C T S ──
 
-  engine/          [✔]  CLI persona host with streaming,
-                         model routing, tool-calling,
-                         retro cyberpunk UI, command palette
+  engine/          [✔]  Agentic coding assistant + jarvis chatbot.
+                         CLI persona host with streaming,
+                         model routing, tool-calling (18 tools),
+                         cloud support (openrouter/opencode),
+                         pixel striker sprite engine,
+                         self-improvement loop, command palette,
+                         retro cyberpunk UI, applet manager.
                          └ model: ayesha (qwen2.5-coder:14b base)
 
-  core/            [✔]  Gradio web UI, mobile API,
-                         tri-node hive sync
+  core/            [✔]  Gradio web UI, FastAPI mobile API,
+                         hivemind client for instance sync.
                          └ needs ollama running locally
 
-  screen/          [→]  Vision chatbox using ollama
-                         llama3.2-vision + qwen2.5-coder:14b
-                         └ replaced gemini endpoints 07/2026
+  tri_mind_sync/   [✔]  Bidirectional sync engine
+                         (github, huggingface, local).
+                         Fixed: now pushes modified files.
 
-  cosmic-rag/      [→]  Local RAG chatbot with vault
+  git_middleware/   [✔]  Gitea webhook receiver + LLM task runner.
+                         Code review, security scan, auto-summary.
+
+  screen/          [→]  Vision chatbox + desktop companion terminal.
+                         Replaced gemini with ollama 07/2026.
+
+  cosmic-rag/      [→]  Local RAG chatbot with vault.
                          └ ollama llama3.2 needed
 
-  screenshotai/    [→]  Screenshot capture + analysis
+  screenshotai/    [→]  Screenshot capture + analysis.
                          └ uses moondream via ollama
 
-  desktop-cat/     [✔]  Desktop pet (no AI needed)
-                         └ pure tkinter, always works
+  desktop-cat/     [✔]  Desktop pet (no AI needed).
+                         └ pure tkinter + Win32 API
 
-  flora-cli/       [→]  Scottish flora phylo explorer
+  flora-cli/       [→]  Scottish flora phylo explorer.
                          └ replaced gemini with ollama 07/2026
-                         └ "ask" command -> qwen2.5-coder:14b
 
-  bring-to-life/   [→]  Image-to-interactive-HTML app
-                         └ replaced gemini with ollama 07/2026
+  bring-to-life/   [→]  Image-to-interactive-HTML app.
                          └ vision -> llama3.2-vision, text -> qwen2.5-coder:14b
 
-  neural-strike/   [!]  SAE interpretability game
+  neural-strike/   [!]  SAE interpretability game.
                          └ local-only (neuronpedia stubbed)
                          └ requires pre-downloaded data exports
 
-  models/          [✔]  Modelfile for ayesha personality
+  poopy-tui/       [!]  Discord terminal client with voice + TUI.
+                         └ requires DISCORD_TOKEN in .env
+
+  models/          [✔]  Modelfile for ayesha personality.
                            └ FROM qwen2.5-coder:14b
 
-  launcher/        [✔]  In-engine applet switcher
+  launcher/        [✔]  In-engine applet switcher.
                           └ Ctrl+M opens launcher mode
                           └ /run, /stop, /apps slash commands
-                          └ /appletname shortcut launches applets
                           └ scripts/launcher.py (tray companion)
 
   ── K N O W N   I S S U E S ──
 
-  ! engine: auto-routing defaults to qwen2.5-coder:14b
-    but detect() pulls all locally available models
-    └ if you have gemma models installed, they'll still show in /models
-
   ! neural-strike: steer() and UMAP fetch disabled
     └ drop JSON exports into data/exports/ to use cached features
 
-  ! HF Space: hotkeys and command palette removed 07/2026
-    └ app.py currently crashing (SyntaxError) — redeploy fixed version
+  ! poopy-tui: requires DISCORD_TOKEN in .env
+    └ uses discord.py-self for user account access
 
   ── S E C U R I T Y   N O T E S ──
 
@@ -73,6 +79,7 @@
   * git author changed to noreply email
   * 0.0.0.0 binds changed to 127.0.0.1
   * no personal paths or system info in source
+  * sandbox blocks sensitive paths (.env, .ssh, .gnupg, .aws)
 
   ── M O D E L S   N E E D E D ──
 
@@ -80,3 +87,17 @@
   ollama pull llama3.2-vision    # vision tasks
   ollama pull moondream          # screenshotai
   ollama create ayesha -f models/Modelfile  # custom personality
+
+  ── C L O U D   M O D E L S   (f r e e) ──
+
+  openrouter:   nvidia/nemotron-3-super:free
+                meta-llama/llama-3.3-70b-instruct:free
+                deepseek/deepseek-r1:free
+                qwen/qwen-2.5-coder-32b-instruct:free
+  opencode:     opencode/big-pickle
+
+  ── D E P L O Y M E N T ──
+
+  github:       git push origin master
+  huggingface:  $env:HF_TOKEN = "hf_..."; .\scripts\sync-all.ps1
+  standalone:   .\scripts\build-exe.ps1 -> dist\ayesha-os.exe

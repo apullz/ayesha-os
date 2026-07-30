@@ -8,7 +8,7 @@
 ║     ╚══════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚══════╝      ║
 ║                                                              ║
 ║     engine  ::  v4.2.0                                       ║
-║     "terminal-native persona host with tool-calling"         ║
+║     agentic coding assistant + jarvis chatbot                 ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 
@@ -16,79 +16,134 @@
 
   Title    : ayesha-engine
   Version  : v4.2.0
-  Type     : CLI AI Agent / Persona Host
+  Type     : CLI AI Agent / Coding Assistant / Persona Host
   Language : Rust (edition 2021)
-  Model    : ollama + qwen2.5:7b (default)
+  Target   : x86_64-pc-windows-msvc
   Features : streaming, thinking blocks, model routing,
-             tool execution, command palette, retro UI
-  Build    : stable-x86_64-pc-windows-gnu
+             tool execution, command palette, retro UI,
+             pixel art generation, cloud model support,
+             self-improvement loop, persistent memory
 
   ── D E S C R I P T I O N ──
 
-  the engine is the central CLI interface of ayesha-os. it
-  connects to a local ollama instance, routes user queries to
-  the best model, streams responses token-by-token with a
-  retro cyberpunk typewriter effect, detects <think> reasoning
-  blocks mid-stream, and supports real-time steering (type
-  during generation to interrupt and redirect).
+  the engine is the heart of ayesha-os. it functions as both
+  an agentic coding assistant (like opencode) and a jarvis-like
+  chatbot, all wrapped in the ayesha personality.
 
-  key features:
+  connects to local ollama + cloud providers (openrouter,
+  opencode), routes queries to the best model, streams
+  responses with a retro cyberpunk typewriter effect, detects
+  <think> reasoning blocks, and supports real-time steering.
 
-  * TRUE STREAMING — tokens print as they arrive from ollama,
-    no artificial delays. <think> blocks render dimmed.
+  ── F E A T U R E S ──
 
-  * MODEL ROUTING — auto-detects coding/vision queries and
-    routes to the optimal model. manual /model override.
+  DUAL BACKEND
+    local:   ollama @ localhost:11434
+    cloud:   openrouter (free tier), opencode
+    models:  auto-detected from ollama + cloud config
 
-  * TOOL EXECUTION — model can call tools: read_file,
-    write_file, list_dir, generate_html, generate_sprite,
-    remember/search_memories, analyze_self, evolve_tools,
-    refine_prompt.
+  MODEL ROUTING
+    auto-detects coding/vision queries by keyword
+    coding -> qwen2.5-coder:14b
+    vision -> llama3.2-vision
+    manual: /model <name>, /route <query>, /auto
 
-  * COMMAND PALETTE — type / alone to see all commands overlayed
-    on the terminal. /help, /clear, /model, /auto, /stats,
-    /memory, /analyze, /evolve, /refine, /name, etc.
+  TRUE STREAMING
+    tokens print as they arrive from ollama
+    <think> blocks render dimmed
+    ~20ms/char typewriter effect
 
-  * SLASH COMMANDS — /name <you> changes the stored user name
-    live. /route <query> routes one query manually.
+  STEERING
+    type during generation to interrupt and redirect
+    Ctrl+C to abort, Ctrl+M for launcher mode
+    Shift+Up/Down to cycle applets
 
-  * SELF-IMPROVEMENT — the engine can read its own source code
-    and suggest improvements, evolve new tools, and refine
-    its system prompt based on usage patterns.
+  TOOL EXECUTION (18 tools)
+    file ops:    read_file, write_file, list_dir
+    generation:  generate_html, generate_sprite,
+                 generate_tileset, generate_object, render_sprite
+    memory:      remember, list_memories, search_memories,
+                 set_preference
+    analysis:    analyze_self, list_source_files, evolve_tools,
+                 refine_prompt, get_tool_stats
+    clipboard:   read_clipboard
+    coding:      coding_agent (read/write/edit/analyze/modify/suggest)
 
-  * RETRO CYBERPUNK UI — green-on-black theme, box-drawing
-    borders (┌─┐│└┘), ◆▶✔✖ symbols, per-line rainbow ASCII
-    banner on startup.
+  PIXEL STRIKER (built-in sprite engine)
+    7-color character palettes
+    4 animation states: idle, walk_left, walk_right, hacking_active
+    checkerboard dithering for soft shadows
+    sub-pixel visor glow effects
+    circuit-line highlights for tech aesthetic
 
-  * USER NAME INJECTION — stored in config.json, injected into
-    the system prompt. model is told to use it occasionally
-    (not every message).
+  SELF-IMPROVEMENT LOOP
+    persistent memory (~/.ayesha/memory.json)
+    self-analysis (scans .rs for issues)
+    tool evolution (generates new tool definitions)
+    prompt refinement (analyzes success rates)
+    error auto-memory (tool failures stored automatically)
+
+  SANDBOX SECURITY
+    blocks sensitive paths: .env, .ssh, .gnupg, .aws
+    path traversal prevention
+    all file ops through Sandbox::resolve()
+
+  COMMAND PALETTE
+    type / to see all commands overlayed on terminal
+    filterable, box-drawing character frame
+
+  RETRO CYBERPUNK UI
+    green-on-black theme with box-drawing borders
+    rainbow ASCII banner on startup
+    kaomoji coloring in responses
+    code block formatting with background coloring
+
+  APPLET MANAGER
+    Ctrl+M to toggle launcher mode
+    launch/stop applets from within the engine
+    auto-installs npm dependencies if needed
+    Shift+Up/Down for quick applet cycling
+
+  CLOUD INTEGRATION
+    OpenRouter: free tier models (nemotron, llama, deepseek, qwen)
+    OpenCode: big-pickle model
+    API keys from .env (OPENROUTER_API_KEY, OPENCODE_API_KEY)
+    SSE streaming with tool-call reconstruction
+
+  PERSISTENT STATE
+    config.json: user_name, engine config
+    ~/.ayesha/memory.json: memories, preferences, facts
+    ~/.ayesha/prompt_history.json: tool usage history
 
   ── B U I L D   R E Q U I R E M E N T S ──
 
-  Rust 1.80+ (stable)
+  Rust 1.80+ (stable, x86_64-pc-windows-msvc)
   ollama running on localhost:11434
-  models pulled: qwen2.5:7b (min), plus opt. qwen2.5-coder:14b
+  models: ayesha (custom), qwen2.5-coder:14b, llama3.2-vision
+  Windows SDK with rc.exe (for icon embedding)
 
-  ── I N S T A L L ──
+  ── B U I L D ──
 
-  cargo run --release
-  # or use the prebuilt binary in target/release/
+  cargo build --release
 
-  config.json is created on first run. edit user_name field
-  or use /name <you> in-app.
+  or use the build script:
+  powershell -ExecutionPolicy Bypass -File ..\scripts\build-exe.ps1
+
+  this creates a standalone dist\ayesha-os.exe with bundled
+  config, models, and applets.
 
   ── U S A G E ──
 
   $ cargo run --release
 
   > write a fibonacci function
-    -- qwen2.5-coder:14b --
     >> sure thing! here's a recursive implementation...
 
   > what's on my screen?
-    -- llama3.2-vision --
     >> i can see a terminal window with...
+
+  > analyze tools.rs
+    >> here's my analysis of the code...
 
   type / for command palette
   type Ctrl+C or /exit to quit
@@ -97,64 +152,84 @@
 
   /                 show command palette overlay
   /help             show help
-  /exit             quit
+  /exit             quit (saves memory + prompt history)
   /clear            clear screen
-  /models           list available models
+  /models           list available models (local + cloud)
   /model <name>     switch model
   /auto             re-enable auto-routing
   /pull <name>      pull a model
   /route <query>    route one query manually
-  /stats            tool usage stats
+  /apps             list registered applets
+  /run <name>       launch an applet
+  /stop <name>      stop an applet
+  /stats            tool usage stats with bar charts
   /memory           list memories
   /analyze          analyze own source code
   /evolve           suggest new tools
   /refine           analyze prompt history
+  /sync             push changes to github + huggingface
   /name <you>       set user name
-
-  ── M O D E L   R O U T I N G ──
-
-  the engine auto-routes by keyword detection:
-
-  "implement", "debug", "function"     -> coding model
-  "image", "screenshot", "vision"      -> vision model
-  everything else                       -> qwen2.5:7b
-
-  models are discovered dynamically from ollama at startup.
-  the known_models() list provides sensible defaults.
 
   ── F I L E S ──
 
   src/
-    main.rs             ~422 lines  entry point, loop, commands
-    ollama.rs           ~677 lines  ollama client, streaming
-    ui.rs               ~352 lines  retro terminal rendering
-    tools.rs            ~240 lines  tool definitions + dispatch
-    sandbox.rs           ~70 lines  file I/O sandbox
-    model_registry.rs   ~248 lines  model discovery + routing
-  config.json                      user name + engine config
-  Cargo.toml                       dependencies
-  run.bat                          windows launcher
-  .cargo/config.toml               link flags
+    main.rs             entry point, agent loop, commands
+    ollama.rs           ollama client, streaming, tool defs
+    cloud.rs            cloud client (openrouter/opencode)
+    ui.rs               retro terminal rendering
+    tools.rs            tool definitions + dispatch
+    sandbox.rs          file I/O sandbox + security
+    model_registry.rs   model discovery + routing
+    memory.rs           persistent memory store
+    self_analysis.rs    code analysis engine
+    tool_evolution.rs   tool gap analysis + generation
+    prompt_refinement.rs prompt history + refinement
+    coding_agent.rs     multi-action coding tool
+    applet_manager.rs   applet process management
+    pixel_striker/      built-in pixel art engine
+      mod.rs            module root
+      palette.rs        color palette system
+      character.rs      character sprite renderer
+      renderer.rs       sprite sheet renderer
+      tileset.rs        terrain tileset (stub)
+      object.rs         game object sprites (stub)
+  config.json           user name + engine config
+  Cargo.toml            dependencies
+  build.rs              icon embedding (rc.exe)
 
   ── D E P E N D E N C I E S ──
 
-  reqwest          HTTP client for ollama API
-  serde/serde_json JSON parsing
-  tokio            async runtime
-  crossterm        terminal control
-  anyhow           error handling
-  colored          terminal colors
-  chrono           timestamps
+  runtime:
+    tokio            async runtime
+    reqwest          HTTP client for ollama + cloud APIs
+    serde/serde_json JSON parsing
+    crossterm        terminal control + raw mode
+    anyhow           error handling
+    colored          terminal colors
+    dirs             user directory paths
+    image            pixel art PNG generation
+    arboard          clipboard access (text + images)
+
+  build:
+    (none — uses rc.exe directly from Windows SDK)
+
+  ── C L O U D   M O D E L S ──
+
+  provider     model                              context   caps
+  ─────────────────────────────────────────────────────────────
+  openrouter   nvidia/nemotron-3-super:free       1M       all
+  openrouter   meta-llama/llama-3.3-70b:free      131K     gen+code
+  openrouter   deepseek/deepseek-r1:free          64K      think
+  openrouter   qwen/qwen-2.5-coder-32b:free       32K      code
+  opencode     opencode/big-pickle                200K     code
 
   ── N O T E S ──
 
-  - the engine defaults to model "ayesha" (custom from
-    Modelfile) but falls back to qwen2.5:7b for routing
+  - defaults to model "ayesha" (custom from Modelfile)
   - config.json stores user_name — edit manually or /name
-  - steer_channel.rs was removed; steering is inline via
-    stdin thread + mpsc channel
-  - the windows build uses /SUBSYSTEM:WINDOWS to hide
-    the console window behind the custom terminal UI
+  - steering uses stdin thread + mpsc channel
+  - cloud models require API keys in .env
+  - icon embedded via rc.exe + build.rs (CARGO_MANIFEST_DIR)
 
   ── G R E E T S ──
 

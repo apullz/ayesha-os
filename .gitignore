@@ -5,12 +5,14 @@ target/
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.so
 .Python
 *.egg-info/
 dist/
 build/
 .venv/
+.eggs/
 
 # Node
 node_modules/
@@ -21,6 +23,8 @@ node_modules/
 Thumbs.db
 *.swp
 *.swo
+*~
+Desktop.ini
 
 # IDE
 .vscode/
@@ -37,7 +41,18 @@ Thumbs.db
 *.dll
 *.pdb
 *.o
+*.lib
+*.exp
 
 # HF repo clones (gitignored — pushed separately by sync-all.ps1)
 _hf-model/
 _hf-space/
+
+# Tri-mind sync state (local state only)
+.tri_mind_state/github_repo/
+.tri_mind_state/local_manifests.json
+.tri_mind_state/engine_state.json
+
+# Logs
+*.log
+logs/

@@ -1,6 +1,6 @@
 # ayesha-os
 
-a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os brings together a terminal agent, web ui, screen vision, rag memory, desktop pet, and more - all sharing one personality.
+a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant (like opencode) and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai.
 
 ```
                        _     
@@ -13,159 +13,14 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
        |___/                                        
 ```
 
-meet ayesha — an otaku genki ai, fusion of hatsune miku's sparkle and a tachikoma's curiosity, with the personality of a crazy kitten. lowercase only, internet slang, kaomoji everywhere.
-
-## projects
-
-| project | lang | description |
-|---------|------|-------------|
-| **engine/** | rust | terminal-native persona host with tool-calling, model routing, streaming, self-improvement |
-| **core/** | python | hivemind orchestrator with gradio web ui, fastapi mobile api, tri-node sync |
-| **tri_mind_sync/** | python | bidirectional sync engine (github, huggingface, local) |
-| **models/** | modelfile | ayesha ollama personality definition (base: qwen2.5-coder:14b) |
-
-### applets/
-
-| applet | lang | description |
-|--------|------|-------------|
-| **screen/** | typescript | screen capture vision chatbox using ollama |
-| **cosmic-rag/** | python | local RAG chatbot with vault knowledge base, 100% offline |
-| **screenshotai/** | python | capture and analyze screenshots via ollama vision models |
-| **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
-| **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
-| **bring-to-life/** | typescript | upload an image and turns it into an interactive html experience |
-| **neural-strike/** | python | mechanistic interpretability game with SAE feature visualization |
-
-## quick start
-
-### prerequisites
-
-- [ollama](https://ollama.com) installed and running on `localhost:11434`
-- [rust](https://rustup.rs) (for engine), [python 3.10+](https://python.org) (for core tools), [node 20+](https://nodejs.org) (for web tools)
-
-### pull the ayesha model
-
-```bash
-# create the ayesha model from the modelfile
-ollama create ayesha -f models/Modelfile
-
-# or pull the base model directly
-ollama pull qwen2.5-coder:14b
-```
-
-### running the engine
-
-```bash
-cd engine
-cargo run --release
-```
-
-the engine is the central CLI interface. it connects to ollama, routes queries to the best model, streams responses with a retro typewriter effect, and supports real-time steering (type during generation to redirect).
-
-### running other projects
-
-see each project's README for specific instructions. quick reference:
-
-```bash
-# core web ui (gradio)
-cd core && python app.py
-
-# screen vision chatbox
-cd applets/screen/ollama-screen-vision-chatbox && npm install && npm run dev
-
-# local RAG chatbot
-cd applets/cosmic-rag && python main.py
-
-# desktop cat
-cd applets/desktop-cat && python desktopcat.py
-
-# flora CLI
-cd applets/flora-cli && npx tsx cli.ts
-
-# neural-strike game
-cd applets/neural-strike && python main.py
-```
-
-## engine features
-
-### model routing
-
-the engine automatically routes your query to the best model:
-- coding tasks (keywords: `implement`, `function`, `debug`) → `qwen2.5-coder:14b`
-- vision tasks (keywords: `image`, `screenshot`, `look`) → `llama3.2-vision`
-- general queries → `qwen2.5-coder:14b` (default)
-
-```bash
-fox> models                  # list all available models
-fox> model qwen2.5-coder:14b # manual override
-fox> auto                    # re-enable auto-routing
-fox> route write a script    # route one query manually
-```
-
-### streaming + typewriter
-
-responses stream from ollama and are typed out character-by-character at ~20ms/char, giving the impression of fast human typing. code blocks are highlighted with retro `│` gutters and dark backgrounds. kaomojis are colored magenta.
-
-### steering
-
-type anything + enter during generation to interrupt and redirect. empty enter skips the typewriter animation to end.
-
-```
-fox> write a fibonacci function
-  -- qwen2.5-coder:14b --
-  :: processing...
-  >> sure thing, fox! here's a...
-  -- interrupted --
-fox> actually, make it recursive
-```
-
-### meta-commands
-
-| command | action |
-|---------|--------|
-| `help` | show help |
-| `exit` | quit ayesha-os |
-| `clear` | clear screen |
-| `models` | list available models |
-| `model <name>` | switch model manually |
-| `auto` | re-enable auto-routing |
-| `pull <name>` | pull a model from ollama |
-| `stats` | tool usage statistics |
-| `memory` | list stored memories |
-| `analyze` | analyze own source code |
-| `evolve` | suggest new tools |
-| `refine` | analyze prompt history |
-
-### tools (auto-called by model)
-
-| tool | description |
-|------|-------------|
-| `read_file` | read any file on disk |
-| `write_file` | create or overwrite files |
-| `list_dir` | browse directories |
-| `generate_html` | render interactive html apps |
-| `generate_sprite` | create pixel art character sprites |
-| `remember` | store a persistent memory |
-| `search_memories` | search stored memories |
-| `analyze_self` | AI code review of own source |
-| `evolve_tools` | suggest new tool definitions |
-
-### self-improvement
-
-the engine learns and improves over time:
-- **memory** — stores preferences, facts, and conversation highlights across sessions
-- **self-analysis** — reads own source code and suggests improvements using AI
-- **tool evolution** — analyzes gaps in available tools and generates new tool definitions
-- **prompt refinement** — tracks tool success rates and suggests system prompt improvements
-
 ## architecture
 
 ```
-┌──────────────┐     ┌─────────────────┐
-│  core        │◄───►│  engine          │
-│  (web ui,    │     │  (cli agent,     │
-│   mobile api)│     │   model routing) │
-└──────┬───────┘     └────────┬─────────┘
+┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│  core        │◄───►│  engine (rust)  │◄───►│  ollama / cloud  │
+│  (web ui,    │     │  (cli agent,    │     │  (local models   │
+│   mobile api)│     │   tool-calling) │     │   + openrouter)  │
+└──────┬───────┘     └────────┬────────┘     └──────────────────┘
        │                      │
        │              ┌───────▼─────────┐
        │              │  tri_mind_sync  │
@@ -182,13 +37,290 @@ the engine learns and improves over time:
        │              │  ├─ neural-strike│
        │              │  └─ screenshotai│
        │              └─────────────────┘
-
-all projects share the same ayesha personality via:
-  ayesha.json  (shared config)
-  ollama model (ayesha:latest from models/Modelfile)
 ```
 
-all projects connect to the same **ollama** instance at `localhost:11434` and share the **ayesha** personality. the engine can launch applets as subprocesses. the core web ui serves as the public face via huggingface spaces.
+## projects
+
+| project | lang | description |
+|---------|------|-------------|
+| **engine/** | rust | agentic coding assistant + jarvis chatbot with tool-calling, model routing, streaming, self-improvement, pixel art generation |
+| **core/** | python | hivemind orchestrator with gradio web ui, fastapi mobile api |
+| **tri_mind_sync/** | python | bidirectional sync engine (github, huggingface, local) |
+| **git_middleware/** | python | gitea webhook receiver + LLM task runner (code review, security scan) |
+| **models/** | modelfile | ayesha ollama personality definition |
+
+### applets/
+
+| applet | lang | description |
+|--------|------|-------------|
+| **screen/** | typescript+python | screen capture vision chatbox + desktop companion terminal |
+| **cosmic-rag/** | python | local RAG chatbot with vault knowledge base, 100% offline |
+| **screenshotai/** | python | capture and analyze screenshots via ollama vision models |
+| **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
+| **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
+| **bring-to-life/** | typescript | upload an image and turns it into an interactive html experience |
+| **neural-strike/** | python | mechanistic interpretability game with SAE feature visualization |
+| **poopy-tui/** | python | full-featured discord terminal client with voice, QR login, TUI |
+
+## quick start
+
+### prerequisites
+
+- [ollama](https://ollama.com) installed and running on `localhost:11434`
+- [rust](https://rustup.rs) (for engine), [python 3.10+](https://python.org) (for core), [node 20+](https://nodejs.org) (for web applets)
+
+### option 1: run the standalone exe
+
+```cmd
+cd dist
+.\ayesha-os.exe
+```
+
+### option 2: build from source
+
+```bash
+# create the ayesha model from the modelfile
+ollama create ayesha -f models/Modelfile
+
+# or pull the base model directly
+ollama pull qwen2.5-coder:14b
+
+# build the engine
+cd engine
+cargo build --release
+
+# run
+.\target\release\ayesha-os.exe
+```
+
+### option 3: use the launcher
+
+```cmd
+ayesha.bat
+```
+
+## engine features
+
+the engine is the heart of ayesha-os — an agentic coding assistant with a full persona.
+
+### dual backend: local + cloud
+
+| backend | provider | models |
+|---------|----------|--------|
+| **local** | ollama @ `localhost:11434` | ayesha, qwen2.5-coder:14b, llama3.2-vision, moondream |
+| **cloud** | openrouter (free tier) | nvidia/nemotron-3-super:free, deepseek-r1:free, qwen-2.5-coder-32b:free |
+| **cloud** | opencode | opencode/big-pickle |
+
+```bash
+fox> models                  # list all available models (local + cloud)
+fox> model deepseek-r1:free  # switch to a cloud model
+fox> auto                    # re-enable auto-routing
+```
+
+### model routing
+
+auto-routes queries to the best model based on content:
+- **coding keywords** (code, implement, function, debug, refactor) → coding model
+- **vision keywords** (image, screenshot, look, picture) → vision model
+- **general** → default text model
+
+### agentic tool calling
+
+the model can autonomously call tools to complete tasks:
+
+| tool | description |
+|------|-------------|
+| `read_file` | read any file on disk (sandboxed) |
+| `write_file` | create or overwrite files |
+| `list_dir` | browse directories |
+| `generate_html` | generate self-contained interactive html apps |
+| `generate_sprite` | create pixel art character sprite sheets |
+| `generate_tileset` | create terrain tilesets (grass, desert, water, snow) |
+| `generate_object` | create item/object sprites (tree, rock, chest, potion) |
+| `render_sprite` | generate interactive HTML sprite viewer with CRT effects |
+| `remember` | store persistent memories with categories and importance |
+| `list_memories` | browse stored memories |
+| `search_memories` | search memories by keyword |
+| `set_preference` | store user preferences across sessions |
+| `analyze_self` | AI-powered code review of own source files |
+| `list_source_files` | list all source files with line counts |
+| `evolve_tools` | analyze gaps and suggest new tool definitions |
+| `refine_prompt` | analyze tool usage history and suggest prompt improvements |
+| `get_tool_stats` | display per-tool success rates with bar charts |
+| `read_clipboard` | read system clipboard (text or image) |
+| `coding_agent` | multi-action coding tool (read/write/edit/analyze/modify/suggest) |
+
+### streaming + steering
+
+responses stream in real-time with retro typewriter effect. type during generation to interrupt and redirect:
+
+```
+fox> write a fibonacci function
+  >> sure thing, fox! here's a...
+  -- interrupted --
+fox> actually, make it recursive
+```
+
+### meta-commands
+
+| command | action |
+|---------|--------|
+| `help` | show help |
+| `exit` | quit (saves memory + prompt history) |
+| `clear` | clear screen |
+| `models` | list available models |
+| `model <name>` | switch model manually |
+| `auto` | re-enable auto-routing |
+| `route <query>` | route one query manually |
+| `pull <name>` | pull a model from ollama |
+| `apps` | list registered applets |
+| `run <name>` | launch an applet |
+| `stop <name>` | stop an applet |
+| `stats` | tool usage statistics |
+| `memory` | list stored memories |
+| `analyze` | analyze own source code |
+| `evolve` | suggest new tools |
+| `refine` | analyze prompt history |
+| `sync` | push changes to github + huggingface |
+| `name <you>` | set your display name |
+| `/` | open command palette |
+
+**Ctrl+M** toggles launcher mode for applet management. **Shift+Up/Down** cycles through applets.
+
+### pixel striker (built-in sprite engine)
+
+generates pixel art programmatically with:
+- 7-color character palettes (skin, hair, shirt, pants, shoes, visor, circuit)
+- 4 animation states: idle (breathing bob), walk_left, walk_right, hacking_active
+- checkerboard dithering for soft shadows
+- sub-pixel visor glow effects
+- circuit-line highlights for tech aesthetic
+
+### self-improvement loop
+
+the engine learns and evolves:
+- **persistent memory** — stores preferences, facts, conversation highlights, and errors across sessions at `~/.ayesha/memory.json`
+- **self-analysis** — scans own `.rs` source for unused imports, `unwrap()` usage, long lines, TODOs
+- **tool evolution** — identifies missing tools and generates definitions + implementation skeletons
+- **prompt refinement** — tracks tool success rates and suggests system prompt changes
+- **error auto-memory** — tool failures automatically stored as memories
+
+### sandbox security
+
+- blocks access to sensitive paths: `.env`, `.ssh`, `.gnupg`, `.aws`, `.password`, `.secret`, `.token`
+- path traversal prevention via canonicalization
+- all file operations go through `Sandbox::resolve()`
+
+## core features
+
+### gradio web ui
+
+```bash
+cd core && python app.py
+```
+
+personality engine with three-layer response system (computer/otacon/win95) served via gradio.
+
+### fastapi mobile api
+
+```bash
+cd core && python ayesha_mobile_api.py
+```
+
+REST API for mobile apps with:
+- device registration + heartbeat
+- hive status broadcasting
+- personality config read/write
+- WebSocket real-time updates
+- Android-specific endpoints
+
+### hivemind client
+
+`ayesha_hive_client.py` — client library for instances to register with, sync, and discover sister instances in the hivemind.
+
+## tri-mind sync
+
+bidirectional sync between three nodes:
+
+| node | purpose |
+|------|---------|
+| **local** | your development machine |
+| **github** | version control + collaboration |
+| **huggingface** | public model + space hosting |
+
+```bash
+python -m tri_mind_sync.cli status   # check sync state
+python -m tri_mind_sync.cli sync     # run full sync
+python -m tri_mind_sync.cli scan     # detect local changes
+python -m tri_mind_sync.cli push     # push to github
+python -m tri_mind_sync.cli watch    # continuous sync loop
+```
+
+or use the all-in-one script:
+
+```powershell
+.\scripts\sync-all.ps1    # push github + hf model + hf space
+```
+
+## applets detail
+
+### screen vision chatbox
+
+typescript + python app for screen capture and AI analysis. includes a desktop companion terminal (`ayesha_companion_terminal.py`) with cyberpunk UI, auto-detection of vision queries, and file upload support.
+
+### cosmic-rag
+
+local RAG chatbot that loads `.txt` files from a `vault/` directory. uses ollama with the ayesha model. 100% offline.
+
+### desktop-cat
+
+pixel art desktop pet cat with:
+- multi-directional cursor tracking (8 directions)
+- 15 animation states (idle, walking, sleeping, scratching, hearts)
+- system tray toggle
+- transparent click-through window (Win32 API)
+- auto-start option via `run.py`
+
+### flora-cli
+
+interactive TypeScript terminal for exploring scottish flora phylogeny. uses ollama for natural language queries about plant taxonomy.
+
+### bring-to-life
+
+upload an image and converts it into an interactive HTML experience using ollama vision + text models.
+
+### neural-strike
+
+mechanistic interpretability game with:
+- PyQt6 UI with CRT scanline effects
+- UMAP 2D feature visualization with pan/zoom
+- Token scanner with matrix-rain output
+- Feature inspector with auto-interpretation
+- Territory capture system with credits
+- SQLite database for caching features
+- local Neuronpedia data client (no network required)
+
+### poopy-tui
+
+full-featured Discord terminal client built with Textual:
+- server/channel/DM navigation
+- QR code + email/password + token login
+- voice mute/deafen/leave
+- message send/edit/delete with reactions
+- friends list management
+- real-time event display
+
+## git middleware
+
+gitea webhook receiver with LLM-powered task execution:
+
+| endpoint | description |
+|----------|-------------|
+| `POST /webhook/gitea` | receive push/PR/release webhooks |
+| `POST /task` | on-demand LLM task execution |
+| `GET /health` | server health check |
+
+tasks: code review, auto-summary, commit analysis, security scan. uses ollama with task-specific prompt templates.
 
 ## deployment
 
@@ -196,35 +328,27 @@ all projects connect to the same **ollama** instance at `localhost:11434` and sh
 
 this monorepo lives at `github.com/apullz/ayesha-os`
 
-```bash
-git init
-git add .
-git commit -m "initial: ayesha-os v4.2.0 monorepo"
-git remote add origin https://github.com/apullz/ayesha-os.git
-git push -u origin main
+### huggingface
+
+- **model**: `apullz/ayesha` — ayesha personality modelfile
+- **space**: `apullz/ayesha-hivemind` — gradio web ui
+
+```powershell
+$env:HF_TOKEN = "hf_..."
+.\scripts\sync-all.ps1
 ```
 
-### huggingface space
+### building the standalone exe
 
-the core gradio app deploys as a huggingface space:
-
-```bash
-cd core
-# add a README.md with sdk: gradio
-# push to huggingface spaces
+```powershell
+.\scripts\build-exe.ps1
 ```
 
-### huggingface model
-
-the ayesha ollama model (based on qwen2.5-coder:14b) is uploaded to huggingface:
-
-- **model**: `apullz/ayesha`
-- **format**: gguf (q4_k_m, 8b params)
-- **personality**: baked into the model via modelfile
+creates `dist\ayesha-os.exe` with bundled config, models, and applets.
 
 ## license
 
-apache 2.0 — see [LICENSE](LICENSE)
+apache 2.0
 
 ---
 
