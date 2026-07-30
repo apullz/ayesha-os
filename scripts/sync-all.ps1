@@ -57,8 +57,6 @@ if ($spaceOk) {
     Copy-Item "$ROOT\core\app.py" "$HF_SPACE\" -Force
     Copy-Item "$ROOT\core\ayesha_hive_client.py" "$HF_SPACE\" -Force
     Copy-Item "$ROOT\core\ayesha_mobile_api.py" "$HF_SPACE\" -Force
-    Copy-Item "$ROOT\core\ayesha_sync.py" "$HF_SPACE\" -Force
-    Copy-Item "$ROOT\core\tri_node_mind.py" "$HF_SPACE\" -Force
     Copy-Item "$ROOT\models\Modelfile" "$HF_SPACE\" -Force
     Copy-Item "$ROOT\scripts\space-app.py" "$HF_SPACE\app.py" -Force
     git add -A
