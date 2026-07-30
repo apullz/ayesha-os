@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
+use dirs::home_dir;
 
 #[derive(Clone)]
 pub struct Sandbox {
@@ -12,7 +13,8 @@ impl Sandbox {
     }
 
     pub fn default_workspace() -> Self {
-        Self::new(PathBuf::from("C:\\"))
+        let root = home_dir().unwrap_or_else(|| PathBuf::from("C:\\"));
+        Self::new(root)
     }
 
     pub fn resolve(&self, path: &str) -> Result<PathBuf> {
@@ -24,20 +26,23 @@ impl Sandbox {
             self.root.join(p)
         };
 
+        let root_canonical = self.root.canonicalize().unwrap_or_else(|_| self.root.clone());
+
         let canonical = match resolved.canonicalize() {
             Ok(c) => c,
             Err(_) => {
-                // File might not exist yet, check if parent is valid
                 if let Some(parent) = resolved.parent() {
                     if parent.exists() {
-                        return Ok(resolved);
+                        // Check that parent is within sandbox before allowing early return
+                        let parent_canonical = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
+                        if parent_canonical.starts_with(&root_canonical) {
+                            return Ok(resolved);
+                        }
                     }
                 }
                 bail!("path does not exist: {}", resolved.display());
             }
         };
-
-        let root_canonical = self.root.canonicalize().unwrap_or_else(|_| self.root.clone());
 
         if !canonical.starts_with(&root_canonical) {
             bail!(

@@ -450,7 +450,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Path to the file to read (relative to workspace or absolute)"
+                                "description": "Absolute path to the file (e.g. C:\\Users\\<name>\\Desktop\\file.txt)"
                             }
                         },
                         "required": ["path"]
@@ -467,7 +467,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Path to the file to write"
+                                "description": "Absolute path to the file to write (e.g. C:\\Users\\<name>\\Desktop\\file.txt)"
                             },
                             "content": {
                                 "type": "string",
@@ -488,7 +488,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Path to the directory to list (defaults to workspace root)"
+                                "description": "Absolute path to the directory to list (defaults to home dir)"
                             }
                         },
                         "required": []
