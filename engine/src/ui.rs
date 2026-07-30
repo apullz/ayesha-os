@@ -234,68 +234,61 @@ pub fn draw_command_overlay(filter: Option<&str>) {
 pub fn print_help() {
     println!();
     println!("  {}",
-        "┌─ commands ─────────────────────────────────┐".bright_green());
+        "┌─ commands ──────────────────────────────────┐".bright_green());
     println!("  {}",
-        "│                                           │".bright_green());
+        "│                                            │".bright_green());
     let help_cmds = [
-        ("help",    "show this message"),
-        ("exit",    "quit ayesha-os"),
-        ("clear",   "clear screen"),
-        ("models",  "list available models"),
-        ("model",   "switch model: model <name>"),
-        ("auto",    "re-enable auto-routing"),
-        ("pull",    "pull model: pull <name>"),
-        ("sync",    "sync to github & hf"),
+        ("help",      "show this message"),
+        ("exit",      "quit ayesha-os"),
+        ("clear",     "clear screen"),
+        ("models",    "list available models"),
+        ("model",     "switch chat model: model <name>"),
+        ("toolmodel", "switch tool model: toolmodel <name>"),
+        ("auto",      "re-enable auto-routing"),
+        ("pull",      "pull model: pull <name>"),
+        ("sync",      "sync to github & hf"),
+        ("apps",      "list applets"),
+        ("run",       "launch applet: run <name>"),
+        ("stop",      "stop applet: stop <name>"),
     ];
     for (cmd, desc) in &help_cmds {
         println!("  {} {:<14} {}",
             "│".bright_green(),
             cmd.bright_cyan(),
-            format!("{:<27}{}", desc.bright_black(), "│").bright_black());
+            format!("{:<28}{}", desc.bright_black(), "│").bright_black());
     }
     println!("  {}",
-        "│                                           │".bright_green());
+        "│                                            │".bright_green());
     println!("  {}",
-        "├─ self-improvement ────────────────────────┤".bright_green());
-    let si_cmds = [
-        ("stats",   "tool usage statistics"),
-        ("memory",  "list stored memories"),
-        ("analyze", "analyze own source code"),
-        ("evolve",  "suggest new tools"),
-        ("refine",  "analyze prompt history"),
+        "├─ tools (auto-called by model) ─────────────┤".bright_green());
+    let tool_cmds = [
+        ("read_file",  "read any file on disk"),
+        ("write_file", "create or overwrite files"),
+        ("list_dir",   "browse directories"),
     ];
-    for (cmd, desc) in &si_cmds {
+    for (cmd, desc) in &tool_cmds {
         println!("  {} {:<14} {}",
             "│".bright_green(),
             cmd.bright_cyan(),
-            format!("{:<27}{}", desc.bright_black(), "│").bright_black());
+            format!("{:<28}{}", desc.bright_black(), "│").bright_black());
     }
     println!("  {}",
-        "└───────────────────────────────────────────┘".bright_green());
-    println!();
+        "│                                            │".bright_green());
     println!("  {}",
-        "┌─ tools (auto-called by model) ────────────┐".bright_green());
-    println!("  {}",
-        "│                                           │".bright_green());
-    let tool_cmds = [
-        ("read_file",       "read any file on disk"),
-        ("write_file",      "create or overwrite files"),
-        ("list_dir",        "browse directories"),
-        ("generate_html",   "render html to file"),
-        ("generate_sprite", "create pixel art characters"),
-        ("remember",        "store a memory"),
-        ("search_memories", "search stored memories"),
-        ("analyze_self",    "ai code review"),
-        ("evolve_tools",    "suggest new tools"),
+        "├─ auto-memory (markers in responses) ───────┤".bright_green());
+    let mem_cmds = [
+        ("[REMEMBER: x]",      "store a fact or preference"),
+        ("[PREFERENCE: k = v]", "store a key-value preference"),
+        ("[FACT: x]",           "store a learned fact"),
     ];
-    for (cmd, desc) in &tool_cmds {
-        println!("  {} {:<18} {}",
+    for (cmd, desc) in &mem_cmds {
+        println!("  {} {:<22} {}",
             "│".bright_green(),
-            cmd.bright_cyan(),
-            format!("{:<23}{}", desc.bright_black(), "│").bright_black());
+            cmd.bright_magenta(),
+            format!("{:<20}{}", desc.bright_black(), "│").bright_black());
     }
     println!("  {}",
-        "└───────────────────────────────────────────┘".bright_green());
+        "└────────────────────────────────────────────┘".bright_green());
     println!();
     std::io::stdout().flush().ok();
 }
