@@ -114,6 +114,8 @@ async fn main() -> anyhow::Result<()> {
     let mut manager = AppletManager::new();
     let executor = ToolExecutor::new(sandbox, AppletManager::new());
     let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
+    let mut tool_client = ActiveBackend::Ollama(OllamaClient::new("qwen2.5:7b"));
+    let mut tool_model_name = "qwen2.5:7b".to_string();
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
 
@@ -227,6 +229,7 @@ async fn main() -> anyhow::Result<()> {
 
     let tools = OllamaClient::tool_definitions();
     let mut current_model = "ayesha:latest".to_string();
+    ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
     // Send /set nothink to disable thinking tokens (hidden from user)
     {
@@ -525,6 +528,25 @@ async fn main() -> anyhow::Result<()> {
                 registry.detect().await;
                 continue;
             }
+            _ if lower.starts_with("toolmodel ") => {
+                let name = input[10..].trim();
+                if registry.is_cloud_model(name) {
+                    let provider = registry.cloud_provider(name).unwrap_or_default();
+                    match CloudClient::new(name, &provider) {
+                        Ok(cc) => {
+                            tool_client = ActiveBackend::Cloud(cc);
+                            tool_model_name = name.to_string();
+                            ui::show_system(&format!("tool model: {} ({})", name, provider));
+                        }
+                        Err(e) => ui::show_error(&format!("cloud setup failed: {}", e)),
+                    }
+                } else {
+                    tool_client = ActiveBackend::Ollama(OllamaClient::new(name));
+                    tool_model_name = name.to_string();
+                    ui::show_system(&format!("tool model: {}", name));
+                }
+                continue;
+            }
             _ if lower.starts_with("pull ") => {
                 let name = input[5..].trim();
                 ui::show_system(&format!("run `ollama pull {}` in another terminal, then `models` to refresh", name));
@@ -613,7 +635,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        // ── agent loop ──
+        // ── agent loop (dual-model: ayesha for personality, qwen for tools) ──
         let msg_count_before = messages.len();
 
         messages.push(ChatMessage {
@@ -624,101 +646,268 @@ async fn main() -> anyhow::Result<()> {
         });
 
         let mut steer_happened = false;
-        let mut iterations = 0;
 
-        loop {
-            iterations += 1;
-            if iterations > 10 {
-                ui::show_error("max tool iterations (10). stopping.");
-                break;
-            }
+        // Step 1: Call ayesha (no tools) for personality response
+        let first_result = client
+            .chat_stream_visible(&messages, None, &steer_rx)
+            .await;
 
-            let result = client
-                .chat_stream_visible(&messages, Some(&tools), &steer_rx)
-                .await;
-
-            let result = match result {
-                Ok(r) => r,
-                Err(e) => {
-                    ui::show_error(&format!("ollama error: {}", e));
-                    break;
-                }
-            };
-
-            if result.was_steered() {
-                ui::show_interrupted();
-                pending_input = result.steering;
-                steer_happened = true;
-                break;
-            }
-
-            if result.has_tool_calls() {
-                messages.push(ChatMessage {
-                    role: "assistant".to_string(),
-                    content: result.content.clone(),
-                    tool_calls: Some(result.tool_calls.clone()),
-                    tool_call_id: None,
-                });
-
-                for tool_call in &result.tool_calls {
-                    let name = &tool_call.function.name;
-                    let args = &tool_call.function.arguments;
-                    let args_str = serde_json::to_string(args).unwrap_or_default();
-
-                    ui::show_tool_call(name, &args_str);
-
-                    let tool_result = match executor.execute(name, args).await {
-                        Ok(r) => r,
-                        Err(e) => {
-                            let err_msg = format!("error: {}", e);
-                            prompt_history.record_usage(name, false, Some(err_msg.clone()), &args_str);
-                            let _ = prompt_history.save();
-                            err_msg
-                        }
-                    };
-
-                    if !tool_result.starts_with("error:") {
-                        prompt_history.record_usage(name, true, None, &args_str);
-                    } else {
-                        memory.add_memory(
-                            "error",
-                            &format!("tool '{}' failed: {}", name, tool_result),
-                            vec![name.to_string(), "error".to_string()],
-                            3,
-                        );
-                    }
-
-                    if tool_result.starts_with("error:") {
-                        ui::show_tool_err(name, &tool_result);
-                    } else {
-                        ui::show_tool_ok(name, &tool_result);
-                    }
-
-                    // Truncate large results to protect context window
-                    let tool_result = truncate_tool_result(&tool_result, 8192);
-
-                    messages.push(ChatMessage {
-                        role: "tool".to_string(),
-                        content: tool_result,
-                        tool_calls: None,
-                        tool_call_id: Some(tool_call.id.clone()),
-                    });
-                }
-
+        let first_result = match first_result {
+            Ok(r) => r,
+            Err(e) => {
+                ui::show_error(&format!("ayesha error: {}", e));
+                messages.truncate(msg_count_before);
                 continue;
             }
+        };
 
-            // Final response — already streamed to screen
-            if !result.content.is_empty() {
+        // Extract flags before consuming content
+        let first_was_steered = first_result.was_steered();
+        let first_had_tools = first_result.has_tool_calls();
+        let first_tool_calls = first_result.tool_calls.clone();
+
+        if first_was_steered {
+            ui::show_interrupted();
+            pending_input = first_result.steering;
+            steer_happened = true;
+        } else if first_had_tools {
+            // Ayesha called tools directly (unlikely but possible)
+            // Execute them, then get final response
+            messages.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: first_result.content,
+                tool_calls: Some(first_tool_calls.clone()),
+                tool_call_id: None,
+            });
+
+            for tool_call in &first_tool_calls {
+                let name = &tool_call.function.name;
+                let args = &tool_call.function.arguments;
+                let args_str = serde_json::to_string(args).unwrap_or_default();
+
+                ui::show_tool_call(name, &args_str);
+
+                let tool_result = match executor.execute(name, args).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        let err_msg = format!("error: {}", e);
+                        prompt_history.record_usage(name, false, Some(err_msg.clone()), &args_str);
+                        let _ = prompt_history.save();
+                        err_msg
+                    }
+                };
+
+                if !tool_result.starts_with("error:") {
+                    prompt_history.record_usage(name, true, None, &args_str);
+                } else {
+                    memory.add_memory(
+                        "error",
+                        &format!("tool '{}' failed: {}", name, tool_result),
+                        vec![name.to_string(), "error".to_string()],
+                        3,
+                    );
+                }
+
+                if tool_result.starts_with("error:") {
+                    ui::show_tool_err(name, &tool_result);
+                } else {
+                    ui::show_tool_ok(name, &tool_result);
+                }
+
+                let tool_result = truncate_tool_result(&tool_result, 8192);
+
+                messages.push(ChatMessage {
+                    role: "tool".to_string(),
+                    content: tool_result,
+                    tool_calls: None,
+                    tool_call_id: Some(tool_call.id.clone()),
+                });
+            }
+
+            // Get final ayesha response after tool execution
+            let final_result = client
+                .chat_stream_visible(&messages, None, &steer_rx)
+                .await;
+
+            if let Ok(r) = final_result {
+                if !r.content.is_empty() {
+                    messages.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: r.content,
+                        tool_calls: None,
+                        tool_call_id: None,
+                    });
+                }
+            }
+        } else {
+            // Pure chat response from ayesha — done
+            if !first_result.content.is_empty() {
                 messages.push(ChatMessage {
                     role: "assistant".to_string(),
-                    content: result.content,
+                    content: first_result.content,
                     tool_calls: None,
                     tool_call_id: None,
                 });
             }
+        }
 
-            break;
+        // Step 2: If ayesha didn't call tools, check if qwen2.5 would
+        if !steer_happened && !first_had_tools {
+            // Try qwen2.5 with tools to see if it wants to call any
+            let qwen_result = tool_client
+                .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+                .await;
+
+            match qwen_result {
+                Ok(qr) if qr.has_tool_calls() => {
+                    // qwen wants to call tools — execute them
+                    messages.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: qr.content.clone(),
+                        tool_calls: Some(qr.tool_calls.clone()),
+                        tool_call_id: None,
+                    });
+
+                    let mut tool_iterations = 0;
+                    loop {
+                        tool_iterations += 1;
+                        if tool_iterations > 8 {
+                            ui::show_error("max tool iterations (8). stopping.");
+                            break;
+                        }
+
+                        // Execute all tool calls from this iteration
+                        let current_tool_calls = messages.last()
+                            .and_then(|m| m.tool_calls.as_ref())
+                            .cloned()
+                            .unwrap_or_default();
+
+                        if current_tool_calls.is_empty() {
+                            break;
+                        }
+
+                        // Remove the assistant message with tool calls
+                        messages.pop();
+
+                        for tool_call in &current_tool_calls {
+                            let name = &tool_call.function.name;
+                            let args = &tool_call.function.arguments;
+                            let args_str = serde_json::to_string(args).unwrap_or_default();
+
+                            ui::show_tool_call(name, &args_str);
+
+                            let tool_result = match executor.execute(name, args).await {
+                                Ok(r) => r,
+                                Err(e) => {
+                                    let err_msg = format!("error: {}", e);
+                                    prompt_history.record_usage(name, false, Some(err_msg.clone()), &args_str);
+                                    let _ = prompt_history.save();
+                                    err_msg
+                                }
+                            };
+
+                            if !tool_result.starts_with("error:") {
+                                prompt_history.record_usage(name, true, None, &args_str);
+                            } else {
+                                memory.add_memory(
+                                    "error",
+                                    &format!("tool '{}' failed: {}", name, tool_result),
+                                    vec![name.to_string(), "error".to_string()],
+                                    3,
+                                );
+                            }
+
+                            if tool_result.starts_with("error:") {
+                                ui::show_tool_err(name, &tool_result);
+                            } else {
+                                ui::show_tool_ok(name, &tool_result);
+                            }
+
+                            let tool_result = truncate_tool_result(&tool_result, 8192);
+
+                            messages.push(ChatMessage {
+                                role: "tool".to_string(),
+                                content: tool_result,
+                                tool_calls: None,
+                                tool_call_id: Some(tool_call.id.clone()),
+                            });
+                        }
+
+                        // Push assistant message back (after tool results)
+                        messages.push(ChatMessage {
+                            role: "assistant".to_string(),
+                            content: qr.content.clone(),
+                            tool_calls: Some(current_tool_calls),
+                            tool_call_id: None,
+                        });
+
+                        // Re-prompt qwen2.5 for next tool calls
+                        let next_result = tool_client
+                            .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+                            .await;
+
+                        match next_result {
+                            Ok(nr) => {
+                                if nr.was_steered() {
+                                    ui::show_interrupted();
+                                    pending_input = nr.steering;
+                                    steer_happened = true;
+                                    break;
+                                }
+                                if nr.has_tool_calls() {
+                                    messages.push(ChatMessage {
+                                        role: "assistant".to_string(),
+                                        content: nr.content.clone(),
+                                        tool_calls: Some(nr.tool_calls.clone()),
+                                        tool_call_id: None,
+                                    });
+                                    // Continue loop to execute these tool calls
+                                } else {
+                                    // qwen is done calling tools — get ayesha's final response
+                                    if !nr.content.is_empty() {
+                                        messages.push(ChatMessage {
+                                            role: "assistant".to_string(),
+                                            content: nr.content,
+                                            tool_calls: None,
+                                            tool_call_id: None,
+                                        });
+                                    }
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                ui::show_error(&format!("tool model error: {}", e));
+                                break;
+                            }
+                        }
+                    }
+
+                    // Final response from ayesha
+                    if !steer_happened {
+                        let final_result = client
+                            .chat_stream_visible(&messages, None, &steer_rx)
+                            .await;
+
+                        if let Ok(r) = final_result {
+                            if !r.content.is_empty() {
+                                messages.push(ChatMessage {
+                                    role: "assistant".to_string(),
+                                    content: r.content,
+                                    tool_calls: None,
+                                    tool_call_id: None,
+                                });
+                            }
+                        }
+                    }
+                }
+                Ok(_) => {
+                    // qwen didn't call tools either — ayesha's response is final
+                    // (already pushed above)
+                }
+                Err(_) => {
+                    // qwen failed — ayesha's response is final
+                }
+            }
         }
 
         if steer_happened {

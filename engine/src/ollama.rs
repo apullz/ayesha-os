@@ -725,18 +725,17 @@ always stay in character. be helpful but keep your personality. now go be cute a
                 "type": "function",
                 "function": {
                     "name": "manage_applet",
-                    "description": "List, launch, stop, or check status of applets (standalone sub-projects). Use 'list' to see all available applets, 'launch' to start one by name, 'stop' to halt one, 'status' for detailed info on one.",
+                    "description": "List, launch, stop, or check status of applets. Call with action='list' to show all applets. Call with action='launch' and name='flora-cli' to launch flora-cli. Call with action='stop' and name='flora-cli' to stop it. Call with action='status' and name='flora-cli' for details.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "action": {
                                 "type": "string",
-                                "enum": ["list", "launch", "stop", "status"],
-                                "description": "Action: list (show all), launch (start), stop (halt), status (detailed info)"
+                                "description": "The action to perform: 'list' shows all applets, 'launch' starts one, 'stop' halts one, 'status' shows details"
                             },
                             "name": {
                                 "type": "string",
-                                "description": "Applet name, e.g. 'flora-cli', 'cosmic-rag', 'screen', 'desktop-cat'"
+                                "description": "Applet name like 'flora-cli', 'cosmic-rag', 'screen', 'desktop-cat'"
                             }
                         },
                         "required": ["action"]
