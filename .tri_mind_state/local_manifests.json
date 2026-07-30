@@ -71,6 +71,22 @@
     "source": "local",
     "status": "synced"
   },
+  ".tri_mind_state\\engine_state.json": {
+    "rel_path": ".tri_mind_state\\engine_state.json",
+    "size": 400,
+    "modified_at": "2026-07-29T15:57:40.980101",
+    "sha256": "6ebc3713dfda0fe3b01a4d867c0434010013d50b6b6d27d4fe46ab3551f157be",
+    "source": "local",
+    "status": "synced"
+  },
+  ".tri_mind_state\\local_manifests.json": {
+    "rel_path": ".tri_mind_state\\local_manifests.json",
+    "size": 88611,
+    "modified_at": "2026-07-30T06:56:07.341609",
+    "sha256": "a9b180131bdf0352a46c0bffd8d988d01299af555e60c95dfb81ac647d6d1fb1",
+    "source": "local",
+    "status": "synced"
+  },
   "applets\\bring-to-life\\.gitignore": {
     "rel_path": "applets\\bring-to-life\\.gitignore",
     "size": 277,
@@ -985,9 +1001,9 @@
   },
   "dist\\ayesha-os.exe": {
     "rel_path": "dist\\ayesha-os.exe",
-    "size": 8829440,
-    "modified_at": "2026-07-29T15:40:36.858402",
-    "sha256": "1254bffc674bc970863c228727dfcd178a8ae018dca5f2e9d1dc5a7505315781",
+    "size": 8996352,
+    "modified_at": "2026-07-30T06:47:45.026625",
+    "sha256": "91cdef2cb8a7ea1365bf662a9cc84d02589de6ea2df24302994a472867941fad",
     "source": "local",
     "status": "synced"
   },
@@ -1809,25 +1825,25 @@
   },
   "engine\\build.rs": {
     "rel_path": "engine\\build.rs",
-    "size": 184,
-    "modified_at": "2026-07-29T15:03:09.571153",
-    "sha256": "f1b4d7c377d6e7e62e51597d9393659587b01d7a2adb95da419779ea89d00a55",
+    "size": 1295,
+    "modified_at": "2026-07-30T06:38:50.237244",
+    "sha256": "c245f10560851cea4736335c5271481dc31a4fa74484acb883f29bd080ab2a2d",
     "source": "local",
     "status": "synced"
   },
   "engine\\Cargo.lock": {
     "rel_path": "engine\\Cargo.lock",
-    "size": 73143,
-    "modified_at": "2026-07-26T11:29:40.328994",
-    "sha256": "a9b7a7a4c5282be7adaa0517ffd44e19a0e57e15552ed3f338df189367871cc4",
+    "size": 68481,
+    "modified_at": "2026-07-30T06:40:53.266020",
+    "sha256": "305f4f63c36673657b7db12358826d04bbb970dae24545fb78dddb56cc3865a6",
     "source": "local",
     "status": "synced"
   },
   "engine\\Cargo.toml": {
     "rel_path": "engine\\Cargo.toml",
-    "size": 584,
-    "modified_at": "2026-07-29T14:51:11.395638",
-    "sha256": "ff4926ebadf5c89fe764be0ec67b7e5ea1f6ce84a1bdb1c2f1adbad3adf0a9c3",
+    "size": 563,
+    "modified_at": "2026-07-30T06:39:32.758145",
+    "sha256": "b8243e648bcd4a538bc74f3a2c9183cfa9ca7f5874bc0906123c6ceabe91edea",
     "source": "local",
     "status": "synced"
   },
@@ -1897,9 +1913,9 @@
   },
   "engine\\src\\ayesha.ico": {
     "rel_path": "engine\\src\\ayesha.ico",
-    "size": 155772,
-    "modified_at": "2026-07-29T15:03:53.417071",
-    "sha256": "4b97163432f9f33d0873af2118e9e406d61cceb971fc4d780ce003a90e738bc7",
+    "size": 165537,
+    "modified_at": "2026-07-30T06:47:25.617440",
+    "sha256": "8c784727073d5c1714d44ef281100765c8e4aac4663aee720291557a0b1d4379",
     "source": "local",
     "status": "synced"
   },
@@ -1921,9 +1937,9 @@
   },
   "engine\\src\\main.rs": {
     "rel_path": "engine\\src\\main.rs",
-    "size": 28557,
-    "modified_at": "2026-07-29T15:39:31.650707",
-    "sha256": "83d59bca170a94974c6480b1710a824875473f68b4989fe5d44f3bd2b5752993",
+    "size": 28777,
+    "modified_at": "2026-07-29T16:01:04.841621",
+    "sha256": "61ae8f2353001e054ddd172c219791e7b34670dab2ab0da1c7a15c19697fa669",
     "source": "local",
     "status": "synced"
   },
@@ -1953,9 +1969,9 @@
   },
   "engine\\src\\ollama.rs": {
     "rel_path": "engine\\src\\ollama.rs",
-    "size": 28669,
-    "modified_at": "2026-07-28T06:22:35.968149",
-    "sha256": "aef848b8f8523ba4742467a61bc353a5babf7255394da64250d2bb13522dc68f",
+    "size": 28920,
+    "modified_at": "2026-07-29T16:17:31.477441",
+    "sha256": "96c2830a3433ab55fe079a6d838f3bd265517a82f7bddbd387ee2f7df0740ded",
     "source": "local",
     "status": "synced"
   },
@@ -1964,6 +1980,14 @@
     "size": 5605,
     "modified_at": "2026-07-26T11:29:40.351026",
     "sha256": "1741a0a4582b8289d70f48863be956366f07f7b53c9cb7be11af37cdf7bd4216",
+    "source": "local",
+    "status": "synced"
+  },
+  "engine\\src\\resources.rc": {
+    "rel_path": "engine\\src\\resources.rc",
+    "size": 20,
+    "modified_at": "2026-07-30T06:28:40.949838",
+    "sha256": "44c02c98cd8a38499be3042e912d89eb2c9866bac963a3df69850f4c8fbf98bb",
     "source": "local",
     "status": "synced"
   },
@@ -2145,9 +2169,9 @@
   },
   "scripts\\build-exe.ps1": {
     "rel_path": "scripts\\build-exe.ps1",
-    "size": 2733,
-    "modified_at": "2026-07-29T15:13:58.121225",
-    "sha256": "95df14d59fa8bb8f5f34467ec7b9e45d55b56132d1b562543aebc0a86b8074fc",
+    "size": 3455,
+    "modified_at": "2026-07-30T06:37:30.546847",
+    "sha256": "d4008beb8174a7469b3092539905babc00176bf2e4583cb72d535f4da725c812",
     "source": "local",
     "status": "synced"
   },
@@ -2217,9 +2241,9 @@
   },
   "tri_mind_sync\\github_sync.py": {
     "rel_path": "tri_mind_sync\\github_sync.py",
-    "size": 7244,
-    "modified_at": "2026-07-26T11:29:40.386125",
-    "sha256": "bb14ca26b9727dd7e0ee7985d395f063a30fe7318cfdd9234e0325731fabeac2",
+    "size": 7383,
+    "modified_at": "2026-07-30T06:57:21.874023",
+    "sha256": "372d8bb6a653d809685190ce197fa0f625b30a5f1b6631386226dc30f0536707",
     "source": "local",
     "status": "synced"
   },
