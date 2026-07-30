@@ -39,6 +39,62 @@ fn truncate_tool_result(result: &str, max_chars: usize) -> String {
     }
 }
 
+/// Parse memory markers from ayesha's output and store them automatically.
+/// Returns the cleaned text with markers stripped.
+fn parse_and_store_memories(text: &str, memory: &mut MemoryStore) -> String {
+    let mut cleaned = text.to_string();
+
+    // [REMEMBER: content] — store as user_pref memory
+    while let Some(start) = cleaned.find("[REMEMBER:") {
+        if let Some(end) = cleaned[start..].find(']') {
+            let inner = cleaned[start + 10..start + end].trim();
+            if !inner.is_empty() {
+                memory.add_memory("user_pref", inner, vec!["user_request".to_string()], 7);
+            }
+            cleaned.replace_range(start..=start + end, "");
+        } else {
+            break;
+        }
+    }
+
+    // [PREFERENCE: key = value] — store in user_preferences map
+    while let Some(start) = cleaned.find("[PREFERENCE:") {
+        if let Some(end) = cleaned[start..].find(']') {
+            let inner = cleaned[start + 12..start + end].trim();
+            if let Some(eq_pos) = inner.find('=') {
+                let key = inner[..eq_pos].trim().to_string();
+                let value = inner[eq_pos + 1..].trim().to_string();
+                if !key.is_empty() && !value.is_empty() {
+                    memory.set_preference(&key, &value);
+                }
+            }
+            cleaned.replace_range(start..=start + end, "");
+        } else {
+            break;
+        }
+    }
+
+    // [FACT: content] — store as fact
+    while let Some(start) = cleaned.find("[FACT:") {
+        if let Some(end) = cleaned[start..].find(']') {
+            let inner = cleaned[start + 6..start + end].trim();
+            if !inner.is_empty() {
+                memory.add_memory("fact", inner, vec!["user_request".to_string()], 6);
+            }
+            cleaned.replace_range(start..=start + end, "");
+        } else {
+            break;
+        }
+    }
+
+    // Collapse multiple blank lines left by stripped markers
+    while cleaned.contains("\n\n\n") {
+        cleaned = cleaned.replace("\n\n\n", "\n\n");
+    }
+
+    cleaned.trim().to_string()
+}
+
 impl ActiveBackend {
     async fn chat_stream_visible(
         &self,
@@ -112,7 +168,7 @@ async fn main() -> anyhow::Result<()> {
 
     let sandbox = Sandbox::default_workspace();
     let mut manager = AppletManager::new();
-    let executor = ToolExecutor::new(sandbox, AppletManager::new());
+    let executor = ToolExecutor::new(sandbox);
     let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
     let mut tool_client = ActiveBackend::Ollama(OllamaClient::new("qwen2.5:7b"));
     let mut tool_model_name = "qwen2.5:7b".to_string();
@@ -378,7 +434,17 @@ async fn main() -> anyhow::Result<()> {
         // ── meta-commands ──
         match lower.as_str() {
             "exit" | "quit" | "q" => {
-                let _ = memory.save();
+        // Auto-parse memory markers from ayesha's last response
+        if let Some(last) = messages.last() {
+            if last.role == "assistant" {
+                let cleaned = parse_and_store_memories(&last.content, &mut memory);
+                if cleaned != last.content {
+                    messages.last_mut().unwrap().content = cleaned;
+                }
+            }
+        }
+
+        let _ = memory.save();
                 let _ = prompt_history.save();
                 manager.stop_all();
                 let _ = crossterm::terminal::disable_raw_mode();
@@ -430,44 +496,6 @@ async fn main() -> anyhow::Result<()> {
                     _ => {
                         ui::show_error("git push executed (check authentication if remote unchanged).");
                     }
-                }
-                continue;
-            }
-            "stats" => {
-                match executor.get_tool_stats() {
-                    Ok(stats) => println!("\n{}", stats),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "memory" => {
-                match executor.list_memories(&serde_json::json!({})) {
-                    Ok(mem) => println!("\n{}", mem),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "analyze" => {
-                ui::show_system("analyzing main.rs...");
-                match executor.analyze_self(&serde_json::json!({"file": "main.rs"})).await {
-                    Ok(analysis) => println!("\n{}", analysis),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "evolve" => {
-                ui::show_system("evolving tools...");
-                match executor.evolve_tools().await {
-                    Ok(suggestions) => println!("\n{}", suggestions),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "refine" => {
-                ui::show_system("analyzing prompt history...");
-                match executor.refine_prompt().await {
-                    Ok(analysis) => println!("\n{}", analysis),
-                    Err(e) => ui::show_error(&e.to_string()),
                 }
                 continue;
             }
