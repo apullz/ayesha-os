@@ -197,6 +197,7 @@ impl ToolExecutor {
 
     async fn list_dir(&self, args: &Value) -> Result<String> {
         let path = args["path"].as_str().unwrap_or(".");
+        self.sandbox.check_sensitive(path)?;
         let resolved = self.sandbox.resolve(path)?;
 
         let entries = fs::read_dir(&resolved)?;
@@ -234,6 +235,7 @@ impl ToolExecutor {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("missing 'content' argument"))?;
 
+        self.sandbox.check_sensitive(path)?;
         let resolved = self.sandbox.resolve(path)?;
         if let Some(parent) = resolved.parent() {
             fs::create_dir_all(parent)?;
@@ -248,6 +250,7 @@ impl ToolExecutor {
             .and_then(|v| v.as_str())
             .unwrap_or("assets/sprite.png");
 
+        self.sandbox.check_sensitive(output)?;
         let resolved = self.sandbox.resolve(output)?;
 
         let config = crate::pixel_striker::renderer::SpriteSheetConfig::from_json_value(args);
@@ -267,6 +270,7 @@ impl ToolExecutor {
             .and_then(|v| v.as_str())
             .unwrap_or("assets/tileset.png");
 
+        self.sandbox.check_sensitive(output)?;
         let resolved = self.sandbox.resolve(output)?;
         if let Some(parent) = resolved.parent() {
             fs::create_dir_all(parent)?;
@@ -277,8 +281,11 @@ impl ToolExecutor {
         let cols = args.get("columns").and_then(|v| v.as_u64()).unwrap_or(8) as u32;
         let rows = args.get("rows").and_then(|v| v.as_u64()).unwrap_or(4) as u32;
 
-        let img_w = cols * tile_w;
-        let img_h = rows * tile_h;
+        let img_w = cols.saturating_mul(tile_w);
+        let img_h = rows.saturating_mul(tile_h);
+        if img_w == 0 || img_h == 0 || img_w > 16384 || img_h > 16384 {
+            return Err(anyhow::anyhow!("image dimensions {}x{} are out of range (must be 1-16384)", img_w, img_h));
+        }
         let mut img = image::RgbaImage::new(img_w, img_h);
 
         let colors = [
@@ -318,6 +325,7 @@ impl ToolExecutor {
             .and_then(|v| v.as_str())
             .unwrap_or("assets/object.png");
 
+        self.sandbox.check_sensitive(output)?;
         let resolved = self.sandbox.resolve(output)?;
         if let Some(parent) = resolved.parent() {
             fs::create_dir_all(parent)?;
@@ -327,8 +335,11 @@ impl ToolExecutor {
         let h = args.get("height").and_then(|v| v.as_u64()).unwrap_or(16) as u32;
         let px = args.get("pixel_size").and_then(|v| v.as_u64()).unwrap_or(4) as u32;
 
-        let img_w = w * px;
-        let img_h = h * px;
+        let img_w = w.saturating_mul(px);
+        let img_h = h.saturating_mul(px);
+        if img_w == 0 || img_h == 0 || img_w > 16384 || img_h > 16384 {
+            return Err(anyhow::anyhow!("image dimensions {}x{} are out of range (must be 1-16384)", img_w, img_h));
+        }
         let mut img = image::RgbaImage::new(img_w, img_h);
 
         let r = args.get("color_r").and_then(|v| v.as_u64()).unwrap_or(200) as u8;
@@ -357,6 +368,7 @@ impl ToolExecutor {
             .and_then(|v| v.as_str())
             .unwrap_or("assets/sprite_viewer.html");
 
+        self.sandbox.check_sensitive(output)?;
         let resolved = self.sandbox.resolve(output)?;
         if let Some(parent) = resolved.parent() {
             fs::create_dir_all(parent)?;
@@ -419,8 +431,9 @@ dr(0)
         match cb.get_text() {
             Ok(text) => {
                 let preview: String = text.chars().take(500).collect();
-                if text.len() > preview.len() {
-                    Ok(format!("{}\n... [truncated: showing 500 of {} chars]", preview, text.len()))
+                let total_chars = text.chars().count();
+                if total_chars > 500 {
+                    Ok(format!("{}\n... [truncated: showing 500 of {} chars]", preview, total_chars))
                 } else {
                     Ok(text)
                 }
@@ -606,7 +619,7 @@ dr(0)
     //  Coding agent (multi-action coding tool)
     // ═══════════════════════════════════════════
 
-    async fn coding_agent(&self, args: &Value, ollama: &OllamaClient, project_root: &Path, _sandbox: &Sandbox) -> Result<String> {
+    async fn coding_agent(&self, args: &Value, ollama: &OllamaClient, project_root: &Path, sandbox: &Sandbox) -> Result<String> {
 
         let action = args.get("action")
             .and_then(|v| v.as_str())
@@ -618,16 +631,18 @@ dr(0)
 
         match action {
             "read" => {
-                let full_path = project_root.join(path);
+                sandbox.check_sensitive(path)?;
+                let full_path = sandbox.resolve(path)?;
                 let content = fs::read_to_string(&full_path)
                     .map_err(|e| anyhow::anyhow!("failed to read '{}': {}", path, e))?;
                 Ok(json!({"path": path, "content": content}).to_string())
             }
             "write" => {
+                sandbox.check_sensitive(path)?;
                 let content = args.get("content")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("missing 'content' argument"))?;
-                let full_path = project_root.join(path);
+                let full_path = sandbox.resolve(path)?;
                 if let Some(parent) = full_path.parent() {
                     fs::create_dir_all(parent)?;
                 }
@@ -635,11 +650,12 @@ dr(0)
                 Ok(json!({"path": path, "status": "written", "bytes": content.len()}).to_string())
             }
             "edit" => {
+                sandbox.check_sensitive(path)?;
                 let edits = args.get("edits")
                     .and_then(|v| v.as_array())
                     .ok_or_else(|| anyhow::anyhow!("missing 'edits' array"))?;
 
-                let full_path = project_root.join(path);
+                let full_path = sandbox.resolve(path)?;
                 let mut content = fs::read_to_string(&full_path)
                     .map_err(|e| anyhow::anyhow!("failed to read '{}': {}", path, e))?;
 
@@ -681,7 +697,8 @@ dr(0)
                 Ok(json!({"path": path, "status": "edited", "bytes": content.len()}).to_string())
             }
             "list" => {
-                let full_path = project_root.join(path);
+                sandbox.check_sensitive(path)?;
+                let full_path = sandbox.resolve(path)?;
                 let mut entries = Vec::new();
                 if full_path.is_dir() {
                     for entry in fs::read_dir(&full_path)? {
@@ -694,7 +711,8 @@ dr(0)
                 Ok(json!({"path": path, "entries": entries}).to_string())
             }
             "analyze" => {
-                let full_path = project_root.join(path);
+                sandbox.check_sensitive(path)?;
+                let full_path = sandbox.resolve(path)?;
                 let content = fs::read_to_string(&full_path)
                     .map_err(|e| anyhow::anyhow!("failed to read '{}': {}", path, e))?;
                 let analyzer = SelfAnalyzer::new(project_root.to_path_buf());
@@ -702,10 +720,11 @@ dr(0)
                 Ok(json!({"path": path, "issues": issues}).to_string())
             }
             "modify" => {
+                sandbox.check_sensitive(path)?;
                 let instruction = args.get("instruction")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("missing 'instruction' argument"))?;
-                let full_path = project_root.join(path);
+                let full_path = sandbox.resolve(path)?;
                 let content = fs::read_to_string(&full_path)
                     .map_err(|e| anyhow::anyhow!("failed to read '{}': {}", path, e))?;
 
@@ -718,7 +737,17 @@ dr(0)
                     tool_calls: None, tool_call_id: None,
                 }];
                 let resp = ollama.chat(&msg, None).await?;
-                let modified = resp.message.content.trim().to_string();
+                let raw = resp.message.content.trim();
+                // Strip markdown code fences if present (```rust ... ``` or ``` ... ```)
+                let modified = if raw.starts_with("```") {
+                    let stripped = raw.trim_start_matches("```");
+                    // Remove language tag on first line
+                    let after_lang = stripped.find('\n').map(|i| &stripped[i+1..]).unwrap_or(stripped);
+                    // Remove trailing fence
+                    after_lang.trim_end_matches("```").trim().to_string()
+                } else {
+                    raw.to_string()
+                };
 
                 if let Some(parent) = full_path.parent() {
                     fs::create_dir_all(parent)?;
@@ -727,7 +756,8 @@ dr(0)
                 Ok(json!({"path": path, "status": "modified", "bytes": modified.len()}).to_string())
             }
             "suggest" => {
-                let full_path = project_root.join(path);
+                sandbox.check_sensitive(path)?;
+                let full_path = sandbox.resolve(path)?;
                 let content = fs::read_to_string(&full_path)
                     .map_err(|e| anyhow::anyhow!("failed to read '{}': {}", path, e))?;
                 let prompt = format!(
