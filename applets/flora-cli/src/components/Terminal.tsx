@@ -52,7 +52,7 @@ function resolvePath(root: PlantNode, currentSegments: string[], targetPath: str
 }
 
 // Recursive helper to build ASCII tree output
-function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = true): string {
+function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = true, maxDepth: number = 999, depth: number = 0): string {
   let result = "";
   if (node.rank !== "clade" || node.name !== "Plantae") {
     const marker = isLast ? "└── " : "├── ";
@@ -61,35 +61,53 @@ function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = 
     result += `\x1b[32m${node.name} (${node.commonName})\x1b[0m\n`;
   }
 
-  if (node.children) {
+  if (node.children && depth < maxDepth) {
     const keys = Object.keys(node.children);
     const subIndent = indent + (isLast ? "    " : "│   ");
     keys.forEach((key, index) => {
       const child = node.children![key];
-      result += buildAsciiTree(child, subIndent, index === keys.length - 1);
+      result += buildAsciiTree(child, subIndent, index === keys.length - 1, maxDepth, depth + 1);
     });
+  } else if (node.children && Object.keys(node.children).length > 0) {
+    result += `${indent}    \x1b[90m... ${Object.keys(node.children).length} more children\x1b[0m\n`;
   }
   return result;
 }
 
 // Parse terminal color codes into JSX
 function parseAnsiColors(text: string): React.ReactNode[] {
-  const parts = text.split(/(\x1b\[\d+m)/);
+  const parts = text.split(/(\x1b\[\d+(?:;\d+)*m)/);
   let currentColorClass = "text-emerald-300";
+  let isBold = false;
 
   return parts.map((part, i) => {
     if (part.startsWith("\x1b[")) {
-      if (part === "\x1b[0m") currentColorClass = "text-emerald-300"; // reset
-      else if (part === "\x1b[31m") currentColorClass = "text-rose-400"; // red
-      else if (part === "\x1b[32m") currentColorClass = "text-green-400"; // green
-      else if (part === "\x1b[33m") currentColorClass = "text-amber-300 font-semibold"; // gold
-      else if (part === "\x1b[34m") currentColorClass = "text-sky-400"; // blue
-      else if (part === "\x1b[35m") currentColorClass = "text-purple-400"; // purple
-      else if (part === "\x1b[36m") currentColorClass = "text-teal-300"; // cyan
-      else if (part === "\x1b[37m") currentColorClass = "text-slate-200"; // white
+      const codes = part.slice(2, -1).split(";").map(Number);
+      let color = "";
+      let bold = false;
+      for (const code of codes) {
+        if (code === 0) { color = ""; bold = false; }
+        else if (code === 1) bold = true;
+        else if (code === 22) bold = false;
+        else if (code === 31) color = "text-rose-400";
+        else if (code === 32) color = "text-green-400";
+        else if (code === 33) color = "text-amber-300";
+        else if (code === 34) color = "text-sky-400";
+        else if (code === 35) color = "text-purple-400";
+        else if (code === 36) color = "text-teal-300";
+        else if (code === 37) color = "text-slate-200";
+      }
+      if (codes[0] === 0 && codes.length === 1) {
+        currentColorClass = "text-emerald-300";
+        isBold = false;
+      } else {
+        if (color) currentColorClass = color;
+        isBold = bold;
+      }
       return null;
     }
-    return <span key={i} className={currentColorClass}>{part}</span>;
+    const cls = isBold ? `${currentColorClass} font-semibold` : currentColorClass;
+    return <span key={i} className={cls}>{part}</span>;
   }).filter(Boolean);
 }
 
@@ -358,9 +376,16 @@ ${foundSpecies.asciiArt || ""}
         }
         break;
 
-      case "tree":
-        addLog("output", `\x1b[32mPhylogeny Tree starting from ${currentNode.name}:\x1b[0m\n\n` + buildAsciiTree(currentNode, "", true));
+      case "tree": {
+        const depthFlag = args.find(a => a.startsWith("--depth=") || a === "--depth");
+        let maxDepth = 3;
+        if (depthFlag) {
+          const val = depthFlag.includes("=") ? depthFlag.split("=")[1] : args[args.indexOf(depthFlag) + 1];
+          maxDepth = Math.max(1, parseInt(val) || 3);
+        }
+        addLog("output", `\x1b[32mPhylogeny Tree starting from ${currentNode.name} (depth ${maxDepth}):\x1b[0m\n\n` + buildAsciiTree(currentNode, "", true, maxDepth));
         break;
+      }
 
       case "evolution":
       case "lineage":
@@ -440,6 +465,17 @@ ${foundSpecies.asciiArt || ""}
         }
         break;
 
+      case "history":
+        if (chatLog.length === 0) {
+          addLog("output", "No conversation history yet.");
+        } else {
+          chatLog.forEach((entry, i) => {
+            const role = entry.role === "user" ? "\x1b[33mYou" : "\x1b[32mSage";
+            addLog("output", `${role}\x1b[0m: ${entry.text.substring(0, 200)}${entry.text.length > 200 ? "..." : ""}`);
+          });
+        }
+        break;
+
       case "clear":
         setLogs([]);
         break;
@@ -451,6 +487,12 @@ ${foundSpecies.asciiArt || ""}
           break;
         }
 
+        if (question === "/reset") {
+          setChatLog([]);
+          addLog("output", "\x1b[33mConversation history cleared.\x1b[0m");
+          break;
+        }
+
         setIsAiLoading(true);
         try {
           const response = await fetch("/api/botanist", {
@@ -459,7 +501,8 @@ ${foundSpecies.asciiArt || ""}
             body: JSON.stringify({
               prompt: question,
               speciesContext: currentNode.rank === "species" ? currentNode.name : undefined,
-              pathContext: "/" + pathSegments.join("/")
+              pathContext: "/" + pathSegments.join("/"),
+              chatHistory: chatLog.slice(-20)
             })
           });
 
@@ -467,7 +510,7 @@ ${foundSpecies.asciiArt || ""}
           if (response.ok) {
             // Append to central chat logs so both components are updated
             setChatLog(prev => [...prev, { role: "user", text: question }, { role: "ai", text: data.text }]);
-            addLog("ai", `\x1b[33mTHE CALEDONIAN BOTANIST SAGE COGELATES:\x1b[0m\n\n${data.text}`);
+            addLog("ai", `\x1b[33mTHE CALEDONIAN BOTANIST SAGE COGITATES:\x1b[0m\n\n${data.text}`);
           } else {
             addLog("error", data.error || "The Sage had trouble hearing you. Try again.");
           }
@@ -486,12 +529,11 @@ ${foundSpecies.asciiArt || ""}
 
   const executeShortcut = (cmdStr: string) => {
     setInput(cmdStr);
-    // Submit in next tick or run directly
     setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
+      if (inputRef.current?.form) {
+        inputRef.current.form.requestSubmit();
       }
-    }, 50);
+    }, 0);
   };
 
   return (
