@@ -349,7 +349,7 @@ async fn main() -> anyhow::Result<()> {
     let mut completion_candidates: Vec<String> = vec![
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
-        "stats", "memory", "analyze", "evolve", "refine",
+        "stats", "history", "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
         completion_candidates.push(name);
@@ -730,6 +730,19 @@ async fn main() -> anyhow::Result<()> {
                 }).await {
                     Ok(r) => println!("\n{}", r),
                     Err(e) => ui::show_error(&e.to_string()),
+                }
+                continue;
+            }
+            "history" => {
+                let n: usize = input[7..].trim().parse().unwrap_or(10);
+                let recent = messages.iter().rev().take(n).rev();
+                for m in recent {
+                    let role = if m.role == "user" { "you" } else { "ayesha" };
+                    let preview: String = m.content.chars().take(100).collect();
+                    println!("  \x1b[90m{}\x1b[0m \x1b[36m{}\x1b[0m: {}{}", role,
+                        if m.role == "user" { "" } else { "" },
+                        preview,
+                        if m.content.chars().count() > 100 { "..." } else { "" });
                 }
                 continue;
             }
