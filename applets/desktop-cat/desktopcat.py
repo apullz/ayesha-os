@@ -12,6 +12,15 @@ import pystray
 
 user32 = ctypes.windll.user32
 
+# DPI awareness — correct coordinates on high-DPI displays
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
 SPRITE_SIZE = 32
 DISPLAY_SCALE = 1.5
 DISPLAY_SIZE = int(SPRITE_SIZE * DISPLAY_SCALE)
@@ -57,9 +66,15 @@ def load_config():
     return {"speed": 5.0, "phrases": DEFAULT_PHRASES, "bubble_interval": 120}
 
 config = load_config()
-CAT_SPEED = config["speed"]
-PHRASES = config["phrases"]
-BUBBLE_INTERVAL = config["bubble_interval"]
+try:
+    CAT_SPEED = max(0.1, float(config["speed"]))
+except (TypeError, ValueError):
+    CAT_SPEED = 5.0
+PHRASES = config["phrases"] if isinstance(config["phrases"], list) and config["phrases"] else DEFAULT_PHRASES
+try:
+    BUBBLE_INTERVAL = max(1, int(config["bubble_interval"]))
+except (TypeError, ValueError):
+    BUBBLE_INTERVAL = 120
 
 COLLAR_COLOR = (200, 30, 30, 255)
 COLLAR_LEN = 8
@@ -118,7 +133,7 @@ def recolor_sprite(img):
                 pixels[x, y] = (220, 30, 30, a)
     return img
 
-def extract_frame(x, y, has_collar=True):
+def extract_frame(x, y):
     crop = atlas.crop((x, y, x + SPRITE_SIZE, y + SPRITE_SIZE))
     crop = recolor_sprite(crop.copy())
     return crop.resize((DISPLAY_SIZE, DISPLAY_SIZE), Image.NEAREST)
@@ -216,9 +231,12 @@ ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
 user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW)
 
 photo_cache = {}
+PHOTO_CACHE_MAX = 256
 def pil_to_photo(pil_img):
     key = pil_img.tobytes()
     if key not in photo_cache:
+        if len(photo_cache) >= PHOTO_CACHE_MAX:
+            photo_cache.clear()
         photo_cache[key] = ImageTk.PhotoImage(pil_img)
     return photo_cache[key]
 
@@ -348,6 +366,7 @@ def update():
 
     if show_bubble and bubble_timer >= BUBBLE_SHOW_TIME:
         show_bubble = False
+        bubble_timer = 0
 
     def draw_frame():
         root.geometry(f"+{int(cat_x - CAT_ORIGIN_X)}+{int(cat_y - CAT_ORIGIN_Y)}")
@@ -382,6 +401,7 @@ def update():
             if cat_y > screen_y + screen_h - 32:
                 available.append("scratchWallS")
             idle_animation = random.choice(available)
+            idleAnimationFrame = 0
 
         if idle_animation == "sleeping":
             if idleAnimationFrame < 8:
@@ -460,7 +480,12 @@ def toggle_cat(icon, item):
 
 def quit_cat(icon, item):
     icon.stop()
-    root.after(0, root.destroy)
+    def safe_destroy():
+        try:
+            root.destroy()
+        except Exception:
+            pass
+    root.after(0, safe_destroy)
 
 def make_tray_icon():
     icon_img = extract_frame(96, 96).resize((64, 64), Image.NEAREST)
@@ -471,10 +496,11 @@ def make_tray_icon():
     icon = pystray.Icon("desktopcat", icon_img, "Desktop Cat", menu)
     return icon
 
-root.after(0, update)
+if __name__ == "__main__":
+    root.after(0, update)
 
-tray_icon = make_tray_icon()
-threading.Thread(target=tray_icon.run, daemon=True).start()
+    tray_icon = make_tray_icon()
+    threading.Thread(target=tray_icon.run, daemon=True).start()
 
-root.deiconify()
-root.mainloop()
+    root.deiconify()
+    root.mainloop()
