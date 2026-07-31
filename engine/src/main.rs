@@ -349,7 +349,7 @@ async fn main() -> anyhow::Result<()> {
     let mut completion_candidates: Vec<String> = vec![
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
-        "stats", "history", "compact", "save", "load", "system",
+        "stats", "history", "compact", "save", "load", "system", "export", "ping",
         "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
@@ -811,6 +811,43 @@ async fn main() -> anyhow::Result<()> {
                     }
                 } else {
                     ui::show_system("no system prompt loaded");
+                }
+                continue;
+            }
+            "export" => {
+                let path_str = input[7..].trim();
+                let path = if path_str.is_empty() {
+                    project_root.join("conversation.md")
+                } else {
+                    std::path::PathBuf::from(path_str)
+                };
+                let mut md = String::from("# ayesha conversation\n\n");
+                for m in &messages {
+                    if m.role == "system" { continue; }
+                    let role = if m.role == "user" { "## you" } else { "## ayesha" };
+                    md.push_str(&format!("{}\n\n{}\n\n", role, m.content));
+                }
+                match std::fs::write(&path, &md) {
+                    Ok(()) => ui::show_system(&format!("exported {} messages to {}", messages.len().saturating_sub(1), path.display())),
+                    Err(e) => ui::show_error(&format!("write error: {}", e)),
+                }
+                continue;
+            }
+            "ping" => {
+                use std::time::Instant;
+                let start = Instant::now();
+                let test_msgs = vec![ChatMessage {
+                    role: "user".to_string(),
+                    content: "ping".to_string(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                }];
+                match client.chat_stream_collect(&test_msgs, None, &steer_rx).await {
+                    Ok(_) => {
+                        let elapsed = start.elapsed().as_millis();
+                        ui::show_system(&format!("pong! {}ms (model: {})", elapsed, current_model));
+                    }
+                    Err(e) => ui::show_error(&format!("ping failed: {}", e)),
                 }
                 continue;
             }
