@@ -351,7 +351,7 @@ async fn main() -> anyhow::Result<()> {
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
         "stats", "history", "compact", "save", "load", "system", "export", "ping",
-        "joke", "time", "uptime",
+        "joke", "time", "uptime", "config",
         "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
@@ -889,6 +889,31 @@ async fn main() -> anyhow::Result<()> {
                 let mins = (secs % 3600) / 60;
                 let secs = secs % 60;
                 ui::show_system(&format!("uptime: {}h {}m {}s", hours, mins, secs));
+                continue;
+            }
+            "config" => {
+                let key = input[7..].trim();
+                if key.is_empty() {
+                    println!("\n\x1b[1;33mConfiguration:\x1b[0m");
+                    println!("  user_name: {}", config.get("user_name").and_then(|v| v.as_str()).unwrap_or("(not set)"));
+                    println!("  tool_model: {}", tool_model_name);
+                    println!("  chat_model: {}", current_model);
+                    println!("  config_path: {}", config_path.display());
+                } else {
+                    let parts: Vec<&str> = key.splitn(2, '=').collect();
+                    if parts.len() == 2 {
+                        let k = parts[0].trim();
+                        let v = parts[1].trim();
+                        config[k] = serde_json::json!(v);
+                        if let Ok(content) = serde_json::to_string_pretty(&config) {
+                            let _ = std::fs::write(&config_path, content);
+                        }
+                        ui::show_system(&format!("set {} = {}", k, v));
+                    } else {
+                        let val = config.get(key).map(|v| v.to_string()).unwrap_or("(not found)".to_string());
+                        println!("  {} = {}", key.bright_cyan(), val.bright_white());
+                    }
+                }
                 continue;
             }
             "memory" => {

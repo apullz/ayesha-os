@@ -269,7 +269,7 @@ impl AppletManager {
             "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
             "model", "toolmodel", "pull", "route", "name", "exit",
             "stats", "history", "compact", "save", "load", "system", "export", "ping",
-            "joke", "time", "uptime",
+            "joke", "time", "uptime", "config",
             "memory", "analyze", "evolve", "refine",
         ].into_iter().map(String::from).collect();
         for name in self.names() {
