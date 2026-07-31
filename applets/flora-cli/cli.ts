@@ -75,7 +75,7 @@ function resolvePath(root: PlantNode, currentSegments: string[], targetPath: str
 }
 
 // Recursive helper to build ASCII tree output
-function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = true): string {
+function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = true, maxDepth: number = 99, depth: number = 0): string {
   let result = "";
   if (node.rank !== "clade" || node.name !== "Plantae") {
     const marker = isLast ? "└── " : "├── ";
@@ -84,13 +84,17 @@ function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = 
     result += `\x1b[32m${node.name} (${node.commonName})\x1b[0m\n`;
   }
 
-  if (node.children) {
+  if (node.children && depth < maxDepth) {
     const keys = Object.keys(node.children);
     const subIndent = indent + (isLast ? "    " : "│   ");
     keys.forEach((key, index) => {
       const child = node.children![key];
-      result += buildAsciiTree(child, subIndent, index === keys.length - 1);
+      result += buildAsciiTree(child, subIndent, index === keys.length - 1, maxDepth, depth + 1);
     });
+  } else if (node.children && depth >= maxDepth) {
+    const childCount = Object.keys(node.children).length;
+    const marker = isLast ? "└── " : "├── ";
+    result += `${indent}${marker}\x1b[90m... (${childCount} more children, use tree --depth ${maxDepth + 1} to expand)\x1b[0m\n`;
   }
   return result;
 }
@@ -129,11 +133,12 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
   \x1b[33mcd [taxon]\x1b[0m          Change active taxonomic directory (e.g. \x1b[36mcd angiosperms\x1b[0m, \x1b[36mcd ..\x1b[0m)
   \x1b[33mpwd\x1b[0m                Print current absolute taxonomic path
   \x1b[33mcat [species.md]\x1b[0m    Inspect detailed botanical report & folklore of a species
-  \x1b[33mtree\x1b[0m               Render ASCII taxonomic branching diagram from current folder
+  \x1b[33mtree [--depth=N]\x1b[0m    Render ASCII taxonomic branching diagram (default depth: 3)
   \x1b[33mevolution\x1b[0m          Draw vertical geologic timeline and milestones of current lineage
   \x1b[33msearch [query]\x1b[0m     Search full database for any plant, family, or Gaelic term
   \x1b[33mask [question]\x1b[0m      Query the Caledonian Botanist AI on folklore, uses, or biology
   \x1b[33mclear\x1b[0m              Clear terminal screen
+  \x1b[33mhistory\x1b[0m            Show conversation history with the Sage
   \x1b[33mexit\x1b[0m / \x1b[33mquit\x1b[0m          Exit the application
 
 \x1b[1;36mTaxonomic Ranks of Earth:\x1b[0m
@@ -147,6 +152,19 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
 
     case "pwd":
       return { output: `/${pathSegments.join("/")}` };
+
+    case "history": {
+      if (chatHistory.length === 0) {
+        return { output: "\x1b[90mNo conversation history yet.\x1b[0m" };
+      }
+      let out = "\x1b[1;33mConversation History:\x1b[0m\n";
+      for (const msg of chatHistory) {
+        const role = msg.role === "user" ? "\x1b[36mYou\x1b[0m" : "\x1b[33mSage\x1b[0m";
+        out += `  ${role}: ${msg.content.slice(0, 120)}${msg.content.length > 120 ? "..." : ""}\n`;
+      }
+      out += `\x1b[90m(${chatHistory.length} messages, use 'ask /reset' to clear)\x1b[0m`;
+      return { output: out };
+    }
 
     case "ls": {
       if (!currentNode.children || Object.keys(currentNode.children).length === 0) {
@@ -223,8 +241,15 @@ ${foundSpecies.asciiArt || ""}
       }
     }
 
-    case "tree":
-      return { output: `\x1b[1;32mPhylogeny Tree starting from ${currentNode.name}:\x1b[0m\n\n` + buildAsciiTree(currentNode, "", true) };
+    case "tree": {
+      const depthFlag = args.find(a => a.startsWith("--depth=") || a === "--depth");
+      let maxDepth = 3;
+      if (depthFlag) {
+        const val = depthFlag.includes("=") ? depthFlag.split("=")[1] : args[args.indexOf(depthFlag) + 1];
+        maxDepth = parseInt(val) || 3;
+      }
+      return { output: `\x1b[1;32mPhylogeny Tree starting from ${currentNode.name} (depth ${maxDepth}):\x1b[0m\n\n` + buildAsciiTree(currentNode, "", true, maxDepth) };
+    }
 
     case "evolution":
     case "lineage": {
