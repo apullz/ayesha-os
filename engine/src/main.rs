@@ -275,6 +275,7 @@ async fn main() -> anyhow::Result<()> {
 
     winapi::init_console();
 
+    let session_start = std::time::Instant::now();
     let sandbox = Sandbox::default_workspace();
     let mut manager = AppletManager::new();
     let executor = ToolExecutor::new(sandbox);
@@ -350,6 +351,7 @@ async fn main() -> anyhow::Result<()> {
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
         "stats", "history", "compact", "save", "load", "system", "export", "ping",
+        "joke", "time", "uptime",
         "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
@@ -849,6 +851,44 @@ async fn main() -> anyhow::Result<()> {
                     }
                     Err(e) => ui::show_error(&format!("ping failed: {}", e)),
                 }
+                continue;
+            }
+            "joke" => {
+                let jokes = [
+                    "why do programmers prefer dark mode? because light attracts bugs.",
+                    "there are 10 types of people in the world: those who understand binary and those who don't.",
+                    "a sql query walks into a bar, walks up to two tables and asks: 'can i join you?'",
+                    "why was the javascript developer sad? because he didn't node how to express himself.",
+                    "what's a programmer's favorite hangout place? foo bar.",
+                    "why do java developers wear glasses? because they can't c#.",
+                    "how many programmers does it take to change a light bulb? none — that's a hardware problem.",
+                    "what is a robot's favorite type of music? heavy metal.",
+                    "why did the developer go broke? because he used up all his cache.",
+                    "what's a computer's least favorite food? spam.",
+                ];
+                let joke = jokes[std::time::Instant::now().elapsed().as_nanos() as usize % jokes.len()];
+                println!("\n  {}", joke.bright_yellow());
+                continue;
+            }
+            "time" => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                // Simple UTC time display
+                let hours = (now / 3600) % 24;
+                let mins = (now / 60) % 60;
+                let secs = now % 60;
+                ui::show_system(&format!("utc time: {:02}:{:02}:{:02}", hours, mins, secs));
+                continue;
+            }
+            "uptime" => {
+                let elapsed = session_start.elapsed();
+                let secs = elapsed.as_secs();
+                let hours = secs / 3600;
+                let mins = (secs % 3600) / 60;
+                let secs = secs % 60;
+                ui::show_system(&format!("uptime: {}h {}m {}s", hours, mins, secs));
                 continue;
             }
             "memory" => {
