@@ -1,6 +1,6 @@
 ╔═══════════════════════════════════════════════╗
 ║       ayesha-os  ::  STATUS REPORT  ::         ║
-║          "[RELEASE] v4.3.0"                   ║
+║          "[RELEASE] v4.4.0"                   ║
 ╚═══════════════════════════════════════════════╝
 
   ── L E G E N D ──
@@ -21,6 +21,11 @@
                          retro cyberpunk UI, applet manager,
                          autocomplete (Tab cycling for commands
                          and applets), 46 unit tests.
+                         └ 22 slash commands (help, clear, models,
+                            auto, sync, apps, run, stop, model,
+                            toolmodel, pull, route, name, exit,
+                            stats, history, compact, save, load,
+                            memory, analyze, evolve, refine)
                          └ model: ayesha (qwen2.5-coder:14b base)
                          └ --selftest for headless E2E verification
 
@@ -45,6 +50,8 @@
                          └ replaced gemini with ollama 07/2026
                          └ OLLAMA_HOST env var now respected
                          └ multi-turn ask (conversation memory)
+                         └ history command shows chat history
+                         └ tree --depth=N limits display depth
                          └ fixed double-escaped ANSI codes
                          └ fixed package.json name + metadata
 
@@ -52,9 +59,10 @@
                          └ login: token / QR / email+password
                          └ token persisted to ~/.poopy-tui/token
                          └ requires DISCORD_TOKEN in .env OR first-run login
-                         └ r to reply to last message
+                         └ r to reply, a for message actions (pin/delete)
                          └ friends list: Enter opens DM
                          └ typing indicator auto-clears after 5s
+                         └ typing indicator deduped per-user
                          └ JSONL message logging to logs/
 
   models/          [✔]  Modelfile for ayesha personality.
