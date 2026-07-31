@@ -1,6 +1,6 @@
 ╔═══════════════════════════════════════════════╗
 ║       ayesha-os  ::  STATUS REPORT  ::         ║
-║          "[RELEASE] v4.4.0"                   ║
+║          "[RELEASE] v4.5.0"                   ║
 ╚═══════════════════════════════════════════════╝
 
   ── L E G E N D ──
@@ -20,12 +20,14 @@
                          self-improvement loop, command palette,
                          retro cyberpunk UI, applet manager,
                          autocomplete (Tab cycling for commands
-                         and applets), 46 unit tests.
-                         └ 22 slash commands (help, clear, models,
-                            auto, sync, apps, run, stop, model,
-                            toolmodel, pull, route, name, exit,
-                            stats, history, compact, save, load,
-                            memory, analyze, evolve, refine)
+                         and applets), 46 unit tests, zero warnings.
+                         └ 25 slash commands:
+                            help, clear, models, auto, sync, apps,
+                            run, stop, model, toolmodel, pull, route,
+                            name, exit, stats, history, compact,
+                            save, load, system, export, ping,
+                            joke, time, uptime, config,
+                            memory, analyze, evolve, refine
                          └ model: ayesha (qwen2.5-coder:14b base)
                          └ --selftest for headless E2E verification
 
@@ -59,10 +61,11 @@
                          └ login: token / QR / email+password
                          └ token persisted to ~/.poopy-tui/token
                          └ requires DISCORD_TOKEN in .env OR first-run login
-                         └ r to reply, a for message actions (pin/delete)
+                         └ r reply, a actions (pin/delete), + react
+                         └ Ctrl+f message search in messages view
                          └ friends list: Enter opens DM
-                         └ typing indicator auto-clears after 5s
-                         └ typing indicator deduped per-user
+                         └ typing indicator auto-clears + deduped
+                         └ Ctrl+End toggle auto-scroll
                          └ JSONL message logging to logs/
 
   models/          [✔]  Modelfile for ayesha personality.
