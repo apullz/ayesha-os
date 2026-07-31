@@ -349,7 +349,8 @@ async fn main() -> anyhow::Result<()> {
     let mut completion_candidates: Vec<String> = vec![
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
-        "stats", "history", "compact", "save", "load", "memory", "analyze", "evolve", "refine",
+        "stats", "history", "compact", "save", "load", "system",
+        "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
         completion_candidates.push(name);
@@ -799,6 +800,17 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     Err(e) => ui::show_error(&format!("read error: {}", e)),
+                }
+                continue;
+            }
+            "system" => {
+                if !messages.is_empty() {
+                    println!("\n\x1b[1;33mSystem Prompt:\x1b[0m");
+                    for line in messages[0].content.lines() {
+                        println!("  {}", line.bright_black());
+                    }
+                } else {
+                    ui::show_system("no system prompt loaded");
                 }
                 continue;
             }
