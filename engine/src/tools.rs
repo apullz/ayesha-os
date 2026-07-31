@@ -154,6 +154,7 @@ impl ToolExecutor {
 
         self.sandbox.check_sensitive(path)?;
         let resolved = self.sandbox.resolve(path)?;
+        self.sandbox.check_sensitive_resolved(&resolved)?;
 
         let content = fs::read_to_string(&resolved)?;
 
@@ -181,6 +182,7 @@ impl ToolExecutor {
 
         self.sandbox.check_sensitive(path)?;
         let resolved = self.sandbox.resolve(path)?;
+        self.sandbox.check_sensitive_resolved(&resolved)?;
 
         if let Some(parent) = resolved.parent() {
             fs::create_dir_all(parent)?;
@@ -199,6 +201,7 @@ impl ToolExecutor {
         let path = args["path"].as_str().unwrap_or(".");
         self.sandbox.check_sensitive(path)?;
         let resolved = self.sandbox.resolve(path)?;
+        self.sandbox.check_sensitive_resolved(&resolved)?;
 
         let entries = fs::read_dir(&resolved)?;
 

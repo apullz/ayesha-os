@@ -62,6 +62,7 @@ impl Sandbox {
         let blocked = [
             ".env", ".ssh", ".gnupg", ".aws", ".azure",
             "password", "secret", "token", "private_key",
+            "id_rsa", "known_hosts", "kubeconfig", "pgpass", "netrc",
         ];
 
         for pattern in &blocked {
@@ -74,6 +75,26 @@ impl Sandbox {
             }
         }
 
+        Ok(())
+    }
+
+    /// Check a resolved/canonical path for sensitive patterns (post-resolution).
+    pub fn check_sensitive_resolved(&self, path: &std::path::Path) -> Result<()> {
+        let s = path.to_string_lossy().to_lowercase();
+        let blocked = [
+            ".env", ".ssh", ".gnupg", ".aws", ".azure",
+            "password", "secret", "token", "private_key",
+            "id_rsa", "known_hosts", "kubeconfig", "pgpass", "netrc",
+        ];
+        for pattern in &blocked {
+            if s.contains(pattern) {
+                bail!(
+                    "access denied: resolved path '{}' matches sensitive pattern '{}'",
+                    path.display(),
+                    pattern
+                );
+            }
+        }
         Ok(())
     }
 
