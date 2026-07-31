@@ -1,8 +1,11 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import dotenv from "dotenv";
 
-const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
+dotenv.config();
+
+const OLLAMA_HOST = (process.env.OLLAMA_HOST || "http://localhost:11434").replace(/\/+$/, "");
 const MODEL = "qwen2.5:7b";
 
 async function askOllama(system: string, user: string): Promise<string> {
@@ -24,6 +27,22 @@ async function askOllama(system: string, user: string): Promise<string> {
   return data.message?.content || "";
 }
 
+async function askOllamaFromMessages(messages: Array<{ role: string; content: string }>): Promise<string> {
+  const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      options: { temperature: 0.7 },
+      stream: false,
+    }),
+  });
+  if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+  const data = await res.json();
+  return data.message?.content || "";
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -32,7 +51,11 @@ async function startServer() {
 
   app.post("/api/botanist", async (req, res) => {
     try {
-      const { prompt, speciesContext, pathContext } = req.body;
+      const { prompt, speciesContext, pathContext, chatHistory } = req.body;
+
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ error: "Missing or invalid 'prompt' field." });
+      }
 
       const system = `You are the legendary Caledonian Botanist AI, a wise and friendly Scottish naturalist, phytologist, and clan historian.
 You are helping the user explore the magnificent evolutionary tree of Scottish Flora inside a simulated terminal.
@@ -49,7 +72,17 @@ Terminal Formatting Instructions:
 - Use dashes, capitals, or simple asterisks for lists or subtitles.
 - If they ask general questions unrelated to Scottish botany, gently guide them back to the lore of the glens, ancient peatlands, Caledonian pine forests, and the deep evolution of plants.`;
 
-      const text = await askOllama(system, prompt);
+      const messages: Array<{ role: string; content: string }> = [
+        { role: "system", content: system },
+      ];
+      if (Array.isArray(chatHistory)) {
+        for (const entry of chatHistory.slice(-20)) {
+          messages.push({ role: entry.role === "user" ? "user" : "assistant", content: entry.text });
+        }
+      }
+      messages.push({ role: "user", content: prompt });
+
+      const text = await askOllamaFromMessages(messages);
       res.json({ text });
     } catch (err: any) {
       console.error("Ollama Botanist Error:", err);

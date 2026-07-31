@@ -1,15 +1,21 @@
 import readline from "readline";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { floraData } from "./src/data/floraData.js";
 import { PlantNode } from "./src/types.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Conversation history for multi-turn ask
 const chatHistory: Array<{ role: string; content: string }> = [];
 
 // Basic manual .env loader to run standalone with zero external dependencies
 try {
-  if (fs.existsSync(".env")) {
-    const dotenvContent = fs.readFileSync(".env", "utf-8");
+  const envPath = path.join(__dirname, ".env");
+  if (fs.existsSync(envPath)) {
+    const dotenvContent = fs.readFileSync(envPath, "utf-8");
     dotenvContent.split(/\r?\n/).forEach((line) => {
       const trimmed = line.trim();
       if (trimmed && !trimmed.startsWith("#")) {
@@ -205,11 +211,15 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
         filename = filename.slice(0, -3);
       }
 
-      // Check if filename matches a child species
+      // Check if filename matches a child species (case-insensitive)
       let foundSpecies: PlantNode | undefined;
-      if (currentNode.children && currentNode.children[filename]) {
-        foundSpecies = currentNode.children[filename];
-      } else if (currentNode.rank === "species" && currentNode.name.toLowerCase().endsWith(filename.toLowerCase())) {
+      if (currentNode.children) {
+        const childKey = Object.keys(currentNode.children).find(
+          k => k.toLowerCase() === filename.toLowerCase()
+        );
+        if (childKey) foundSpecies = currentNode.children[childKey];
+      }
+      if (!foundSpecies && currentNode.rank === "species" && currentNode.name.toLowerCase().endsWith(filename.toLowerCase())) {
         foundSpecies = currentNode;
       }
 
@@ -246,7 +256,7 @@ ${foundSpecies.asciiArt || ""}
       let maxDepth = 3;
       if (depthFlag) {
         const val = depthFlag.includes("=") ? depthFlag.split("=")[1] : args[args.indexOf(depthFlag) + 1];
-        maxDepth = parseInt(val) || 3;
+        maxDepth = Math.max(1, parseInt(val) || 3);
       }
       return { output: `\x1b[1;32mPhylogeny Tree starting from ${currentNode.name} (depth ${maxDepth}):\x1b[0m\n\n` + buildAsciiTree(currentNode, "", true, maxDepth) };
     }
@@ -363,7 +373,13 @@ Terminal Formatting Instructions:
           { role: "user", content: question },
         ];
 
-        const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
+        let ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
+        if (!ollamaHost.startsWith("http://") && !ollamaHost.startsWith("https://")) {
+          ollamaHost = "http://" + ollamaHost;
+        }
+        ollamaHost = ollamaHost.replace(/\/+$/, "");
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
         const res = await fetch(`${ollamaHost}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -373,7 +389,9 @@ Terminal Formatting Instructions:
             options: { temperature: 0.7 },
             stream: false,
           }),
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
 
         if (!res.ok) throw new Error(`ollama returned ${res.status}`);
         const data = await res.json();
@@ -381,6 +399,7 @@ Terminal Formatting Instructions:
 
         chatHistory.push({ role: "user", content: question });
         chatHistory.push({ role: "assistant", content: text });
+        if (chatHistory.length > 50) chatHistory.splice(0, chatHistory.length - 50);
 
         return { output: `\n\x1b[1;33mTHE CALEDONIAN BOTANIST SAGE COGITATES:\x1b[0m\n\n${text}\n` };
       } catch (err: any) {

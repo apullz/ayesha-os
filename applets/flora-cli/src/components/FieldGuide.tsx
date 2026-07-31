@@ -141,7 +141,7 @@ export default function FieldGuide({
                       {activeSpecies.name}
                     </h2>
                     <p className="text-xs text-emerald-400 font-sans tracking-wide">
-                      {activeSpecies.commonName} • <span className="font-semibold">{activeSpecies.gaelicName}</span>
+                      {activeSpecies.commonName || "Unknown"} • <span className="font-semibold">{activeSpecies.gaelicName || "Not recorded"}</span>
                     </p>
                   </div>
                   <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -180,7 +180,7 @@ export default function FieldGuide({
                   Scottish Habitat
                 </h3>
                 <p className="text-xs leading-relaxed text-slate-300 font-sans bg-slate-950/20 p-3 rounded border border-slate-800/30">
-                  {activeSpecies.habitat}
+                  {activeSpecies.habitat || "Widespread"}
                 </p>
               </div>
 
@@ -191,7 +191,7 @@ export default function FieldGuide({
                   Gaelic Lore & Traditional Uses
                 </h3>
                 <p className="text-xs leading-relaxed text-slate-300 font-sans bg-slate-950/20 p-3 rounded border border-slate-800/30">
-                  {activeSpecies.lore}
+                  {activeSpecies.lore || "No lore recorded."}
                 </p>
               </div>
 
