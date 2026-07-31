@@ -349,7 +349,7 @@ async fn main() -> anyhow::Result<()> {
     let mut completion_candidates: Vec<String> = vec![
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
-        "stats", "history", "memory", "analyze", "evolve", "refine",
+        "stats", "history", "compact", "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
         completion_candidates.push(name);
@@ -743,6 +743,21 @@ async fn main() -> anyhow::Result<()> {
                         if m.role == "user" { "" } else { "" },
                         preview,
                         if m.content.chars().count() > 100 { "..." } else { "" });
+                }
+                continue;
+            }
+            "compact" => {
+                let before = messages.len();
+                // Keep system message + last 4 exchanges (8 messages)
+                if messages.len() > 9 {
+                    let system = messages[0].clone();
+                    let recent: Vec<_> = messages.iter().rev().take(8).rev().cloned().collect();
+                    messages.clear();
+                    messages.push(system);
+                    messages.extend(recent);
+                    ui::show_system(&format!("compacted: {} → {} messages (kept system + last 8)", before, messages.len()));
+                } else {
+                    ui::show_system(&format!("already compact ({} messages)", before));
                 }
                 continue;
             }
