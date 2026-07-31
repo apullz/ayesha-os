@@ -3,6 +3,9 @@ import fs from "fs";
 import { floraData } from "./src/data/floraData.js";
 import { PlantNode } from "./src/types.js";
 
+// Conversation history for multi-turn ask
+const chatHistory: Array<{ role: string; content: string }> = [];
+
 // Basic manual .env loader to run standalone with zero external dependencies
 try {
   if (fs.existsSync(".env")) {
@@ -303,7 +306,12 @@ ${foundSpecies.asciiArt || ""}
     case "ask": {
       const question = args.join(" ").trim();
       if (!question) {
-        return { output: "\x1b[31mask: What would you like to ask the Caledonian Botanist? Example: ask Tell me about rowan saining rituals.\x1b[0m" };
+        return { output: "\x1b[31mask: What would you like to ask? Use 'ask /reset' to clear history.\x1b[0m" };
+      }
+
+      if (question === "/reset") {
+        chatHistory.length = 0;
+        return { output: "\x1b[33mConversation history cleared.\x1b[0m" };
       }
 
       console.log("\x1b[33mThe Caledonian Botanist Sage is cogitating...\x1b[0m");
@@ -324,15 +332,19 @@ Terminal Formatting Instructions:
 - Use dashes, capitals, or simple asterisks for lists or subtitles.
 - If they ask general questions unrelated to Scottish botany, gently guide them back to the lore of the glens, ancient peatlands, Caledonian pine forests, and the deep evolution of plants.`;
 
-        const res = await fetch("http://localhost:11434/api/chat", {
+        const messages = [
+          { role: "system", content: system },
+          ...chatHistory.slice(-20),
+          { role: "user", content: question },
+        ];
+
+        const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
+        const res = await fetch(`${ollamaHost}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "qwen2.5:7b",
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: question },
-            ],
+            messages,
             options: { temperature: 0.7 },
             stream: false,
           }),
@@ -341,6 +353,9 @@ Terminal Formatting Instructions:
         if (!res.ok) throw new Error(`ollama returned ${res.status}`);
         const data = await res.json();
         const text = data.message?.content || "The sage was silent.";
+
+        chatHistory.push({ role: "user", content: question });
+        chatHistory.push({ role: "assistant", content: text });
 
         return { output: `\n\x1b[1;33mTHE CALEDONIAN BOTANIST SAGE COGITATES:\x1b[0m\n\n${text}\n` };
       } catch (err: any) {
@@ -370,8 +385,8 @@ async function runShell() {
   console.log("\x1b[1;32m          🌲  CALEDONIAN PHYLOGENETIC TERMINAL v1.2  🌲          \x1b[0m");
   console.log("\x1b[1;33m=================================================================\x1b[0m");
   console.log("Welcome, Scholar. Traverse the deep branches of Scottish Flora.");
-  console.log("Type \\x1b[36mhelp\\x1b[0m to list commands, \\x1b[36mls\\x1b[0m to view clades, or \\x1b[36mexit\\x1b[0m to quit.");
-  console.log("Inquire of the \\x1b[1;33mCaledonian Botanist AI\\x1b[0m using: \\x1b[33mask [question]\\x1b[0m");
+  console.log("Type \x1b[36mhelp\x1b[0m to list commands, \x1b[36mls\x1b[0m to view clades, or \x1b[36mexit\x1b[0m to quit.");
+  console.log("Inquire of the \x1b[1;33mCaledonian Botanist AI\x1b[0m using: \x1b[33mask [question]\x1b[0m");
   console.log("\x1b[1;33m-----------------------------------------------------------------\x1b[0m\n");
 
   const rl = readline.createInterface({

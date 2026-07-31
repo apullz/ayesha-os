@@ -14,6 +14,7 @@ mod model_registry;
 mod applet_manager;
 mod applet_runner;
 mod agent;
+mod completion;
 
 use std::io::Write;
 use colored::*;
@@ -342,7 +343,18 @@ async fn main() -> anyhow::Result<()> {
     // Steering channel: input thread sends keys here. The thread is poll-based
     // so it can be suspended while a foreground applet owns the terminal.
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
-    let mut input_flag = applet_runner::spawn_input_thread(steer_tx.clone());
+
+    // Build completion candidates: slash commands + applet names
+    let mut completion_candidates: Vec<String> = vec![
+        "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
+        "model", "toolmodel", "pull", "route", "name", "exit",
+        "stats", "memory", "analyze", "evolve", "refine",
+    ].into_iter().map(String::from).collect();
+    for name in manager.names() {
+        completion_candidates.push(name);
+    }
+
+    let mut input_flag = applet_runner::spawn_input_thread(steer_tx.clone(), completion_candidates);
 
     ui::print_banner();
     ui::show_system(&memory.summary());
@@ -705,6 +717,66 @@ async fn main() -> anyhow::Result<()> {
                     }
                     messages[0].content = OllamaClient::system_prompt(&name);
                     ui::show_system(&format!("okay, {} it is!", name));
+                }
+                continue;
+            }
+            "stats" => {
+                match executor.execute("get_tool_stats", &serde_json::json!({}), &mut ToolContext {
+                    memory: &mut memory, prompt_history: &mut prompt_history,
+                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    project_root: &project_root, applet_manager: &mut manager,
+                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                }).await {
+                    Ok(r) => println!("\n{}", r),
+                    Err(e) => ui::show_error(&e.to_string()),
+                }
+                continue;
+            }
+            "memory" => {
+                match executor.execute("list_memories", &serde_json::json!({}), &mut ToolContext {
+                    memory: &mut memory, prompt_history: &mut prompt_history,
+                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    project_root: &project_root, applet_manager: &mut manager,
+                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                }).await {
+                    Ok(r) => println!("\n{}", r),
+                    Err(e) => ui::show_error(&e.to_string()),
+                }
+                continue;
+            }
+            "analyze" => {
+                match executor.execute("analyze_self", &serde_json::json!({}), &mut ToolContext {
+                    memory: &mut memory, prompt_history: &mut prompt_history,
+                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    project_root: &project_root, applet_manager: &mut manager,
+                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                }).await {
+                    Ok(r) => println!("\n{}", r),
+                    Err(e) => ui::show_error(&e.to_string()),
+                }
+                continue;
+            }
+            "evolve" => {
+                match executor.execute("evolve_tools", &serde_json::json!({}), &mut ToolContext {
+                    memory: &mut memory, prompt_history: &mut prompt_history,
+                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    project_root: &project_root, applet_manager: &mut manager,
+                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                }).await {
+                    Ok(r) => println!("\n{}", r),
+                    Err(e) => ui::show_error(&e.to_string()),
+                }
+                continue;
+            }
+            "refine" => {
+                match executor.execute("refine_prompt", &serde_json::json!({}), &mut ToolContext {
+                    memory: &mut memory, prompt_history: &mut prompt_history,
+                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    project_root: &project_root, applet_manager: &mut manager,
+                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                }).await {
+                    Ok(r) => println!("\n{}", r),
+                    Err(e) => ui::show_error(&e.to_string()),
                 }
                 continue;
             }

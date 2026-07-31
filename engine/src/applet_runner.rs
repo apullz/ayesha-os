@@ -3,16 +3,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
+use crate::completion::Completer;
+
 /// Spawn the engine's keyboard input thread. Returns a flag that can be used to
 /// suspend the thread (set to false) so a foreground applet can take over the
 /// terminal. The thread is poll-based so the flag is checked even while idle.
-pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>) -> Arc<AtomicBool> {
+pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String>) -> Arc<AtomicBool> {
     let flag = Arc::new(AtomicBool::new(true));
     let flag2 = flag.clone();
 
     std::thread::spawn(move || {
         use crossterm::event::{self, Event, KeyCode, KeyModifiers, KeyEventKind};
         let mut input_buf = String::new();
+        let mut completer = Completer::new(candidates);
+
         loop {
             if !flag2.load(Ordering::Relaxed) {
                 break;
@@ -23,39 +27,83 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>) -> Arc<AtomicBool> {
                 Err(_) => break,
             }
             match event::read() {
-                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat => {
                     match (key.code, key.modifiers) {
                         (KeyCode::Char('m'), KeyModifiers::CONTROL) => {
-                            if steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
+                            if key.kind == KeyEventKind::Press {
+                                if steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
+                            }
                         }
                         (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
-                            if steer_tx.send("\0ctrl-p".to_string()).is_err() { break; }
+                            if key.kind == KeyEventKind::Press {
+                                if steer_tx.send("\0ctrl-p".to_string()).is_err() { break; }
+                            }
                         }
                         (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                            if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
+                            if key.kind == KeyEventKind::Press {
+                                if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
+                            }
                         }
                         (KeyCode::Up, KeyModifiers::SHIFT) => {
-                            if steer_tx.send("\0shift-up".to_string()).is_err() { break; }
+                            if key.kind == KeyEventKind::Press {
+                                if steer_tx.send("\0shift-up".to_string()).is_err() { break; }
+                            }
                         }
                         (KeyCode::Down, KeyModifiers::SHIFT) => {
-                            if steer_tx.send("\0shift-down".to_string()).is_err() { break; }
+                            if key.kind == KeyEventKind::Press {
+                                if steer_tx.send("\0shift-down".to_string()).is_err() { break; }
+                            }
+                        }
+                        (KeyCode::Tab, _) => {
+                            if key.kind != KeyEventKind::Press { continue; }
+                            let prefix = input_buf.trim_start().to_string();
+                            let (selected, show_all) = completer.complete(&prefix);
+                            if let Some(completed) = selected {
+                                // Erase current line
+                                let erase_len = input_buf.len();
+                                for _ in 0..erase_len {
+                                    print!("\x08 \x08");
+                                }
+                                // Write new buffer
+                                input_buf = completed;
+                                print!("{}", input_buf);
+                                let _ = std::io::stdout().flush();
+                                // Show all matches on double-tab
+                                if !show_all.is_empty() {
+                                    println!();
+                                    for m in &show_all {
+                                        print!("  {} ", m);
+                                    }
+                                    println!();
+                                    // Re-print prompt + buffer
+                                    print!("\x1b[32m$\x1b[0m {}", input_buf);
+                                    let _ = std::io::stdout().flush();
+                                }
+                            }
                         }
                         (KeyCode::Enter, _) => {
+                            if key.kind != KeyEventKind::Press { continue; }
                             let line = input_buf.trim().to_string();
                             if steer_tx.send(line).is_err() { break; }
+                            completer.reset();
                             input_buf.clear();
                             print!("\r\n");
                             let _ = std::io::stdout().flush();
                         }
                         (KeyCode::Char(c), _) if c as u8 >= 32 => {
+                            if key.kind != KeyEventKind::Press { continue; }
                             input_buf.push(c);
+                            completer.reset();
                             print!("{}", c);
                             let _ = std::io::stdout().flush();
                         }
                         (KeyCode::Backspace, _) => {
-                            input_buf.pop();
-                            print!("\x08 \x08");
-                            let _ = std::io::stdout().flush();
+                            if !input_buf.is_empty() {
+                                input_buf.pop();
+                                completer.reset();
+                                print!("\x08 \x08");
+                                let _ = std::io::stdout().flush();
+                            }
                         }
                         _ => {}
                     }

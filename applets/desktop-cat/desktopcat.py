@@ -1,11 +1,12 @@
 import tkinter as tk
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageFont
 import ctypes
 import ctypes.wintypes
 import math
 import os
 import random
 import threading
+import json
 
 import pystray
 
@@ -26,6 +27,39 @@ screen_h = user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 atlas = Image.open(os.path.join(script_dir, "oneko_sprite.png")).convert("RGBA")
+
+CONFIG_PATH = os.path.join(script_dir, "..", "..", "ayesha.json")
+DEFAULT_PHRASES = [
+    "Purring...",
+    "Meow!",
+    "Found a bug!",
+    "Running on all cores...",
+    "Compiling dreams...",
+    "Dreaming of tuna...",
+    "Catnap time.",
+    "Paws and reflect.",
+    "Meowdel driven.",
+    "Purrrfect code.",
+]
+def load_config():
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            cat_cfg = data.get("desktopCat", {})
+            return {
+                "speed": cat_cfg.get("speed", 5.0),
+                "phrases": cat_cfg.get("phrases", DEFAULT_PHRASES),
+                "bubble_interval": cat_cfg.get("bubbleInterval", 120),
+            }
+    except Exception:
+        pass
+    return {"speed": 5.0, "phrases": DEFAULT_PHRASES, "bubble_interval": 120}
+
+config = load_config()
+CAT_SPEED = config["speed"]
+PHRASES = config["phrases"]
+BUBBLE_INTERVAL = config["bubble_interval"]
 
 COLLAR_COLOR = (200, 30, 30, 255)
 COLLAR_LEN = 8
@@ -52,7 +86,6 @@ NO_COLLAR_ANIMS = {"sleeping", "tired", "scratchSelf"}
 
 collar_cache = {}
 def get_collar_img(angle, top_ext=0):
-    """top_ext: extra pixels extending above center (left side pre-rotation)"""
     key = (angle, top_ext)
     if key not in collar_cache:
         left = COLLAR_LEN // 2 + top_ext
@@ -141,6 +174,20 @@ def make_heart_image():
 
 heart_img = make_heart_image()
 
+def make_bubble_image(text):
+    bubble_w = max(80, len(text) * 7 + 16)
+    bubble_h = 22
+    img = Image.new("RGBA", (bubble_w, bubble_h + 6), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([0, 0, bubble_w - 1, bubble_h - 1], radius=6, fill=(255, 255, 255, 220), outline=(100, 100, 100, 255))
+    try:
+        font = ImageFont.truetype("arial.ttf", 11)
+    except Exception:
+        font = ImageFont.load_default()
+    d.text((8, 4), text, fill=(30, 30, 30, 255), font=font)
+    d.polygon([(bubble_w // 2 - 4, bubble_h), (bubble_w // 2 + 4, bubble_h), (bubble_w // 2, bubble_h + 5)], fill=(255, 255, 255, 220))
+    return img
+
 root = tk.Tk()
 root.withdraw()
 root.overrideredirect(True)
@@ -154,7 +201,7 @@ WINDOW_H = DISPLAY_SIZE + HEART_H + BORDER * 2
 root.geometry(f"{WINDOW_W}x{WINDOW_H}")
 
 GWL_EXSTYLE = -20
-WS_EX_TRANSPARENT = 0x00000020
+WS_EX_NOACTIVATE = 0x08000000
 WS_EX_TOOLWINDOW = 0x00000080
 
 canvas = tk.Canvas(root, width=WINDOW_W, height=WINDOW_H,
@@ -166,7 +213,7 @@ hwnd = user32.GetParent(root.winfo_id())
 if not hwnd:
     hwnd = root.winfo_id()
 ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW)
+user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW)
 
 photo_cache = {}
 def pil_to_photo(pil_img):
@@ -179,7 +226,7 @@ pt = ctypes.wintypes.POINT()
 user32.GetCursorPos(ctypes.byref(pt))
 cat_x = float(pt.x)
 cat_y = float(pt.y)
-cat_speed = 5.0
+cat_speed = CAT_SPEED
 current_anim = "idle"
 frame_idx = 0
 anim_timer = 0
@@ -196,6 +243,16 @@ heart_timer = 0
 HEART_PET_TIME = 1500
 HEART_SHOW_TIME = 2500
 
+show_bubble = False
+bubble_timer = 0
+bubble_text = ""
+bubble_photo = None
+BUBBLE_SHOW_TIME = 4000
+
+dragging = False
+drag_off_x = 0
+drag_off_y = 0
+
 def get_cursor_pos():
     pt = ctypes.wintypes.POINT()
     user32.GetCursorPos(ctypes.byref(pt))
@@ -211,10 +268,36 @@ def reset_idle_animation():
     idle_animation = None
     idleAnimationFrame = 0
 
+def on_mouse_down(event):
+    global dragging, drag_off_x, drag_off_y
+    mx, my = get_cursor_pos()
+    cat_win_x = int(cat_x - CAT_ORIGIN_X)
+    cat_win_y = int(cat_y - CAT_ORIGIN_Y)
+    if abs(mx - cat_x) < DISPLAY_SIZE and abs(my - cat_y) < DISPLAY_SIZE:
+        dragging = True
+        drag_off_x = mx - cat_x
+        drag_off_y = my - cat_y
+
+def on_mouse_up(event):
+    global dragging
+    dragging = False
+
+def on_mouse_drag(event):
+    global cat_x, cat_y
+    if dragging:
+        mx, my = get_cursor_pos()
+        cat_x = mx - drag_off_x
+        cat_y = my - drag_off_y
+
+canvas.bind("<Button-1>", on_mouse_down)
+canvas.bind("<ButtonRelease-1>", on_mouse_up)
+canvas.bind("<B1-Motion>", on_mouse_drag)
+
 def update():
     global cat_x, cat_y, current_anim, frame_idx, anim_timer
     global idle_time, idle_animation, idleAnimationFrame
     global pet_timer, show_heart, heart_timer
+    global show_bubble, bubble_timer, bubble_text, bubble_photo
     global prev_mx, prev_my
 
     dt = 16
@@ -223,6 +306,15 @@ def update():
     mx, my = get_cursor_pos()
     cursor_speed = math.hypot(mx - prev_mx, my - prev_my)
     prev_mx, prev_my = mx, my
+
+    if dragging:
+        idle_time = 0
+        current_anim = "idle"
+        frames = animations["idle"]
+        frame_idx = 0
+        draw_frame()
+        root.after(16, update)
+        return
 
     diffX = cat_x - mx
     diffY = cat_y - my
@@ -247,9 +339,23 @@ def update():
             heart_timer = 0
             pet_timer = 0
 
+    bubble_timer += dt
+    if not show_bubble and bubble_timer >= BUBBLE_INTERVAL * 1000:
+        bubble_timer = 0
+        bubble_text = random.choice(PHRASES)
+        bubble_photo = pil_to_photo(make_bubble_image(bubble_text))
+        show_bubble = True
+
+    if show_bubble and bubble_timer >= BUBBLE_SHOW_TIME:
+        show_bubble = False
+
     def draw_frame():
         root.geometry(f"+{int(cat_x - CAT_ORIGIN_X)}+{int(cat_y - CAT_ORIGIN_Y)}")
         canvas.delete("all")
+        if show_bubble and bubble_photo:
+            bw = bubble_photo.width()
+            canvas.create_image(CAT_ORIGIN_X, CAT_ORIGIN_Y - DISPLAY_SIZE // 2 - 14,
+                                anchor="s", image=bubble_photo)
         if show_heart:
             canvas.create_image(CAT_ORIGIN_X, HEART_H // 2, anchor="center",
                                 image=pil_to_photo(heart_img))

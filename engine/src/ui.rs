@@ -306,6 +306,11 @@ pub fn print_help() {
         ("apps",      "list applets"),
         ("run",       "launch applet: run <name>"),
         ("stop",      "stop applet: stop <name>"),
+        ("stats",     "tool usage statistics"),
+        ("memory",    "list stored memories"),
+        ("analyze",   "analyze own source code"),
+        ("evolve",    "suggest new tools"),
+        ("refine",    "analyze prompt history"),
         ("ctrl+p",    "page switcher (in-window)"),
     ];
     for (cmd, desc) in &help_cmds {

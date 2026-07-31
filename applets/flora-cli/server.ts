@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 
-const OLLAMA_HOST = "http://localhost:11434";
+const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
 const MODEL = "qwen2.5:7b";
 
 async function askOllama(system: string, user: string): Promise<string> {

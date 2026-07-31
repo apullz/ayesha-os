@@ -1,6 +1,6 @@
 ╔═══════════════════════════════════════════════╗
 ║       ayesha-os  ::  STATUS REPORT  ::         ║
-║          "[RELEASE] v4.2.0"                   ║
+║          "[RELEASE] v4.3.0"                   ║
 ╚═══════════════════════════════════════════════╝
 
   ── L E G E N D ──
@@ -18,7 +18,9 @@
                          cloud support (openrouter/opencode),
                          pixel striker sprite engine,
                          self-improvement loop, command palette,
-                         retro cyberpunk UI, applet manager.
+                         retro cyberpunk UI, applet manager,
+                         autocomplete (Tab cycling for commands
+                         and applets), 46 unit tests.
                          └ model: ayesha (qwen2.5-coder:14b base)
                          └ --selftest for headless E2E verification
 
@@ -35,18 +37,25 @@
 
   desktop-cat/     [✔]  Desktop pet (no AI needed).
                          └ pure tkinter + Win32 API
+                         └ click-to-drag (WS_EX_NOACTIVATE)
+                         └ speech bubbles (configurable phrases)
+                         └ reads config from ayesha.json
 
   flora-cli/       [→]  Scottish flora phylo explorer.
                          └ replaced gemini with ollama 07/2026
-
-  neural-strike/   [!]  SAE interpretability game.
-                         └ local-only (neuronpedia stubbed)
-                         └ requires pre-downloaded data exports
+                         └ OLLAMA_HOST env var now respected
+                         └ multi-turn ask (conversation memory)
+                         └ fixed double-escaped ANSI codes
+                         └ fixed package.json name + metadata
 
   poopy-tui/       [✔]  Discord terminal client with voice + TUI.
                          └ login: token / QR / email+password
                          └ token persisted to ~/.poopy-tui/token
                          └ requires DISCORD_TOKEN in .env OR first-run login
+                         └ r to reply to last message
+                         └ friends list: Enter opens DM
+                         └ typing indicator auto-clears after 5s
+                         └ JSONL message logging to logs/
 
   models/          [✔]  Modelfile for ayesha personality.
                            └ FROM qwen2.5-coder:14b
@@ -60,9 +69,6 @@
                           └ scripts/launcher.py (tray companion)
 
   ── K N O W N   I S S U E S ──
-
-  ! neural-strike: steer() and UMAP fetch disabled
-    └ drop JSON exports into data/exports/ to use cached features
 
   ! poopy-tui: requires DISCORD_TOKEN in .env
     └ uses discord.py-self for user account access

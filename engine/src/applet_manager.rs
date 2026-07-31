@@ -264,7 +264,15 @@ impl AppletManager {
 
         // 5. hand the window back to the engine
         let _ = crossterm::terminal::enable_raw_mode();
-        *input_flag = crate::applet_runner::spawn_input_thread(steer_tx.clone());
+        let mut candidates: Vec<String> = vec![
+            "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
+            "model", "toolmodel", "pull", "route", "name", "exit",
+            "stats", "memory", "analyze", "evolve", "refine",
+        ].into_iter().map(String::from).collect();
+        for name in self.names() {
+            candidates.push(name);
+        }
+        *input_flag = crate::applet_runner::spawn_input_thread(steer_tx.clone(), candidates);
         print!("\x1B[2J\x1B[1;1H");
         let _ = std::io::stdout().flush();
         crate::ui::print_banner();

@@ -12,7 +12,6 @@ ayesha-os/
 ├── applets/
 │   ├── desktop-cat/     python — desktop pet cat
 │   ├── flora-cli/       typescript — scottish flora phylogeny explorer
-│   ├── neural-strike/   python — SAE interpretability game
 │   └── poopy-tui/       python — discord terminal client (textual)
 ├── ayesha.json          central config (personality, projects, ollama models)
 └── ayesha.bat           dev shortcut — NOT for delivery (see "delivery" below)
@@ -65,9 +64,6 @@ cd applets/desktop-cat && python desktopcat.py
 # flora-cli
 cd applets/flora-cli && npx tsx cli.ts
 
-# neural-strike
-cd applets/neural-strike && python main.py
-
 # poopy-tui
 cd applets/poopy-tui && python main.py
 ```
@@ -97,8 +93,8 @@ ollama create ayesha -f models/Modelfile
 
 ## gotchas
 
-- no test suites in any project (engine has `cargo test` — 15 passing)
-- `applets/desktop-cat/desktopcat.py` expects `cat.png` sprite in same dir
+- no test suites in any project (engine has `cargo test` — 33 passing)
+- `applets/desktop-cat/desktopcat.py` uses `oneko_sprite.png` (NOT `cat.png` — that's unused)
 - python projects have no pyproject.toml — deps in requirements.txt only
 - typescript projects need `npm install` before first run
 - engine build requires `C:\msys64\mingw64\bin` in PATH for dlltool (gnu toolchain)
