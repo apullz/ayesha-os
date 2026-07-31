@@ -18,7 +18,15 @@ import time
 
 # Import hive components
 from ayesha_hive_client import AyeshaHiveClient
-from tri_node_mind import AyeshaTriNodeMind
+
+# AyeshaTriNodeMind provides multi-node broadcast capabilities.
+# If the module isn't available (standalone install), broadcasts fall back to hive-only.
+try:
+    from tri_node_mind import AyeshaTriNodeMind
+except ImportError:
+    class AyeshaTriNodeMind:
+        def broadcast_to_all_nodes(self, message, data=None):
+            pass
 
 # Initialize FastAPI app
 app = FastAPI(

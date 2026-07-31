@@ -14,7 +14,7 @@ pub struct Memory {
     pub importance: u8,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryStore {
     pub memories: Vec<Memory>,
     pub user_preferences: std::collections::HashMap<String, String>,

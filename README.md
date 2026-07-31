@@ -29,13 +29,9 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
        │                      │
        │              ┌───────▼─────────┐
        │              │  applets/       │
-       │              │  ├─ screen      │
-       │              │  ├─ cosmic-rag  │
-       │              │  ├─ desktop-cat │
-       │              │  ├─ flora-cli   │
-       │              │  ├─ bring-to-life│
-       │              │  ├─ neural-strike│
-       │              │  └─ screenshotai│
+        │              │  ├─ desktop-cat │
+        │              │  ├─ flora-cli   │
+        │              │  └─ neural-strike│
        │              └─────────────────┘
 ```
 
@@ -53,12 +49,8 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 
 | applet | lang | description |
 |--------|------|-------------|
-| **screen/** | typescript+python | screen capture vision chatbox + desktop companion terminal |
-| **cosmic-rag/** | python | local RAG chatbot with vault knowledge base, 100% offline |
-| **screenshotai/** | python | capture and analyze screenshots via ollama vision models |
 | **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
 | **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
-| **bring-to-life/** | typescript | upload an image and turns it into an interactive html experience |
 | **neural-strike/** | python | mechanistic interpretability game with SAE feature visualization |
 | **poopy-tui/** | python | full-featured discord terminal client with voice, QR login, TUI |
 
@@ -107,7 +99,7 @@ the engine is the heart of ayesha-os — an agentic coding assistant with a full
 
 | backend | provider | models |
 |---------|----------|--------|
-| **local** | ollama @ `localhost:11434` | ayesha, qwen2.5-coder:14b, llama3.2-vision, moondream |
+| **local** | ollama @ `localhost:11434` | ayesha, qwen2.5-coder:14b, llama3.2-vision |
 | **cloud** | openrouter (free tier) | nvidia/nemotron-3-super:free, deepseek-r1:free, qwen-2.5-coder-32b:free |
 | **cloud** | opencode | opencode/big-pickle |
 
@@ -264,14 +256,6 @@ or use the all-in-one script:
 
 ## applets detail
 
-### screen vision chatbox
-
-typescript + python app for screen capture and AI analysis. includes a desktop companion terminal (`ayesha_companion_terminal.py`) with cyberpunk UI, auto-detection of vision queries, and file upload support.
-
-### cosmic-rag
-
-local RAG chatbot that loads `.txt` files from a `vault/` directory. uses ollama with the ayesha model. 100% offline.
-
 ### desktop-cat
 
 pixel art desktop pet cat with:
@@ -284,10 +268,6 @@ pixel art desktop pet cat with:
 ### flora-cli
 
 interactive TypeScript terminal for exploring scottish flora phylogeny. uses ollama for natural language queries about plant taxonomy.
-
-### bring-to-life
-
-upload an image and converts it into an interactive HTML experience using ollama vision + text models.
 
 ### neural-strike
 

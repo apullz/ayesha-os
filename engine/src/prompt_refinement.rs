@@ -12,7 +12,7 @@ pub struct ToolUsageRecord {
     pub input_summary: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptHistory {
     pub records: Vec<ToolUsageRecord>,
     pub current_system_prompt: String,

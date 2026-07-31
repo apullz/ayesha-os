@@ -58,7 +58,7 @@
   "README.md": {
     "rel_path": "README.md",
     "size": 8436,
-    "modified_at": "2026-07-26T11:29:40.188730",
+    "modified_at": "2026-07-26T11:29:40.18873",
     "sha256": "42aab7841bd2bcb01725e44cad3b5725d78b4de236e6f1d4a4785933c852a4cb",
     "source": "local",
     "status": "synced"
@@ -84,158 +84,6 @@
     "size": 88611,
     "modified_at": "2026-07-30T06:56:07.341609",
     "sha256": "a9b180131bdf0352a46c0bffd8d988d01299af555e60c95dfb81ac647d6d1fb1",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\.gitignore": {
-    "rel_path": "applets\\bring-to-life\\.gitignore",
-    "size": 277,
-    "modified_at": "2026-07-26T11:29:40.192537",
-    "sha256": "d50ab07e11fa4bf3b1c7c3312e1d7baeab56cca756832ccf40476823ad2a38b7",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\App.tsx": {
-    "rel_path": "applets\\bring-to-life\\App.tsx",
-    "size": 9333,
-    "modified_at": "2026-07-26T11:29:40.193542",
-    "sha256": "e457d95d2f20bd61a8e8afa455f1af7d9290c52f2a65676ba30101e6390921f1",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\index.css": {
-    "rel_path": "applets\\bring-to-life\\index.css",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.200256",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\index.html": {
-    "rel_path": "applets\\bring-to-life\\index.html",
-    "size": 2141,
-    "modified_at": "2026-07-26T11:29:40.201256",
-    "sha256": "13cd7c4f81fc80a0a98ca58ce1c8e2b4a44ef82264e4d7ee888939cf2dcb25e7",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\index.tsx": {
-    "rel_path": "applets\\bring-to-life\\index.tsx",
-    "size": 427,
-    "modified_at": "2026-07-26T11:29:40.202265",
-    "sha256": "401e44f8c8077061e684500b91bf4dd82f6dfd7b46b3b6437ea10fb09de7a8f5",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\metadata.json": {
-    "rel_path": "applets\\bring-to-life\\metadata.json",
-    "size": 242,
-    "modified_at": "2026-07-26T11:29:40.202265",
-    "sha256": "6d7d601bf38df45440df5cdb80d89d5558331cb0417481c8bff180d46579a5c3",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\package.json": {
-    "rel_path": "applets\\bring-to-life\\package.json",
-    "size": 474,
-    "modified_at": "2026-07-26T11:29:40.203269",
-    "sha256": "6cb58dd4f0de25814d27edec29de2b82e020b57f422c5eb2e948f4a9046dd7fc",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\README.md": {
-    "rel_path": "applets\\bring-to-life\\README.md",
-    "size": 5668,
-    "modified_at": "2026-07-26T11:29:40.194540",
-    "sha256": "28be13084fa00f3d233452a52629ac7db57d263734577fa33084ba72a507108a",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\tsconfig.json": {
-    "rel_path": "applets\\bring-to-life\\tsconfig.json",
-    "size": 570,
-    "modified_at": "2026-07-26T11:29:40.206270",
-    "sha256": "87d3eb8a957369a386144312f42d6c34cfbd88bcf9dcbf17e8bfe0fd90c00abe",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\vite.config.ts": {
-    "rel_path": "applets\\bring-to-life\\vite.config.ts",
-    "size": 455,
-    "modified_at": "2026-07-26T11:29:40.207269",
-    "sha256": "8e5ff7bcb8cce25f338153169f000678fa990717a5d3ccb43b345b00ad0ef0e8",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\components\\CreationHistory.tsx": {
-    "rel_path": "applets\\bring-to-life\\components\\CreationHistory.tsx",
-    "size": 3383,
-    "modified_at": "2026-07-26T11:29:40.195540",
-    "sha256": "2f8af2553509b0ab7ef5816bddf5e42327fbc27ffd9493ce4451de875d48bd54",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\components\\Hero.tsx": {
-    "rel_path": "applets\\bring-to-life\\components\\Hero.tsx",
-    "size": 6465,
-    "modified_at": "2026-07-26T11:29:40.197042",
-    "sha256": "6fc5b07bff6bc209bec1ad2d32644f863a7124c2a2e9bad22421dcfa1caa8fb9",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\components\\InputArea.tsx": {
-    "rel_path": "applets\\bring-to-life\\components\\InputArea.tsx",
-    "size": 6969,
-    "modified_at": "2026-07-26T11:29:40.198044",
-    "sha256": "d0e4e72eb1d86d89eaf06d38962884fc7cf1da73fd50556eb2989f8d52d79b1a",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\components\\LivePreview.tsx": {
-    "rel_path": "applets\\bring-to-life\\components\\LivePreview.tsx",
-    "size": 12895,
-    "modified_at": "2026-07-26T11:29:40.199045",
-    "sha256": "0aa15602fda1ebfaa445eb83c02e42782ea83eda72f22b2fbee543f696774ae2",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\bring-to-life\\services\\ollama.ts": {
-    "rel_path": "applets\\bring-to-life\\services\\ollama.ts",
-    "size": 4082,
-    "modified_at": "2026-07-26T11:29:40.205269",
-    "sha256": "b66241cb1099c09a190f8d24350e5ab24b69b26ff95d011c61210c606a33c38f",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\cosmic-rag\\main.py": {
-    "rel_path": "applets\\cosmic-rag\\main.py",
-    "size": 2598,
-    "modified_at": "2026-07-26T11:29:40.208948",
-    "sha256": "8579bc509f07046e0e75f15fa43219507336989e2ffcc1d0cabbccadb87ee11b",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\cosmic-rag\\README.md": {
-    "rel_path": "applets\\cosmic-rag\\README.md",
-    "size": 4395,
-    "modified_at": "2026-07-26T11:29:40.208948",
-    "sha256": "65316351c76d65ca204b26782c974d1f1164a3655bb2417d6520e5957e47b190",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\cosmic-rag\\requirements.txt": {
-    "rel_path": "applets\\cosmic-rag\\requirements.txt",
-    "size": 15,
-    "modified_at": "2026-07-26T11:29:40.210517",
-    "sha256": "a99f949cab4f867b06f8f42e21ce62a026d6fb3cc55a6020ac8cde10dd386ae8",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\cosmic-rag\\vault\\memories.txt": {
-    "rel_path": "applets\\cosmic-rag\\vault\\memories.txt",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.211530",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "source": "local",
     "status": "synced"
   },
@@ -314,7 +162,7 @@
   "applets\\flora-cli\\.gitignore": {
     "rel_path": "applets\\flora-cli\\.gitignore",
     "size": 81,
-    "modified_at": "2026-07-26T11:29:40.232940",
+    "modified_at": "2026-07-26T11:29:40.23294",
     "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74",
     "source": "local",
     "status": "synced"
@@ -434,7 +282,7 @@
   "applets\\flora-cli\\src\\components\\VisualTree.tsx": {
     "rel_path": "applets\\flora-cli\\src\\components\\VisualTree.tsx",
     "size": 24970,
-    "modified_at": "2026-07-26T11:29:40.245200",
+    "modified_at": "2026-07-26T11:29:40.2452",
     "sha256": "efad3582a82c338603958b9e543d16ce93693b43214fab327cdf15c8cf43e241",
     "source": "local",
     "status": "synced"
@@ -482,7 +330,7 @@
   "applets\\neural-strike\\run.bat": {
     "rel_path": "applets\\neural-strike\\run.bat",
     "size": 211,
-    "modified_at": "2026-07-26T11:29:40.269810",
+    "modified_at": "2026-07-26T11:29:40.26981",
     "sha256": "cf4cec397d47018db8075cd2ced452f3a44607495f2e83719027b91ab5d8299e",
     "source": "local",
     "status": "synced"
@@ -546,7 +394,7 @@
   "applets\\neural-strike\\ui\\feature_inspector.py": {
     "rel_path": "applets\\neural-strike\\ui\\feature_inspector.py",
     "size": 7758,
-    "modified_at": "2026-07-26T11:29:40.273550",
+    "modified_at": "2026-07-26T11:29:40.27355",
     "sha256": "f4208f6434af89554a7d7141f9f246f54eb0ef45529fb378d0d6d6adcbaac976",
     "source": "local",
     "status": "synced"
@@ -666,7 +514,7 @@
   "applets\\poopy-tui\\test_client.py": {
     "rel_path": "applets\\poopy-tui\\test_client.py",
     "size": 1375,
-    "modified_at": "2026-07-26T08:36:21.987930",
+    "modified_at": "2026-07-26T08:36:21.98793",
     "sha256": "d3b9a878e047fe6400be163d668f52ed58360da4af04206dbc73b689f76e98af",
     "source": "local",
     "status": "synced"
@@ -703,178 +551,10 @@
     "source": "local",
     "status": "synced"
   },
-  "applets\\screen\\ollama-screen-vision-chatbox.zip": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox.zip",
-    "size": 121242,
-    "modified_at": "2026-07-26T11:29:40.279121",
-    "sha256": "b89d7113d892e1d7314419fa2ae6a7d6a883d83719ae80bd0816a726f002cad2",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\README.md": {
-    "rel_path": "applets\\screen\\README.md",
-    "size": 3297,
-    "modified_at": "2026-07-26T11:29:40.278118",
-    "sha256": "669346606ee115e30ea2b4b40aa7f12dc326dd4b23d0c2a2d6a976a911c02f1a",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\.gitignore": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\.gitignore",
-    "size": 81,
-    "modified_at": "2026-07-26T11:29:40.282001",
-    "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\index.html": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\index.html",
-    "size": 317,
-    "modified_at": "2026-07-26T11:29:40.288027",
-    "sha256": "4388964ac5640317dee06ed6c709727c547635b987120238fbc7ec12cd2e90ae",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\metadata.json": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\metadata.json",
-    "size": 350,
-    "modified_at": "2026-07-26T11:29:40.289026",
-    "sha256": "64f978b519c8f7ba9f9d9302142e2d51a703c7816923dcad86be3a91054213cf",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\package-lock.json": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\package-lock.json",
-    "size": 150513,
-    "modified_at": "2026-07-26T11:29:40.290733",
-    "sha256": "a365306a83d7edd5211afe277397bd10a167d71a44054550fc51a76560feab18",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\package.json": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\package.json",
-    "size": 897,
-    "modified_at": "2026-07-26T11:29:40.290733",
-    "sha256": "346046fa0c6342164edc351a9b00855ac6730d476205de30ac4e3f15416bf483",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\README.md": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\README.md",
-    "size": 7427,
-    "modified_at": "2026-07-26T11:29:40.283508",
-    "sha256": "0fcb8f6b9ea3088349d9df52f67c1e263a84d1150e8699f27d14c15840fdb7af",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\server.ts": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\server.ts",
-    "size": 7866,
-    "modified_at": "2026-07-26T11:29:40.292908",
-    "sha256": "37f6972ae03ac2f71a0b999af8a6d4c08a41c61198139ab88a307b22b40786e1",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\tsconfig.json": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\tsconfig.json",
-    "size": 534,
-    "modified_at": "2026-07-26T11:29:40.297470",
-    "sha256": "3c6abfb62d861145b657e37a6bbf96d1626752b6145e3bf9c218a0e66112cdd6",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\vite.config.ts": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\vite.config.ts",
-    "size": 730,
-    "modified_at": "2026-07-26T11:29:40.298470",
-    "sha256": "b990c4afdfb5195bdc994739210dbfeb0b5eece38bd0caf2a76d44b2ee97c6bb",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\android\\MainActivity.kt": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\android\\MainActivity.kt",
-    "size": 20117,
-    "modified_at": "2026-07-26T11:29:40.285022",
-    "sha256": "c2cf335f3d2a2271eb742f8e2a5253f33a55ab0bda06cca319c2558d189c7451",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\desktop\\ayesha_companion_terminal.py": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\desktop\\ayesha_companion_terminal.py",
-    "size": 19179,
-    "modified_at": "2026-07-26T11:29:40.287022",
-    "sha256": "a8e019faf24ad6c9641939136b154fadf09486a13a4c1c754dc65f75468c09ba",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\src\\App.tsx": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\src\\App.tsx",
-    "size": 67943,
-    "modified_at": "2026-07-26T11:29:40.294467",
-    "sha256": "3766468c35af1a9cead127621a0b0cfdb42e891643249ffb278dba41a551b086",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\src\\index.css": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\src\\index.css",
-    "size": 24,
-    "modified_at": "2026-07-26T11:29:40.295475",
-    "sha256": "8a760a784f79570e06fdcb0c6a2677ea66c304230b7925ea313d63b46d8ba407",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\src\\main.tsx": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\src\\main.tsx",
-    "size": 241,
-    "modified_at": "2026-07-26T11:29:40.296472",
-    "sha256": "8b129211a1e36a01a0c294633d8463c9a661a78fe04c3f26f45ca2fdabdedff0",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screen\\ollama-screen-vision-chatbox\\src\\types.ts": {
-    "rel_path": "applets\\screen\\ollama-screen-vision-chatbox\\src\\types.ts",
-    "size": 262,
-    "modified_at": "2026-07-26T11:29:40.297470",
-    "sha256": "fbb6f6ddb3f98d5ae59f2d26feca6041ed0f2b32f02dcdab1b28f2a564224fb9",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screenshotai\\main.py": {
-    "rel_path": "applets\\screenshotai\\main.py",
-    "size": 940,
-    "modified_at": "2026-07-26T11:29:40.303999",
-    "sha256": "c0c9dd73112ece5ee4dc052071bba717eb0f9d41da7568c78fdc0bd0c9d1ec54",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screenshotai\\README.md": {
-    "rel_path": "applets\\screenshotai\\README.md",
-    "size": 3508,
-    "modified_at": "2026-07-26T11:29:40.302998",
-    "sha256": "7f9a841db22d29e729192e4b3702541f9c057fddf66558140aa407ba89ae1e97",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screenshotai\\requirements.txt": {
-    "rel_path": "applets\\screenshotai\\requirements.txt",
-    "size": 44,
-    "modified_at": "2026-07-26T11:29:40.304999",
-    "sha256": "928d9d621c919003717d10e5941b1eb1dd6bf298288543b1817385d32809126a",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\screenshotai\\.github\\agents\\ayesha.agent.md": {
-    "rel_path": "applets\\screenshotai\\.github\\agents\\ayesha.agent.md",
-    "size": 3572,
-    "modified_at": "2026-07-26T11:29:40.302494",
-    "sha256": "3671d7961909c8349891d042e315906eb2ad466c102f6e8929df499b9c9e9b19",
-    "source": "local",
-    "status": "synced"
-  },
   "core\\.gitattributes": {
     "rel_path": "core\\.gitattributes",
     "size": 1554,
-    "modified_at": "2026-07-26T11:29:40.309000",
+    "modified_at": "2026-07-26T11:29:40.309",
     "sha256": "88023d0a029a0c409b30c03b689c68605b559f5cefe06376e4a26b38ed795269",
     "source": "local",
     "status": "synced"
@@ -954,7 +634,7 @@
   "core\\README.md": {
     "rel_path": "core\\README.md",
     "size": 5201,
-    "modified_at": "2026-07-26T11:29:40.313630",
+    "modified_at": "2026-07-26T11:29:40.31363",
     "sha256": "02a1df763595690fbaf33129c85627da130d8ee5b20cce7bed1f714d84a27a52",
     "source": "local",
     "status": "synced"
@@ -1020,158 +700,6 @@
     "size": 24,
     "modified_at": "2026-07-29T15:08:39.033394",
     "sha256": "cdfe3645b03221d99419429b6e1c73824b8c3e22fe4bf73295971d16e7374d7c",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\.gitignore": {
-    "rel_path": "dist\\applets\\bring-to-life\\.gitignore",
-    "size": 277,
-    "modified_at": "2026-07-26T11:29:40.192537",
-    "sha256": "d50ab07e11fa4bf3b1c7c3312e1d7baeab56cca756832ccf40476823ad2a38b7",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\App.tsx": {
-    "rel_path": "dist\\applets\\bring-to-life\\App.tsx",
-    "size": 9333,
-    "modified_at": "2026-07-26T11:29:40.193542",
-    "sha256": "e457d95d2f20bd61a8e8afa455f1af7d9290c52f2a65676ba30101e6390921f1",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\index.css": {
-    "rel_path": "dist\\applets\\bring-to-life\\index.css",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.200256",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\index.html": {
-    "rel_path": "dist\\applets\\bring-to-life\\index.html",
-    "size": 2141,
-    "modified_at": "2026-07-26T11:29:40.201256",
-    "sha256": "13cd7c4f81fc80a0a98ca58ce1c8e2b4a44ef82264e4d7ee888939cf2dcb25e7",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\index.tsx": {
-    "rel_path": "dist\\applets\\bring-to-life\\index.tsx",
-    "size": 427,
-    "modified_at": "2026-07-26T11:29:40.202265",
-    "sha256": "401e44f8c8077061e684500b91bf4dd82f6dfd7b46b3b6437ea10fb09de7a8f5",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\metadata.json": {
-    "rel_path": "dist\\applets\\bring-to-life\\metadata.json",
-    "size": 242,
-    "modified_at": "2026-07-26T11:29:40.202265",
-    "sha256": "6d7d601bf38df45440df5cdb80d89d5558331cb0417481c8bff180d46579a5c3",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\package.json": {
-    "rel_path": "dist\\applets\\bring-to-life\\package.json",
-    "size": 474,
-    "modified_at": "2026-07-26T11:29:40.203269",
-    "sha256": "6cb58dd4f0de25814d27edec29de2b82e020b57f422c5eb2e948f4a9046dd7fc",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\README.md": {
-    "rel_path": "dist\\applets\\bring-to-life\\README.md",
-    "size": 5668,
-    "modified_at": "2026-07-26T11:29:40.194540",
-    "sha256": "28be13084fa00f3d233452a52629ac7db57d263734577fa33084ba72a507108a",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\tsconfig.json": {
-    "rel_path": "dist\\applets\\bring-to-life\\tsconfig.json",
-    "size": 570,
-    "modified_at": "2026-07-26T11:29:40.206270",
-    "sha256": "87d3eb8a957369a386144312f42d6c34cfbd88bcf9dcbf17e8bfe0fd90c00abe",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\vite.config.ts": {
-    "rel_path": "dist\\applets\\bring-to-life\\vite.config.ts",
-    "size": 455,
-    "modified_at": "2026-07-26T11:29:40.207269",
-    "sha256": "8e5ff7bcb8cce25f338153169f000678fa990717a5d3ccb43b345b00ad0ef0e8",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\components\\CreationHistory.tsx": {
-    "rel_path": "dist\\applets\\bring-to-life\\components\\CreationHistory.tsx",
-    "size": 3383,
-    "modified_at": "2026-07-26T11:29:40.195540",
-    "sha256": "2f8af2553509b0ab7ef5816bddf5e42327fbc27ffd9493ce4451de875d48bd54",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\components\\Hero.tsx": {
-    "rel_path": "dist\\applets\\bring-to-life\\components\\Hero.tsx",
-    "size": 6465,
-    "modified_at": "2026-07-26T11:29:40.197042",
-    "sha256": "6fc5b07bff6bc209bec1ad2d32644f863a7124c2a2e9bad22421dcfa1caa8fb9",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\components\\InputArea.tsx": {
-    "rel_path": "dist\\applets\\bring-to-life\\components\\InputArea.tsx",
-    "size": 6969,
-    "modified_at": "2026-07-26T11:29:40.198044",
-    "sha256": "d0e4e72eb1d86d89eaf06d38962884fc7cf1da73fd50556eb2989f8d52d79b1a",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\components\\LivePreview.tsx": {
-    "rel_path": "dist\\applets\\bring-to-life\\components\\LivePreview.tsx",
-    "size": 12895,
-    "modified_at": "2026-07-26T11:29:40.199045",
-    "sha256": "0aa15602fda1ebfaa445eb83c02e42782ea83eda72f22b2fbee543f696774ae2",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\bring-to-life\\services\\ollama.ts": {
-    "rel_path": "dist\\applets\\bring-to-life\\services\\ollama.ts",
-    "size": 4082,
-    "modified_at": "2026-07-26T11:29:40.205269",
-    "sha256": "b66241cb1099c09a190f8d24350e5ab24b69b26ff95d011c61210c606a33c38f",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\cosmic-rag\\main.py": {
-    "rel_path": "dist\\applets\\cosmic-rag\\main.py",
-    "size": 2598,
-    "modified_at": "2026-07-26T11:29:40.208948",
-    "sha256": "8579bc509f07046e0e75f15fa43219507336989e2ffcc1d0cabbccadb87ee11b",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\cosmic-rag\\README.md": {
-    "rel_path": "dist\\applets\\cosmic-rag\\README.md",
-    "size": 4395,
-    "modified_at": "2026-07-26T11:29:40.208948",
-    "sha256": "65316351c76d65ca204b26782c974d1f1164a3655bb2417d6520e5957e47b190",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\cosmic-rag\\requirements.txt": {
-    "rel_path": "dist\\applets\\cosmic-rag\\requirements.txt",
-    "size": 15,
-    "modified_at": "2026-07-26T11:29:40.210517",
-    "sha256": "a99f949cab4f867b06f8f42e21ce62a026d6fb3cc55a6020ac8cde10dd386ae8",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\cosmic-rag\\vault\\memories.txt": {
-    "rel_path": "dist\\applets\\cosmic-rag\\vault\\memories.txt",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.211530",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "source": "local",
     "status": "synced"
   },
@@ -1250,7 +778,7 @@
   "dist\\applets\\flora-cli\\.gitignore": {
     "rel_path": "dist\\applets\\flora-cli\\.gitignore",
     "size": 81,
-    "modified_at": "2026-07-26T11:29:40.232940",
+    "modified_at": "2026-07-26T11:29:40.23294",
     "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74",
     "source": "local",
     "status": "synced"
@@ -1370,7 +898,7 @@
   "dist\\applets\\flora-cli\\src\\components\\VisualTree.tsx": {
     "rel_path": "dist\\applets\\flora-cli\\src\\components\\VisualTree.tsx",
     "size": 24970,
-    "modified_at": "2026-07-26T11:29:40.245200",
+    "modified_at": "2026-07-26T11:29:40.2452",
     "sha256": "efad3582a82c338603958b9e543d16ce93693b43214fab327cdf15c8cf43e241",
     "source": "local",
     "status": "synced"
@@ -1418,7 +946,7 @@
   "dist\\applets\\neural-strike\\run.bat": {
     "rel_path": "dist\\applets\\neural-strike\\run.bat",
     "size": 211,
-    "modified_at": "2026-07-26T11:29:40.269810",
+    "modified_at": "2026-07-26T11:29:40.26981",
     "sha256": "cf4cec397d47018db8075cd2ced452f3a44607495f2e83719027b91ab5d8299e",
     "source": "local",
     "status": "synced"
@@ -1482,7 +1010,7 @@
   "dist\\applets\\neural-strike\\ui\\feature_inspector.py": {
     "rel_path": "dist\\applets\\neural-strike\\ui\\feature_inspector.py",
     "size": 7758,
-    "modified_at": "2026-07-26T11:29:40.273550",
+    "modified_at": "2026-07-26T11:29:40.27355",
     "sha256": "f4208f6434af89554a7d7141f9f246f54eb0ef45529fb378d0d6d6adcbaac976",
     "source": "local",
     "status": "synced"
@@ -1602,7 +1130,7 @@
   "dist\\applets\\poopy-tui\\test_client.py": {
     "rel_path": "dist\\applets\\poopy-tui\\test_client.py",
     "size": 1375,
-    "modified_at": "2026-07-26T08:36:21.987930",
+    "modified_at": "2026-07-26T08:36:21.98793",
     "sha256": "d3b9a878e047fe6400be163d668f52ed58360da4af04206dbc73b689f76e98af",
     "source": "local",
     "status": "synced"
@@ -1639,174 +1167,6 @@
     "source": "local",
     "status": "synced"
   },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox.zip": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox.zip",
-    "size": 121242,
-    "modified_at": "2026-07-26T11:29:40.279121",
-    "sha256": "b89d7113d892e1d7314419fa2ae6a7d6a883d83719ae80bd0816a726f002cad2",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\README.md": {
-    "rel_path": "dist\\applets\\screen\\README.md",
-    "size": 3297,
-    "modified_at": "2026-07-26T11:29:40.278118",
-    "sha256": "669346606ee115e30ea2b4b40aa7f12dc326dd4b23d0c2a2d6a976a911c02f1a",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\.gitignore": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\.gitignore",
-    "size": 81,
-    "modified_at": "2026-07-26T11:29:40.282001",
-    "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\index.html": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\index.html",
-    "size": 317,
-    "modified_at": "2026-07-26T11:29:40.288027",
-    "sha256": "4388964ac5640317dee06ed6c709727c547635b987120238fbc7ec12cd2e90ae",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\metadata.json": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\metadata.json",
-    "size": 350,
-    "modified_at": "2026-07-26T11:29:40.289026",
-    "sha256": "64f978b519c8f7ba9f9d9302142e2d51a703c7816923dcad86be3a91054213cf",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\package-lock.json": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\package-lock.json",
-    "size": 150513,
-    "modified_at": "2026-07-26T11:29:40.290733",
-    "sha256": "a365306a83d7edd5211afe277397bd10a167d71a44054550fc51a76560feab18",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\package.json": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\package.json",
-    "size": 897,
-    "modified_at": "2026-07-26T11:29:40.290733",
-    "sha256": "346046fa0c6342164edc351a9b00855ac6730d476205de30ac4e3f15416bf483",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\README.md": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\README.md",
-    "size": 7427,
-    "modified_at": "2026-07-26T11:29:40.283508",
-    "sha256": "0fcb8f6b9ea3088349d9df52f67c1e263a84d1150e8699f27d14c15840fdb7af",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\server.ts": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\server.ts",
-    "size": 7866,
-    "modified_at": "2026-07-26T11:29:40.292908",
-    "sha256": "37f6972ae03ac2f71a0b999af8a6d4c08a41c61198139ab88a307b22b40786e1",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\tsconfig.json": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\tsconfig.json",
-    "size": 534,
-    "modified_at": "2026-07-26T11:29:40.297470",
-    "sha256": "3c6abfb62d861145b657e37a6bbf96d1626752b6145e3bf9c218a0e66112cdd6",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\vite.config.ts": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\vite.config.ts",
-    "size": 730,
-    "modified_at": "2026-07-26T11:29:40.298470",
-    "sha256": "b990c4afdfb5195bdc994739210dbfeb0b5eece38bd0caf2a76d44b2ee97c6bb",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\android\\MainActivity.kt": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\android\\MainActivity.kt",
-    "size": 20117,
-    "modified_at": "2026-07-26T11:29:40.285022",
-    "sha256": "c2cf335f3d2a2271eb742f8e2a5253f33a55ab0bda06cca319c2558d189c7451",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\desktop\\ayesha_companion_terminal.py": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\desktop\\ayesha_companion_terminal.py",
-    "size": 19179,
-    "modified_at": "2026-07-26T11:29:40.287022",
-    "sha256": "a8e019faf24ad6c9641939136b154fadf09486a13a4c1c754dc65f75468c09ba",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\App.tsx": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\App.tsx",
-    "size": 67943,
-    "modified_at": "2026-07-26T11:29:40.294467",
-    "sha256": "3766468c35af1a9cead127621a0b0cfdb42e891643249ffb278dba41a551b086",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\index.css": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\index.css",
-    "size": 24,
-    "modified_at": "2026-07-26T11:29:40.295475",
-    "sha256": "8a760a784f79570e06fdcb0c6a2677ea66c304230b7925ea313d63b46d8ba407",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\main.tsx": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\main.tsx",
-    "size": 241,
-    "modified_at": "2026-07-26T11:29:40.296472",
-    "sha256": "8b129211a1e36a01a0c294633d8463c9a661a78fe04c3f26f45ca2fdabdedff0",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\types.ts": {
-    "rel_path": "dist\\applets\\screen\\ollama-screen-vision-chatbox\\src\\types.ts",
-    "size": 262,
-    "modified_at": "2026-07-26T11:29:40.297470",
-    "sha256": "fbb6f6ddb3f98d5ae59f2d26feca6041ed0f2b32f02dcdab1b28f2a564224fb9",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screenshotai\\main.py": {
-    "rel_path": "dist\\applets\\screenshotai\\main.py",
-    "size": 940,
-    "modified_at": "2026-07-26T11:29:40.303999",
-    "sha256": "c0c9dd73112ece5ee4dc052071bba717eb0f9d41da7568c78fdc0bd0c9d1ec54",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screenshotai\\README.md": {
-    "rel_path": "dist\\applets\\screenshotai\\README.md",
-    "size": 3508,
-    "modified_at": "2026-07-26T11:29:40.302998",
-    "sha256": "7f9a841db22d29e729192e4b3702541f9c057fddf66558140aa407ba89ae1e97",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screenshotai\\requirements.txt": {
-    "rel_path": "dist\\applets\\screenshotai\\requirements.txt",
-    "size": 44,
-    "modified_at": "2026-07-26T11:29:40.304999",
-    "sha256": "928d9d621c919003717d10e5941b1eb1dd6bf298288543b1817385d32809126a",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\screenshotai\\.github\\agents\\ayesha.agent.md": {
-    "rel_path": "dist\\applets\\screenshotai\\.github\\agents\\ayesha.agent.md",
-    "size": 3572,
-    "modified_at": "2026-07-26T11:29:40.302494",
-    "sha256": "3671d7961909c8349891d042e315906eb2ad466c102f6e8929df499b9c9e9b19",
-    "source": "local",
-    "status": "synced"
-  },
   "dist\\models\\Modelfile": {
     "rel_path": "dist\\models\\Modelfile",
     "size": 4390,
@@ -1834,7 +1194,7 @@
   "engine\\Cargo.lock": {
     "rel_path": "engine\\Cargo.lock",
     "size": 68481,
-    "modified_at": "2026-07-30T06:40:53.266020",
+    "modified_at": "2026-07-30T06:40:53.26602",
     "sha256": "305f4f63c36673657b7db12358826d04bbb970dae24545fb78dddb56cc3865a6",
     "source": "local",
     "status": "synced"
@@ -1914,7 +1274,7 @@
   "engine\\src\\ayesha.ico": {
     "rel_path": "engine\\src\\ayesha.ico",
     "size": 165537,
-    "modified_at": "2026-07-30T06:47:25.617440",
+    "modified_at": "2026-07-30T06:47:25.61744",
     "sha256": "8c784727073d5c1714d44ef281100765c8e4aac4663aee720291557a0b1d4379",
     "source": "local",
     "status": "synced"
@@ -1954,7 +1314,7 @@
   "engine\\src\\memory.rs": {
     "rel_path": "engine\\src\\memory.rs",
     "size": 3822,
-    "modified_at": "2026-07-26T11:29:40.339510",
+    "modified_at": "2026-07-26T11:29:40.33951",
     "sha256": "de276f9a22f0669c214412fda6c1c9ac05475f610277be3b11cd8e1944f15bb4",
     "source": "local",
     "status": "synced"
@@ -2122,7 +1482,7 @@
   "git_middleware\\router.py": {
     "rel_path": "git_middleware\\router.py",
     "size": 2432,
-    "modified_at": "2026-07-26T11:29:40.365570",
+    "modified_at": "2026-07-26T11:29:40.36557",
     "sha256": "b2d18680aad10bae1fcb30d6feb82645619ae3b650560b77ba438db84e300fbf",
     "source": "local",
     "status": "synced"
@@ -2194,7 +1554,7 @@
   "scripts\\space-app.py": {
     "rel_path": "scripts\\space-app.py",
     "size": 8852,
-    "modified_at": "2026-07-26T11:29:40.379020",
+    "modified_at": "2026-07-26T11:29:40.37902",
     "sha256": "cb6c4c73aebc2e4d5d63d09fd2757015de9ceb08049bbd6c1405fa3be078d862",
     "source": "local",
     "status": "synced"
@@ -2258,7 +1618,7 @@
   "tri_mind_sync\\local_sync.py": {
     "rel_path": "tri_mind_sync\\local_sync.py",
     "size": 5612,
-    "modified_at": "2026-07-26T11:29:40.388130",
+    "modified_at": "2026-07-26T11:29:40.38813",
     "sha256": "169001449dde3ef0b2f58b22f898ae8fcb8f10fdad81d48f741f5bd77ffa243c",
     "source": "local",
     "status": "synced"

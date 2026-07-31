@@ -11,7 +11,7 @@ pub struct CodeAnalysis {
     pub complexity_score: u8,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issue {
     pub severity: String,
     pub line: Option<usize>,
@@ -19,6 +19,7 @@ pub struct Issue {
     pub fix: String,
 }
 
+#[derive(Clone)]
 pub struct SelfAnalyzer {
     project_root: PathBuf,
 }

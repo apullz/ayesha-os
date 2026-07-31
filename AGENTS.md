@@ -10,13 +10,9 @@ ayesha-os/
 ├── models/              ollama modelfile for ayesha personality
 ├── scripts/             launcher, deploy scripts
 ├── applets/
-│   ├── screen/          typescript — screen capture vision chatbox
-│   ├── cosmic-rag/      python — local RAG chatbot
 │   ├── desktop-cat/     python — desktop pet cat
 │   ├── flora-cli/       typescript — scottish flora phylogeny explorer
-│   ├── bring-to-life/   typescript — image to interactive html
 │   ├── neural-strike/   python — SAE interpretability game
-│   ├── screenshotai/    python — screenshot capture + analysis
 │   └── poopy-tui/       python — discord terminal client (textual)
 ├── ayesha.json          central config (personality, projects, ollama models)
 └── ayesha.bat           shortcut to launch engine
@@ -48,26 +44,14 @@ python -m tri_mind_sync.cli watch
 
 ### applets
 ```bash
-# screen vision chatbox
-cd applets/screen/ollama-screen-vision-chatbox && npm install && npm run dev
-
-# cosmic-rag
-cd applets/cosmic-rag && python main.py
-
 # desktop-cat (no AI needed)
 cd applets/desktop-cat && python desktopcat.py
 
 # flora-cli
 cd applets/flora-cli && npx tsx cli.ts
 
-# bring-to-life
-cd applets/bring-to-life && npm run dev
-
 # neural-strike
 cd applets/neural-strike && python main.py
-
-# screenshotai
-cd applets/screenshotai && python main.py
 
 # poopy-tui
 cd applets/poopy-tui && python main.py
@@ -93,7 +77,6 @@ cd applets/poopy-tui && python main.py
 ollama pull qwen2.5:7b
 ollama pull qwen2.5-coder:14b
 ollama pull llama3.2-vision
-ollama pull moondream
 ollama create ayesha -f models/Modelfile
 ```
 

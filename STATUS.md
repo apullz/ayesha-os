@@ -32,23 +32,11 @@
   git_middleware/   [✔]  Gitea webhook receiver + LLM task runner.
                          Code review, security scan, auto-summary.
 
-  screen/          [→]  Vision chatbox + desktop companion terminal.
-                         Replaced gemini with ollama 07/2026.
-
-  cosmic-rag/      [→]  Local RAG chatbot with vault.
-                         └ ollama llama3.2 needed
-
-  screenshotai/    [→]  Screenshot capture + analysis.
-                         └ uses moondream via ollama
-
   desktop-cat/     [✔]  Desktop pet (no AI needed).
                          └ pure tkinter + Win32 API
 
   flora-cli/       [→]  Scottish flora phylo explorer.
                          └ replaced gemini with ollama 07/2026
-
-  bring-to-life/   [→]  Image-to-interactive-HTML app.
-                         └ vision -> llama3.2-vision, text -> qwen2.5-coder:14b
 
   neural-strike/   [!]  SAE interpretability game.
                          └ local-only (neuronpedia stubbed)
@@ -85,7 +73,6 @@
 
   ollama pull qwen2.5-coder:14b  # default text + coding model
   ollama pull llama3.2-vision    # vision tasks
-  ollama pull moondream          # screenshotai
   ollama create ayesha -f models/Modelfile  # custom personality
 
   ── C L O U D   M O D E L S   (f r e e) ──

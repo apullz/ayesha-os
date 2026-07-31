@@ -79,3 +79,56 @@ impl Sandbox {
         &self.root
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_workspace() {
+        let s = Sandbox::default_workspace();
+        assert!(s.root.exists());
+    }
+
+    #[test]
+    fn test_resolve_absolute() {
+        let s = Sandbox::new("C:\\");
+        let resolved = s.resolve("C:\\Windows").unwrap();
+        // On Windows, canonicalize adds \\?\ prefix
+        assert!(resolved.to_string_lossy().contains("Windows"));
+        assert!(resolved.exists());
+    }
+
+    #[test]
+    fn test_resolve_nonexistent_fails() {
+        let s = Sandbox::new("C:\\Windows");
+        // Should fail because path escapes sandbox
+        let result = s.resolve("C:\\Users");
+        assert!(result.is_err(), "expected error but got: {:?}", result.ok());
+    }
+
+    #[test]
+    fn test_check_sensitive_env() {
+        let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive("C:\\project\\.env").is_err());
+    }
+
+    #[test]
+    fn test_check_sensitive_ssh() {
+        let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive("C:\\Users\\me\\.ssh\\id_rsa").is_err());
+    }
+
+    #[test]
+    fn test_check_sensitive_allow_normal() {
+        let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive("C:\\Users\\me\\Documents\\file.txt").is_ok());
+    }
+
+    #[test]
+    fn test_sandbox_escape_blocked() {
+        let s = Sandbox::new("C:\\Users");
+        let result = s.resolve("C:\\Windows\\System32");
+        assert!(result.is_err());
+    }
+}

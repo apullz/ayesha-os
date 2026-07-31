@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use anyhow::Result;
 use std::time::Duration;
 use std::fs;
+use std::path::PathBuf;
 
 use crate::ollama::{ChatMessage, StreamResult, ToolCall, ToolFunction, ChatResponse, ChatResponseMessage};
 
@@ -17,8 +18,27 @@ pub struct CloudClient {
 }
 
 impl CloudClient {
-    fn get_api_key(provider: &str) -> Option<String> {
-        let env_content = fs::read_to_string("C:\\ayesha-os\\.env").ok()?;
+    fn find_project_root() -> PathBuf {
+    // Try exe directory, then current directory, then ancestor search for ayesha.json
+    let candidates = [
+        std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())),
+        Some(std::env::current_dir().unwrap_or_default()),
+        std::env::current_exe().ok().and_then(|p| {
+            let mut dir = p.parent()?.to_path_buf();
+            loop {
+                if dir.join("ayesha.json").exists() {
+                    return Some(dir);
+                }
+                dir = dir.parent()?.to_path_buf();
+            }
+        }),
+    ];
+    candidates.into_iter().flatten().next().unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn get_api_key(provider: &str) -> Option<String> {
+        let root = Self::find_project_root();
+        let env_content = fs::read_to_string(root.join(".env")).ok()?;
         let key_name = if provider == "openrouter" {
             "OPENROUTER_API_KEY"
         } else {
@@ -39,7 +59,8 @@ impl CloudClient {
     }
 
     fn get_base_url(provider: &str) -> Option<String> {
-        let config_str = fs::read_to_string("C:\\ayesha-os\\ayesha.json").ok()?;
+        let root = Self::find_project_root();
+        let config_str = fs::read_to_string(root.join("ayesha.json")).ok()?;
         let json_val: Value = serde_json::from_str(&config_str).ok()?;
         
         let provider_key = if provider == "openrouter" { "openrouter" } else { "opencode_zen" };

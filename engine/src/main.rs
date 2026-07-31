@@ -16,10 +16,12 @@ use std::io::Write;
 use colored::*;
 use ollama::{OllamaClient, ChatMessage, StreamResult};
 use cloud::CloudClient;
-use tools::ToolExecutor;
+use tools::{ToolExecutor, ToolContext};
 use sandbox::Sandbox;
 use prompt_refinement::PromptHistory;
 use memory::MemoryStore;
+use self_analysis::SelfAnalyzer;
+use tool_evolution::ToolEvolver;
 use model_registry::ModelRegistry;
 use applet_manager::AppletManager;
 use serde_json;
@@ -174,6 +176,20 @@ async fn main() -> anyhow::Result<()> {
     let mut tool_model_name = "qwen2.5:7b".to_string();
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
+
+    // Self-analysis, tool evolution, and a separate ollama client for generative tools
+    let project_root = std::env::current_dir().unwrap_or_default();
+    let analyzer = SelfAnalyzer::new(project_root.clone());
+    let tool_ollama = OllamaClient::new("ayesha");
+    let evolver = ToolEvolver::new(vec![
+        "read_file".into(), "write_file".into(), "list_dir".into(),
+        "generate_html".into(), "generate_sprite".into(), "generate_tileset".into(),
+        "generate_object".into(), "render_sprite".into(), "read_clipboard".into(),
+        "remember".into(), "list_memories".into(), "search_memories".into(),
+        "set_preference".into(), "analyze_self".into(), "list_source_files".into(),
+        "evolve_tools".into(), "refine_prompt".into(), "get_tool_stats".into(),
+        "coding_agent".into(),
+    ]);
 
     // Model registry
     let mut registry = ModelRegistry::new();
@@ -715,7 +731,14 @@ async fn main() -> anyhow::Result<()> {
 
                 ui::show_tool_call(name, &args_str);
 
-                let tool_result = match executor.execute(name, args).await {
+                let tool_result = match executor.execute(name, args, &mut ToolContext {
+                                memory: &mut memory,
+                                prompt_history: &mut prompt_history,
+                                analyzer: &analyzer,
+                                evolver: &evolver,
+                                ollama: &tool_ollama,
+                                project_root: &project_root,
+                            }).await {
                     Ok(r) => r,
                     Err(e) => {
                         let err_msg = format!("error: {}", e);
@@ -824,7 +847,14 @@ async fn main() -> anyhow::Result<()> {
 
                             ui::show_tool_call(name, &args_str);
 
-                            let tool_result = match executor.execute(name, args).await {
+                            let tool_result = match executor.execute(name, args, &mut ToolContext {
+                                memory: &mut memory,
+                                prompt_history: &mut prompt_history,
+                                analyzer: &analyzer,
+                                evolver: &evolver,
+                                ollama: &tool_ollama,
+                                project_root: &project_root,
+                            }).await {
                                 Ok(r) => r,
                                 Err(e) => {
                                     let err_msg = format!("error: {}", e);

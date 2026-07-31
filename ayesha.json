@@ -26,8 +26,7 @@
     "models": {
       "qwen2.5:7b": ["general", "tools", "thinking"],
       "qwen2.5-coder:14b": ["general", "tools", "coding"],
-      "llama3.2-vision": ["general", "vision"],
-      "moondream": ["general", "vision"]
+      "llama3.2-vision": ["general", "vision"]
     }
   },
   "cloud_models": {
@@ -50,12 +49,8 @@
   "projects": {
     "engine": { "path": "engine/", "lang": "rust", "desc": "terminal-native persona host with tool-calling" },
     "core": { "path": "core/", "lang": "python", "desc": "hivemind orchestrator with gradio web ui", "run": "python app.py", "port": 7860 },
-    "screen": { "path": "applets/screen/ollama-screen-vision-chatbox/", "lang": "typescript", "desc": "screen capture vision chatbox", "run": "npm run dev", "port": 5173 },
-    "cosmic-rag": { "path": "applets/cosmic-rag/", "lang": "python", "desc": "local RAG chatbot with vault knowledge base", "run": "python main.py", "port": 8000 },
-    "screenshotai": { "path": "applets/screenshotai/", "lang": "python", "desc": "screenshot capture and analysis", "run": "python main.py" },
     "desktop-cat": { "path": "applets/desktop-cat/", "lang": "python", "desc": "desktop pet cat that follows cursor", "run": "python desktopcat.py" },
     "flora-cli": { "path": "applets/flora-cli/", "lang": "typescript", "desc": "scottish flora phylogeny explorer", "run": "npx tsx cli.ts" },
-    "bring-to-life": { "path": "applets/bring-to-life/", "lang": "typescript", "desc": "turn images into interactive html", "run": "npm run dev", "port": 5174 },
     "neural-strike": { "path": "applets/neural-strike/", "lang": "python", "desc": "mechanistic interpretability game", "run": "python main.py" },
     "models": { "path": "models/", "lang": "ollama", "desc": "ayesha personality modelfile" },
     "git-middleware": { "path": "git_middleware/", "lang": "python", "desc": "gitea webhook + LLM task runner", "run": "python main.py", "port": 9000 }

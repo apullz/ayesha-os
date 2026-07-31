@@ -102,6 +102,7 @@ struct OllamaTagsResponse {
     models: Vec<OllamaTag>,
 }
 
+#[derive(Clone)]
 pub struct OllamaClient {
     client: Client,
     pub model: String,
@@ -382,17 +383,16 @@ you have tools to interact with the file system and manage applets. use them imm
 applets — standalone sub-projects you can launch and manage:
 use the manage_applet tool to control them:
 - list: show all applets, their status (● running / ○ stopped), and ports
-- launch: start an applet by name (e.g. "flora-cli", "cosmic-rag")
+- launch: start an applet by name (e.g. "flora-cli", "desktop-cat")
 - stop: stop a running applet
 - status: get detailed info about a specific applet
 
-available applets: flora-cli (scottish flora phylogeny explorer), cosmic-rag (local rag chatbot),
-screen (screen capture vision chatbox), desktop-cat (desktop pet cat), neural-strike (interpretability game),
-bring-to-life (image to interactive html), screenshotai (screenshot analysis), poopy-tui (discord client),
+available applets: desktop-cat (desktop pet cat), flora-cli (scottish flora phylogeny explorer),
+neural-strike (interpretability game), poopy-tui (discord client),
 git-middleware (gitea webhook + llm task runner), core (hivemind orchestrator with gradio web ui),
 engine (terminal-native persona host — that's you!)
 
-when the user asks to "launch flora-cli" or "open cosmic-rag", use manage_applet with action "launch".
+when the user asks to "launch flora-cli" or "open desktop-cat", use manage_applet with action "launch".
 when the user asks to "stop flora-cli", use manage_applet with action "stop".
 when the user asks "what applets are running" or "list applets", use manage_applet with action "list".
 
@@ -448,10 +448,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {
-                                "type": "string",
-                                "description": "Absolute path to the file (e.g. C:\\Users\\<name>\\Desktop\\file.txt)"
-                            }
+                            "path": { "type": "string", "description": "Absolute path to the file" }
                         },
                         "required": ["path"]
                     }
@@ -465,14 +462,8 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {
-                                "type": "string",
-                                "description": "Absolute path to the file to write (e.g. C:\\Users\\<name>\\Desktop\\file.txt)"
-                            },
-                            "content": {
-                                "type": "string",
-                                "description": "The content to write to the file"
-                            }
+                            "path": { "type": "string", "description": "Absolute path to the file to write" },
+                            "content": { "type": "string", "description": "The content to write to the file" }
                         },
                         "required": ["path", "content"]
                     }
@@ -486,12 +477,262 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {
-                                "type": "string",
-                                "description": "Absolute path to the directory to list (defaults to home dir)"
-                            }
+                            "path": { "type": "string", "description": "Absolute path to the directory to list" }
                         },
                         "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "generate_html",
+                    "description": "Generate a standalone HTML file with embedded CSS and JS.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string", "description": "Output path for the HTML file" },
+                            "content": { "type": "string", "description": "Full HTML content to write" }
+                        },
+                        "required": ["path", "content"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "generate_sprite",
+                    "description": "Generate a pixel art character sprite sheet as a PNG file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "output": { "type": "string", "description": "Output path for the PNG file" },
+                            "sprite_width": { "type": "integer", "description": "Width of each sprite frame in pixels" },
+                            "sprite_height": { "type": "integer", "description": "Height of each sprite frame in pixels" },
+                            "pixel_size": { "type": "integer", "description": "Size of each pixel in the output" },
+                            "palette": { "type": "object", "description": "Color palette with skin, hair, shirt, pants, shoes, visor, circuit keys" }
+                        },
+                        "required": ["output"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "generate_tileset",
+                    "description": "Generate a terrain tileset as a PNG file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "output": { "type": "string", "description": "Output path for the PNG file" },
+                            "tile_width": { "type": "integer", "description": "Width of each tile in pixels" },
+                            "tile_height": { "type": "integer", "description": "Height of each tile in pixels" },
+                            "columns": { "type": "integer", "description": "Number of tile columns" },
+                            "rows": { "type": "integer", "description": "Number of tile rows" }
+                        },
+                        "required": ["output"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "generate_object",
+                    "description": "Generate an item/object sprite as a PNG file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "output": { "type": "string", "description": "Output path for the PNG file" },
+                            "width": { "type": "integer", "description": "Width in pixels" },
+                            "height": { "type": "integer", "description": "Height in pixels" },
+                            "pixel_size": { "type": "integer", "description": "Size of each pixel" },
+                            "color_r": { "type": "integer", "description": "Red component of main color" },
+                            "color_g": { "type": "integer", "description": "Green component of main color" },
+                            "color_b": { "type": "integer", "description": "Blue component of main color" }
+                        },
+                        "required": ["output"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "render_sprite",
+                    "description": "Render an interactive HTML canvas sprite viewer.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "output": { "type": "string", "description": "Output path for the HTML file" }
+                        },
+                        "required": ["output"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "read_clipboard",
+                    "description": "Read text or image data from the system clipboard.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "remember",
+                    "description": "Store a fact or memory. The model should use this when the user asks it to remember something.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "content": { "type": "string", "description": "The content to remember" },
+                            "category": { "type": "string", "description": "Category of memory (general, user_pref, fact)" }
+                        },
+                        "required": ["content"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "list_memories",
+                    "description": "List recent memories.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "count": { "type": "integer", "description": "Number of recent memories to show" }
+                        },
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "search_memories",
+                    "description": "Search stored memories by keyword.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": { "type": "string", "description": "Search keyword or phrase" }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "set_preference",
+                    "description": "Store a user preference (key-value pair).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "key": { "type": "string", "description": "Preference name" },
+                            "value": { "type": "string", "description": "Preference value" }
+                        },
+                        "required": ["key", "value"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "analyze_self",
+                    "description": "Analyze own source code for issues and improvements.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file": { "type": "string", "description": "Filename to analyze (e.g. tools.rs). Omit to list all source files." }
+                        },
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "list_source_files",
+                    "description": "List all Rust source files in the project with line counts.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "evolve_tools",
+                    "description": "Analyze tool gaps and generate suggestions for new tools.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "gap": { "type": "string", "description": "Optional specific gap to fill (omit to list all gaps)" }
+                        },
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "refine_prompt",
+                    "description": "Analyze tool usage history and suggest improvements to the system prompt.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "get_tool_stats",
+                    "description": "Get tool usage statistics with success rates.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "coding_agent",
+                    "description": "Multi-action coding tool. Use this for complex code operations.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "description": "Action to perform: read, write, edit, list, analyze, modify, suggest"
+                            },
+                            "path": { "type": "string", "description": "File path relative to project root" },
+                            "content": { "type": "string", "description": "Content for write action" },
+                            "edits": {
+                                "type": "array",
+                                "description": "Array of edit operations for edit action",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "action": { "type": "string" },
+                                        "old": { "type": "string" },
+                                        "new": { "type": "string" },
+                                        "text": { "type": "string" },
+                                        "after": { "type": "string" }
+                                    }
+                                }
+                            },
+                            "instruction": { "type": "string", "description": "Natural language instruction for modify action" }
+                        },
+                        "required": ["action", "path"]
                     }
                 }
             }),

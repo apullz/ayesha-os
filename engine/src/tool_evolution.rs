@@ -18,6 +18,7 @@ pub struct ParamDef {
     pub required: bool,
 }
 
+#[derive(Clone)]
 pub struct ToolEvolver {
     existing_tools: Vec<String>,
 }

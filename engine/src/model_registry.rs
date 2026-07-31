@@ -157,12 +157,6 @@ impl ModelRegistry {
                 context_length: 8192,
                 backend: Backend::Ollama,
             },
-            ModelProfile {
-                name: "moondream".into(),
-                capabilities: vec![Capability::General, Capability::Vision],
-                context_length: 4096,
-                backend: Backend::Ollama,
-            },
         ]
     }
 
