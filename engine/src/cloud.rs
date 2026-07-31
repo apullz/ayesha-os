@@ -346,4 +346,140 @@ fn get_api_key(provider: &str) -> Option<String> {
 
         Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })
     }
+
+    /// Streaming chat that collects without printing — used by the tool model
+    /// so its deliberation text is invisible to the user.
+    pub async fn chat_stream_collect(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<&[Value]>,
+        steer_rx: &std::sync::mpsc::Receiver<String>,
+    ) -> Result<StreamResult> {
+        let req_body = json!({
+            "model": self.model,
+            "messages": messages,
+            "tools": tools,
+            "stream": true,
+        });
+
+        let mut req = self.client.post(format!("{}/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json");
+
+        if self.provider == "openrouter" {
+            req = req.header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
+                     .header("X-Title", "ayesha-os");
+        }
+
+        let mut resp = req.json(&req_body).send().await?;
+
+        if let Err(e) = resp.error_for_status_ref() {
+            anyhow::bail!("cloud http error: {}", e);
+        }
+
+        let mut buf = String::new();
+        let mut full_content = String::new();
+
+        #[derive(Default)]
+        struct ActiveToolCall {
+            id: String,
+            call_type: String,
+            name: String,
+            args: String,
+        }
+        let mut active_tool_calls: Vec<ActiveToolCall> = Vec::new();
+
+        while let Some(chunk) = resp.chunk().await? {
+            buf.push_str(&String::from_utf8_lossy(&chunk));
+
+            while let Some(nl) = buf.find('\n') {
+                let line = buf[..nl].to_string();
+                buf = buf[nl + 1..].to_string();
+
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed == "data: [DONE]" {
+                    if trimmed == "data: [DONE]" { break; }
+                    continue;
+                }
+
+                if let Some(data_str) = trimmed.strip_prefix("data: ") {
+                    if let Ok(json_obj) = serde_json::from_str::<Value>(data_str) {
+                        if let Some(choices) = json_obj.get("choices").and_then(|c| c.as_array()) {
+                            if let Some(choice) = choices.first() {
+                                if let Some(delta) = choice.get("delta") {
+                                    if let Some(c) = delta.get("content").and_then(|c| c.as_str()) {
+                                        full_content.push_str(c);
+                                    }
+                                    if let Some(tcs) = delta.get("tool_calls").and_then(|t| t.as_array()) {
+                                        for tc in tcs {
+                                            if let Some(index) = tc.get("index").and_then(|i| i.as_u64()) {
+                                                let idx = index as usize;
+                                                while active_tool_calls.len() <= idx {
+                                                    active_tool_calls.push(ActiveToolCall::default());
+                                                }
+                                                let active = &mut active_tool_calls[idx];
+                                                if let Some(id) = tc.get("id").and_then(|i| i.as_str()) {
+                                                    active.id = id.to_string();
+                                                }
+                                                if let Some(t) = tc.get("type").and_then(|t| t.as_str()) {
+                                                    active.call_type = t.to_string();
+                                                }
+                                                if let Some(f) = tc.get("function") {
+                                                    if let Some(name) = f.get("name").and_then(|n| n.as_str()) {
+                                                        active.name = name.to_string();
+                                                    }
+                                                    if let Some(args) = f.get("arguments").and_then(|a| a.as_str()) {
+                                                        active.args.push_str(args);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Ok(input) = steer_rx.try_recv() {
+                let mut final_tcs = Vec::new();
+                for a in &active_tool_calls {
+                    let args_val = if a.args.is_empty() {
+                        json!({})
+                    } else {
+                        serde_json::from_str(&a.args).unwrap_or(json!({}))
+                    };
+                    final_tcs.push(ToolCall {
+                        id: a.id.clone(),
+                        call_type: if a.call_type.is_empty() { "function".to_string() } else { a.call_type.clone() },
+                        function: ToolFunction {
+                            name: a.name.clone(),
+                            arguments: args_val,
+                        }
+                    });
+                }
+                return Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: Some(input) });
+            }
+        }
+
+        let mut final_tcs = Vec::new();
+        for a in active_tool_calls {
+            let args_val = if a.args.is_empty() {
+                json!({})
+            } else {
+                serde_json::from_str(&a.args).unwrap_or(json!({}))
+            };
+            final_tcs.push(ToolCall {
+                id: a.id,
+                call_type: if a.call_type.is_empty() { "function".to_string() } else { a.call_type },
+                function: ToolFunction {
+                    name: a.name,
+                    arguments: args_val,
+                }
+            });
+        }
+
+        Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })
+    }
 }

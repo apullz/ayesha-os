@@ -11,6 +11,7 @@ mod prompt_refinement;
 mod coding_agent;
 mod model_registry;
 mod applet_manager;
+mod applet_runner;
 
 use std::io::Write;
 use colored::*;
@@ -109,6 +110,20 @@ impl ActiveBackend {
             ActiveBackend::Cloud(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
         }
     }
+
+    /// Invisible streaming — collects response without printing. Used for the
+    /// tool model so its deliberation text doesn't appear on screen.
+    async fn chat_stream_collect(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<&[serde_json::Value]>,
+        steer_rx: &std::sync::mpsc::Receiver<String>,
+    ) -> anyhow::Result<StreamResult> {
+        match self {
+            ActiveBackend::Ollama(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
+            ActiveBackend::Cloud(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -164,6 +179,60 @@ mod winapi {
     pub fn init_console() {}
 }
 
+/// Match natural-language applet phrases like "launch flora cli", "open
+/// desktop-cat", or "stop poopy-tui" to a registered applet name.
+/// Returns (applet name, is_stop).
+fn parse_applet_phrase(names: &[String], input: &str) -> Option<(String, bool)> {
+    let normalize = |s: &str| -> String {
+        s.chars()
+            .filter(|c| *c != '-' && *c != '_' && *c != ' ')
+            .collect::<String>()
+            .to_lowercase()
+    };
+    let phrases: [(&str, bool); 5] = [
+        ("launch ", false),
+        ("open ", false),
+        ("start ", false),
+        ("run ", false),
+        ("stop ", true),
+    ];
+    let lower = input.to_lowercase();
+    for (prefix, is_stop) in phrases {
+        if !lower.starts_with(prefix) {
+            continue;
+        }
+        let candidate = input[prefix.len()..].trim();
+        let target = normalize(candidate);
+        let matched = names.iter().find(|n| normalize(n) == target).cloned();
+        return matched.map(|m| (m, is_stop));
+    }
+    None
+}
+
+/// Open an applet as a page in the current window (foreground applets) or in
+/// its own window (background applets).
+fn switch_applet_page(
+    manager: &mut AppletManager,
+    name: &str,
+    steer_tx: &std::sync::mpsc::Sender<String>,
+    steer_rx: &std::sync::mpsc::Receiver<String>,
+    input_flag: &mut std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    if manager.is_foreground(name) {
+        match manager.run_in_window(name, steer_tx, steer_rx, input_flag) {
+            Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", name)),
+            Err(e) => ui::show_error(&e),
+        }
+    } else if manager.is_running(name) {
+        ui::show_system(&format!("{} is already running in its own window", name));
+    } else {
+        match manager.launch(name) {
+            Ok(()) => ui::show_system(&format!("launched {} in its own window", name)),
+            Err(e) => ui::show_error(&e),
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     winapi::init_console();
@@ -188,7 +257,7 @@ async fn main() -> anyhow::Result<()> {
         "remember".into(), "list_memories".into(), "search_memories".into(),
         "set_preference".into(), "analyze_self".into(), "list_source_files".into(),
         "evolve_tools".into(), "refine_prompt".into(), "get_tool_stats".into(),
-        "coding_agent".into(),
+        "coding_agent".into(), "manage_applet".into(),
     ]);
 
     // Model registry
@@ -234,58 +303,10 @@ async fn main() -> anyhow::Result<()> {
     // Enable raw mode for Ctrl+M detection
     let _ = crossterm::terminal::enable_raw_mode();
 
-    // Steering channel: crossterm event thread sends input here
+    // Steering channel: input thread sends keys here. The thread is poll-based
+    // so it can be suspended while a foreground applet owns the terminal.
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
-
-    std::thread::spawn(move || {
-        use crossterm::event::{self, Event, KeyCode, KeyModifiers, KeyEventKind};
-        let mut input_buf = String::new();
-        loop {
-            match event::read() {
-                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
-                    match (key.code, key.modifiers) {
-                        (KeyCode::Char('m'), KeyModifiers::CONTROL) => {
-                            if steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
-                        }
-                        (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                            if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
-                        }
-                        (KeyCode::Up, KeyModifiers::SHIFT) => {
-                            if steer_tx.send("\0shift-up".to_string()).is_err() { break; }
-                        }
-                        (KeyCode::Down, KeyModifiers::SHIFT) => {
-                            if steer_tx.send("\0shift-down".to_string()).is_err() { break; }
-                        }
-                        (KeyCode::Enter, _) => {
-                            let line = input_buf.trim().to_string();
-                            if steer_tx.send(line).is_err() { break; }
-                            input_buf.clear();
-                            print!("\r\n");
-                            let _ = std::io::stdout().flush();
-                        }
-                        (KeyCode::Char(c), _) if c as u8 >= 32 => {
-                            input_buf.push(c);
-                            print!("{}", c);
-                            let _ = std::io::stdout().flush();
-                        }
-                        (KeyCode::Backspace, _) => {
-                            input_buf.pop();
-                            print!("\x08 \x08");
-                            let _ = std::io::stdout().flush();
-                        }
-                        _ => {}
-                    }
-                }
-                Ok(Event::Paste(s)) => {
-                    for c in s.chars() {
-                        if c as u8 >= 32 { input_buf.push(c); print!("{}", c); }
-                    }
-                    let _ = std::io::stdout().flush();
-                }
-                _ => {}
-            }
-        }
-    });
+    let mut input_flag = applet_runner::spawn_input_thread(steer_tx.clone());
 
     ui::print_banner();
     ui::show_system(&memory.summary());
@@ -303,29 +324,15 @@ async fn main() -> anyhow::Result<()> {
     let mut current_model = "ayesha:latest".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
-    // Send /set nothink to disable thinking tokens (hidden from user)
+    // Warm up ollama (ensures model is loaded, no conversation pollution)
     {
-        messages.push(ChatMessage {
-            role: "user".to_string(),
-            content: "/set nothink".to_string(),
-            tool_calls: None,
-            tool_call_id: None,
-        });
-        let init_client = OllamaClient::new(&current_model);
-        if let Ok(resp) = init_client.chat(&messages, None).await {
-            messages.push(ChatMessage {
-                role: "assistant".to_string(),
-                content: resp.message.content,
-                tool_calls: None,
-                tool_call_id: None,
-            });
-        }
+        let _ = OllamaClient::list_models().await;
     }
 
     // Holds steering input that needs to be processed as the next user message
     let mut pending_input: Option<String> = None;
 
-    enum InputMode { Normal, Launcher }
+    enum InputMode { Normal, Launcher, PageSwitcher }
     let mut input_mode = InputMode::Normal;
     let mut applet_cycle_idx: Option<usize> = None;
 
@@ -337,48 +344,15 @@ async fn main() -> anyhow::Result<()> {
             match input_mode {
                 InputMode::Normal => ui::prompt_line(),
                 InputMode::Launcher => ui::launcher_prompt(),
+                InputMode::PageSwitcher => ui::page_switch_prompt(),
             }
             let inp = match steer_rx.recv() {
                 Ok(i) => i,
                 Err(_) => break,
             };
-            // Ctrl+C → exit
-            if inp == "\0ctrl-c" {
-                break;
-            }
-            // Ctrl+M → toggle launcher mode
-            if inp == "\0ctrl-m" {
-                input_mode = InputMode::Launcher;
-                println!("\n{}", manager.list());
-                ui::show_system("type applet name to launch/stop, `back` to exit, `list` to refresh");
-                continue;
-            }
-            // Shift + Up / Shift + Down → cycle applets
-            if inp == "\0shift-up" || inp == "\0shift-down" {
-                let applets = manager.names();
-                if !applets.is_empty() {
-                    let next_idx = match applet_cycle_idx {
-                        None => 0,
-                        Some(i) => {
-                            if inp == "\0shift-down" {
-                                (i + 1) % applets.len()
-                            } else {
-                                if i == 0 { applets.len() - 1 } else { i - 1 }
-                            }
-                        }
-                    };
-                    applet_cycle_idx = Some(next_idx);
-                    let target = &applets[next_idx];
-                    match manager.launch(target) {
-                        Ok(()) => ui::show_system(&format!("(Shift+Arrow) Launched applet: /{}", target)),
-                        Err(e) => ui::show_system(&format!("(Shift+Arrow) Applet /{} status: {}", target, e)),
-                    }
-                }
-                continue;
-            }
             if inp.is_empty() {
-                // In launcher mode, empty line exits
-                if matches!(input_mode, InputMode::Launcher) {
+                // In launcher/page-switcher mode, empty line exits
+                if matches!(input_mode, InputMode::Launcher | InputMode::PageSwitcher) {
                     input_mode = InputMode::Normal;
                     print!("\x1B[2J\x1B[1;1H");
                     std::io::stdout().flush().ok();
@@ -387,6 +361,60 @@ async fn main() -> anyhow::Result<()> {
             }
             inp
         };
+
+        // ── control keys (work from normal input and steering interrupts) ──
+        // Ctrl+C → exit
+        if input == "\0ctrl-c" {
+            break;
+        }
+        // Ctrl+M → toggle launcher mode
+        if input == "\0ctrl-m" {
+            input_mode = InputMode::Launcher;
+            println!("\n{}", manager.list());
+            ui::show_system("type applet name to launch/stop, `back` to exit, `list` to refresh");
+            continue;
+        }
+        // Ctrl+P → page switcher (open applets in this window)
+        if input == "\0ctrl-p" {
+            input_mode = InputMode::PageSwitcher;
+            let mut pages: Vec<(String, String, bool, bool)> = vec![
+                ("engine".to_string(), "terminal persona host — that's me".to_string(), true, true),
+            ];
+            for name in manager.names() {
+                if name == "engine" {
+                    continue;
+                }
+                if let Some(e) = manager.entries.get(&name) {
+                    pages.push((name.clone(), e.desc.clone(), manager.is_running(&name), e.foreground));
+                }
+            }
+            println!("\n{}", ui::draw_page_switcher(&pages));
+            ui::show_system("type a number or name to switch page, `back` to return");
+            continue;
+        }
+        // Shift + Up / Shift + Down → cycle applets
+        if input == "\0shift-up" || input == "\0shift-down" {
+            let applets = manager.names();
+            if !applets.is_empty() {
+                let next_idx = match applet_cycle_idx {
+                    None => 0,
+                    Some(i) => {
+                        if input == "\0shift-down" {
+                            (i + 1) % applets.len()
+                        } else {
+                            if i == 0 { applets.len() - 1 } else { i - 1 }
+                        }
+                    }
+                };
+                applet_cycle_idx = Some(next_idx);
+                let target = &applets[next_idx];
+                match manager.launch(target) {
+                    Ok(()) => ui::show_system(&format!("(Shift+Arrow) Launched applet: /{}", target)),
+                    Err(e) => ui::show_system(&format!("(Shift+Arrow) Applet /{} status: {}", target, e)),
+                }
+            }
+            continue;
+        }
 
         // ── handle launcher mode ──
         if matches!(input_mode, InputMode::Launcher) {
@@ -427,6 +455,34 @@ async fn main() -> anyhow::Result<()> {
                     } else {
                         ui::show_error(&format!("unknown applet. type `list` to see available"));
                     }
+                    continue;
+                }
+            }
+        }
+
+        // ── handle page-switcher mode ──
+        if matches!(input_mode, InputMode::PageSwitcher) {
+            match input.trim() {
+                "" | "back" | "exit" | "/back" | "engine" | "1" => {
+                    input_mode = InputMode::Normal;
+                    print!("\x1B[2J\x1B[1;1H");
+                    std::io::stdout().flush().ok();
+                    continue;
+                }
+                _ => {
+                    if let Ok(n) = input.trim().parse::<usize>() {
+                        let names = manager.names();
+                        if n >= 2 && n - 2 < names.len() {
+                            switch_applet_page(&mut manager, &names[n - 2], &steer_tx, &steer_rx, &mut input_flag);
+                        } else {
+                            ui::show_error(&format!("no page {}", n));
+                        }
+                    } else if manager.has(input.trim()) {
+                        switch_applet_page(&mut manager, input.trim(), &steer_tx, &steer_rx, &mut input_flag);
+                    } else {
+                        ui::show_error(&format!("unknown applet: {}", input.trim()));
+                    }
+                    input_mode = InputMode::Normal;
                     continue;
                 }
             }
@@ -522,7 +578,12 @@ async fn main() -> anyhow::Result<()> {
             _ if lower.starts_with("run ") => {
                 let name = input[4..].trim();
                 if manager.has(name) {
-                    if manager.is_running(name) {
+                    if manager.is_foreground(name) {
+                        match manager.run_in_window(name, &steer_tx, &steer_rx, &mut input_flag) {
+                            Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", name)),
+                            Err(e) => ui::show_error(&e),
+                        }
+                    } else if manager.is_running(name) {
                         ui::show_system(&format!("{} is already running", name));
                     } else {
                         match manager.launch(name) {
@@ -617,7 +678,12 @@ async fn main() -> anyhow::Result<()> {
             _ => {
                 // If it was a slash command, check applet short names
                 if was_slash && manager.has(&input) {
-                    if manager.is_running(&input) {
+                    if manager.is_foreground(&input) {
+                        match manager.run_in_window(&input, &steer_tx, &steer_rx, &mut input_flag) {
+                            Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", input)),
+                            Err(e) => ui::show_error(&e),
+                        }
+                    } else if manager.is_running(&input) {
                         match manager.stop(&input) {
                             Ok(()) => ui::show_system(&format!("stopped {}", input)),
                             Err(e) => ui::show_error(&e),
@@ -636,6 +702,20 @@ async fn main() -> anyhow::Result<()> {
         // After match, if was_slash but no command matched, show error
         if was_slash {
             ui::show_error(&format!("unknown command: /{}. type /help", input));
+            continue;
+        }
+
+        // ── natural-language applet phrases (no model round-trip) ──
+        // "launch flora cli", "open desktop-cat", "stop poopy-tui", etc.
+        if let Some((name, is_stop)) = parse_applet_phrase(&manager.names(), &input) {
+            if is_stop {
+                match manager.stop(&name) {
+                    Ok(()) => ui::show_system(&format!("stopped {}", name)),
+                    Err(e) => ui::show_error(&e),
+                }
+            } else {
+                switch_applet_page(&mut manager, &name, &steer_tx, &steer_rx, &mut input_flag);
+            }
             continue;
         }
 
@@ -738,6 +818,10 @@ async fn main() -> anyhow::Result<()> {
                                 evolver: &evolver,
                                 ollama: &tool_ollama,
                                 project_root: &project_root,
+                                applet_manager: &mut manager,
+                                steer_tx: &steer_tx,
+                                steer_rx: &steer_rx,
+                                input_flag: &mut input_flag,
                             }).await {
                     Ok(r) => r,
                     Err(e) => {
@@ -805,8 +889,9 @@ async fn main() -> anyhow::Result<()> {
         // Step 2: If ayesha didn't call tools, check if qwen2.5 would
         if !steer_happened && !first_had_tools {
             // Try qwen2.5 with tools to see if it wants to call any
+            // (invisible — tool model deliberation is not shown to user)
             let qwen_result = tool_client
-                .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+                .chat_stream_collect(&messages, Some(&tools), &steer_rx)
                 .await;
 
             match qwen_result {
@@ -854,6 +939,10 @@ async fn main() -> anyhow::Result<()> {
                                 evolver: &evolver,
                                 ollama: &tool_ollama,
                                 project_root: &project_root,
+                                applet_manager: &mut manager,
+                                steer_tx: &steer_tx,
+                                steer_rx: &steer_rx,
+                                input_flag: &mut input_flag,
                             }).await {
                                 Ok(r) => r,
                                 Err(e) => {
@@ -899,9 +988,9 @@ async fn main() -> anyhow::Result<()> {
                             tool_call_id: None,
                         });
 
-                        // Re-prompt qwen2.5 for next tool calls
+                        // Re-prompt qwen2.5 for next tool calls (invisible)
                         let next_result = tool_client
-                            .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+                            .chat_stream_collect(&messages, Some(&tools), &steer_rx)
                             .await;
 
                         match next_result {
@@ -978,4 +1067,28 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn applet_phrase_matches() {
+        let n = names(&["flora-cli", "desktop-cat", "poopy-tui", "engine"]);
+
+        assert_eq!(parse_applet_phrase(&n, "launch flora cli"), Some(("flora-cli".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "launch flora-cli"), Some(("flora-cli".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "open Desktop Cat"), Some(("desktop-cat".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "start poopy tui"), Some(("poopy-tui".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "run engine"), Some(("engine".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "stop poopy-tui"), Some(("poopy-tui".to_string(), true)));
+        assert_eq!(parse_applet_phrase(&n, "launch poopy"), None);
+        assert_eq!(parse_applet_phrase(&n, "launch a test for me"), None);
+        assert_eq!(parse_applet_phrase(&n, "what is the weather"), None);
+    }
 }

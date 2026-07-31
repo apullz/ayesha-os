@@ -157,6 +157,59 @@ pub fn launcher_prompt() {
     stdout().flush().ok();
 }
 
+pub fn page_switch_prompt() {
+    print!("  {} {} ",
+        "\u{25b6}".bright_cyan().bold(),
+        "switch to".bright_cyan());
+    stdout().flush().ok();
+}
+
+// ── page switcher overlay (ctrl+p) ─────────────────────────
+
+/// Draw a numbered page list. Each page is (name, desc, running, foreground).
+/// Page 1 is always the engine itself.
+pub fn draw_page_switcher(pages: &[(String, String, bool, bool)]) -> String {
+    let mut out = String::new();
+    let inner_w = 52usize;
+    let title = "page switcher (ctrl+p)";
+    let dashes = inner_w - 1 - title.len();
+    out.push_str(&format!("  ┌─{}{}┐\n", title, "─".repeat(dashes)));
+    out.push_str(&format!("  │{}│\n", "─".repeat(inner_w)));
+    for (i, (name, desc, running, _foreground)) in pages.iter().enumerate() {
+        let n = i + 1;
+        let status = if *running { "●" } else { "○" };
+        let marker = if n == 1 { "◄" } else { " " };
+        out.push_str(&format!("  │{:<2} {} {:<14} {:<29} {:<2}│\n", n, status, name, desc, marker));
+    }
+    out.push_str(&format!("  │{:<52}│\n", ""));
+    out.push_str(&format!("  │{:<52}│\n", "● running   ○ stopped   ◄ = current page"));
+    out.push_str(&format!("  └{}┘\n", "─".repeat(inner_w)));
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn page_switcher_lines_are_aligned() {
+        let pages = vec![
+            ("engine".to_string(), "terminal persona host".to_string(), true, true),
+            ("flora-cli".to_string(), "scottish flora explorer".to_string(), false, true),
+            ("desktop-cat".to_string(), "desktop pet cat".to_string(), true, false),
+        ];
+        let out = draw_page_switcher(&pages);
+        let lines: Vec<&str> = out.lines().collect();
+        assert!(!lines.is_empty());
+        let expected = lines[0].chars().count();
+        for line in &lines {
+            assert_eq!(line.chars().count(), expected, "misaligned line: {}", line);
+        }
+        assert!(out.contains("◄"));
+        assert!(out.contains("ctrl+p"));
+    }
+}
+
 // ── command palette overlay ───────────────────────────────
 
 pub fn draw_command_overlay(filter: Option<&str>) {
@@ -170,6 +223,9 @@ pub fn draw_command_overlay(filter: Option<&str>) {
         ("route",   "route a query: /route <query>"),
         ("pull",    "pull model: /pull <name>"),
         ("name",    "set your name: /name <you>"),
+        ("run",     "launch applet: /run <name>"),
+        ("apps",    "list applets"),
+        ("stop",    "stop applet: /stop <name>"),
         ("stats",   "tool usage statistics"),
         ("memory",  "list stored memories"),
         ("analyze", "analyze own source code"),
@@ -250,6 +306,7 @@ pub fn print_help() {
         ("apps",      "list applets"),
         ("run",       "launch applet: run <name>"),
         ("stop",      "stop applet: stop <name>"),
+        ("ctrl+p",    "page switcher (in-window)"),
     ];
     for (cmd, desc) in &help_cmds {
         println!("  {} {:<14} {}",
@@ -262,9 +319,10 @@ pub fn print_help() {
     println!("  {}",
         "├─ tools (auto-called by model) ─────────────┤".bright_green());
     let tool_cmds = [
-        ("read_file",  "read any file on disk"),
-        ("write_file", "create or overwrite files"),
-        ("list_dir",   "browse directories"),
+        ("read_file",    "read any file on disk"),
+        ("write_file",   "create or overwrite files"),
+        ("list_dir",     "browse directories"),
+        ("manage_applet","list/launch/stop applets"),
     ];
     for (cmd, desc) in &tool_cmds {
         println!("  {} {:<14} {}",

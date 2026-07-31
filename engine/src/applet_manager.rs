@@ -1,5 +1,9 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, mpsc};
+use colored::*;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -11,6 +15,8 @@ pub struct AppletEntry {
     pub run: Option<String>,
     #[serde(default)]
     pub port: Option<u16>,
+    #[serde(default)]
+    pub foreground: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,6 +89,10 @@ impl AppletManager {
 
     pub fn is_running(&self, name: &str) -> bool {
         self.processes.contains_key(name)
+    }
+
+    pub fn is_foreground(&self, name: &str) -> bool {
+        self.entries.get(name).map(|e| e.foreground).unwrap_or(false)
     }
 
     pub fn list(&self) -> String {
@@ -165,6 +175,100 @@ impl AppletManager {
         };
 
         self.processes.insert(name.to_string(), child);
+        Ok(())
+    }
+
+    /// Spawn an applet as a child process attached to the *current* console,
+    /// so it takes over this terminal window until it exits.
+    pub fn launch_foreground(&mut self, name: &str) -> Result<Child, String> {
+        let entry = self.entries.get(name).ok_or_else(|| format!("unknown applet: {}", name))?;
+        let run_cmd = entry.run.as_deref().ok_or_else(|| format!("no run command for {}", name))?;
+        let work_dir = std::path::Path::new(&self.root).join(&entry.path);
+
+        let parts: Vec<&str> = run_cmd.split_whitespace().collect();
+        if parts.is_empty() {
+            return Err(format!("invalid run command for {}", name));
+        }
+
+        let program = if parts[0] == "npm" {
+            if cfg!(windows) { "npm.cmd" } else { "npm" }
+        } else if parts[0] == "npx" {
+            if cfg!(windows) { "npx.cmd" } else { "npx" }
+        } else {
+            parts[0]
+        };
+
+        if !work_dir.exists() {
+            return Err(format!("path not found: {}", work_dir.display()));
+        }
+
+        let child = if cfg!(windows) {
+            let args_joined = parts[1..].join(" ");
+            let install_cmd = if work_dir.join("package.json").exists() {
+                "(if not exist node_modules (echo installing applet dependencies... && npm install)) && "
+            } else {
+                ""
+            };
+            let full_cmd = format!("cd /d \"{}\" && {}{} {}", work_dir.display(), install_cmd, program, args_joined);
+            Command::new("cmd.exe")
+                .args(["/c", &full_cmd])
+                .spawn()
+                .map_err(|e| format!("failed to launch {} in this window: {}", name, e))?
+        } else {
+            Command::new(program)
+                .args(&parts[1..])
+                .current_dir(&work_dir)
+                .spawn()
+                .map_err(|e| format!("failed to launch {} in this window: {}", name, e))?
+        };
+
+        Ok(child)
+    }
+
+    /// Run a foreground applet inside the current terminal window. The engine's
+    /// input thread is suspended and raw mode is released so the applet owns the
+    /// terminal; when it exits, the engine's UI is restored.
+    pub fn run_in_window(
+        &mut self,
+        name: &str,
+        steer_tx: &mpsc::Sender<String>,
+        steer_rx: &mpsc::Receiver<String>,
+        input_flag: &mut Arc<AtomicBool>,
+    ) -> Result<(), String> {
+        if !self.is_foreground(name) {
+            self.launch(name)?;
+            return Ok(());
+        }
+
+        // 1. stop the engine's input thread so it can't steal keystrokes
+        crate::applet_runner::suspend_input(input_flag);
+
+        // 2. release raw mode so the applet controls the terminal
+        let _ = crossterm::terminal::disable_raw_mode();
+
+        // 3. drain stale keystrokes queued before the suspend
+        while steer_rx.try_recv().is_ok() {}
+
+        // 4. hand the window over to the applet
+        print!("\x1B[2J\x1B[1;1H");
+        let _ = std::io::stdout().flush();
+        println!();
+        println!("  {} {}",
+            "◆".bright_green(),
+            format!("{} running in this window — exit it (or close) to return to ayesha", name).bright_cyan());
+        println!();
+        let _ = std::io::stdout().flush();
+
+        let mut child = self.launch_foreground(name)?;
+        let _ = child.wait();
+
+        // 5. hand the window back to the engine
+        let _ = crossterm::terminal::enable_raw_mode();
+        *input_flag = crate::applet_runner::spawn_input_thread(steer_tx.clone());
+        print!("\x1B[2J\x1B[1;1H");
+        let _ = std::io::stdout().flush();
+        crate::ui::print_banner();
+
         Ok(())
     }
 

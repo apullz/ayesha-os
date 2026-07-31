@@ -59,37 +59,24 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 ### prerequisites
 
 - [ollama](https://ollama.com) installed and running on `localhost:11434`
-- [rust](https://rustup.rs) (for engine), [python 3.10+](https://python.org) (for core), [node 20+](https://nodejs.org) (for web applets)
+- the `ayesha` model created (`ollama create ayesha -f models/Modelfile`)
 
-### option 1: run the standalone exe
+### run the standalone exe (the app)
 
 ```cmd
 cd dist
 .\ayesha-os.exe
 ```
 
-### option 2: build from source
-
-```bash
-# create the ayesha model from the modelfile
-ollama create ayesha -f models/Modelfile
-
-# or pull the base model directly
-ollama pull qwen2.5-coder:14b
-
-# build the engine
-cd engine
-cargo build --release
-
-# run
-.\target\release\ayesha-os.exe
-```
-
-### option 3: use the launcher
+`dist\ayesha-os.exe` IS the app — a self-contained build with applets, models, and config
+bundled in. rebuild it after any engine/applet change with:
 
 ```cmd
-ayesha.bat
+.\scripts\build-exe.ps1
 ```
+
+> dev-only: building/running the engine with cargo or `ayesha.bat` is for iterating on
+> code. end users always get the exe.
 
 ## engine features
 

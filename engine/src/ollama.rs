@@ -387,12 +387,18 @@ use the manage_applet tool to control them:
 - stop: stop a running applet
 - status: get detailed info about a specific applet
 
-available applets: desktop-cat (desktop pet cat), flora-cli (scottish flora phylogeny explorer),
-neural-strike (interpretability game), poopy-tui (discord client),
+some applets are "foreground" applets (flora-cli, poopy-tui): when launched they take over
+the current terminal window and run there like a page of ayesha-os. the user returns to
+ayesha when the applet exits, or by pressing ctrl+p to open the page switcher.
+the rest open in their own separate window.
+
+available applets: desktop-cat (desktop pet cat), flora-cli (scottish flora phylogeny explorer, in-window),
+neural-strike (interpretability game), poopy-tui (discord client, in-window),
 git-middleware (gitea webhook + llm task runner), core (hivemind orchestrator with gradio web ui),
 engine (terminal-native persona host — that's you!)
 
 when the user asks to "launch flora-cli" or "open desktop-cat", use manage_applet with action "launch".
+foreground applets will run in the current window; background applets open in their own window.
 when the user asks to "stop flora-cli", use manage_applet with action "stop".
 when the user asks "what applets are running" or "list applets", use manage_applet with action "list".
 
@@ -733,6 +739,24 @@ always stay in character. be helpful but keep your personality. now go be cute a
                             "instruction": { "type": "string", "description": "Natural language instruction for modify action" }
                         },
                         "required": ["action", "path"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "manage_applet",
+                    "description": "Control applets. launch runs a foreground applet in the current window (or a background applet in its own window), list shows all applets with status, stop kills a running applet, status gives details.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "description": "Action to perform: list, status, launch, stop"
+                            },
+                            "name": { "type": "string", "description": "Applet name for status/launch/stop (e.g. flora-cli, desktop-cat)" }
+                        },
+                        "required": ["action"]
                     }
                 }
             }),

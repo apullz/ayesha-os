@@ -1,5 +1,7 @@
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, mpsc};
 use anyhow::{Result, bail};
 use serde_json::{json, Value};
 
@@ -9,6 +11,7 @@ use crate::prompt_refinement::PromptHistory;
 use crate::self_analysis::SelfAnalyzer;
 use crate::tool_evolution::ToolEvolver;
 use crate::ollama::{OllamaClient, ChatMessage};
+use crate::applet_manager::AppletManager;
 
 const MAX_READ_SIZE: usize = 256 * 1024;
 
@@ -19,6 +22,10 @@ pub struct ToolContext<'a> {
     pub evolver: &'a ToolEvolver,
     pub ollama: &'a OllamaClient,
     pub project_root: &'a Path,
+    pub applet_manager: &'a mut AppletManager,
+    pub steer_tx: &'a mpsc::Sender<String>,
+    pub steer_rx: &'a mpsc::Receiver<String>,
+    pub input_flag: &'a mut Arc<AtomicBool>,
 }
 
 pub struct ToolExecutor {
@@ -67,7 +74,72 @@ impl ToolExecutor {
             // Coding agent
             "coding_agent" => self.coding_agent(args, ctx.ollama, ctx.project_root, &self.sandbox).await,
 
+            // Applets
+            "manage_applet" => self.manage_applet(args, ctx).await,
+
             _ => bail!("unknown tool: {}", name),
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    //  Applet management
+    // ═══════════════════════════════════════════
+
+    async fn manage_applet(&self, args: &Value, ctx: &mut ToolContext<'_>) -> Result<String> {
+        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("list");
+        match action {
+            "list" => Ok(ctx.applet_manager.list()),
+            "status" => {
+                let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                if name.is_empty() {
+                    bail!("status requires a 'name' argument");
+                }
+                if !ctx.applet_manager.has(name) {
+                    bail!("unknown applet: {}", name);
+                }
+                let running = ctx.applet_manager.is_running(name);
+                let foreground = ctx.applet_manager.is_foreground(name);
+                let entry = ctx.applet_manager.entries.get(name).unwrap();
+                let port = entry.port.map(|p| p.to_string()).unwrap_or_else(|| "none".to_string());
+                Ok(format!(
+                    "{}: {}\n  status: {}\n  mode: {} (runs in the current window)\n  port: {}",
+                    name, entry.desc,
+                    if running { "● running" } else { "○ stopped" },
+                    if foreground { "in-window" } else { "own window" },
+                    port,
+                ))
+            }
+            "launch" => {
+                let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                if name.is_empty() {
+                    bail!("launch requires a 'name' argument");
+                }
+                if ctx.applet_manager.is_foreground(name) {
+                    // Takes over the current window until it exits, then ayesha returns
+                    ctx.applet_manager
+                        .run_in_window(name, ctx.steer_tx, ctx.steer_rx, ctx.input_flag)
+                        .map_err(|e| anyhow::anyhow!("{}", e))
+                        .map(|_| format!("ran {} in the current window and returned (press ctrl+p to switch pages again)", name))
+                } else if ctx.applet_manager.is_running(name) {
+                    bail!("{} is already running", name)
+                } else {
+                    ctx.applet_manager
+                        .launch(name)
+                        .map_err(|e| anyhow::anyhow!("{}", e))
+                        .map(|_| format!("launched {} in its own window", name))
+                }
+            }
+            "stop" => {
+                let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                if name.is_empty() {
+                    bail!("stop requires a 'name' argument");
+                }
+                ctx.applet_manager
+                    .stop(name)
+                    .map_err(|e| anyhow::anyhow!("{}", e))
+                    .map(|_| format!("stopped {}", name))
+            }
+            _ => bail!("unknown manage_applet action: {} (expected list/status/launch/stop)", action),
         }
     }
 
@@ -683,6 +755,9 @@ mod tests {
     #[tokio::test]
     async fn test_unknown_tool() {
         let executor = ToolExecutor::new(Sandbox::new("."));
+        let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
+        let mut input_flag = Arc::new(AtomicBool::new(true));
+        let mut manager = AppletManager::new();
         let result = executor.execute("nonexistent_tool", &json!({}), &mut ToolContext {
             memory: &mut MemoryStore::default(),
             prompt_history: &mut PromptHistory::default(),
@@ -690,6 +765,10 @@ mod tests {
             evolver: &ToolEvolver::new(vec![]),
             ollama: &OllamaClient::new("test"),
             project_root: std::path::Path::new("."),
+            applet_manager: &mut manager,
+            steer_tx: &steer_tx,
+            steer_rx: &steer_rx,
+            input_flag: &mut input_flag,
         }).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("unknown tool"));
@@ -784,5 +863,27 @@ mod tests {
         }), &mut memory);
 
         assert_eq!(memory.get_preference("favorite color"), Some("cyan"));
+    }
+
+    #[tokio::test]
+    async fn test_manage_applet_list() {
+        let executor = ToolExecutor::new(Sandbox::new("."));
+        let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
+        let mut input_flag = Arc::new(AtomicBool::new(true));
+        let mut manager = AppletManager::new();
+        let result = executor.execute("manage_applet", &json!({ "action": "list" }), &mut ToolContext {
+            memory: &mut MemoryStore::default(),
+            prompt_history: &mut PromptHistory::default(),
+            analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
+            evolver: &ToolEvolver::new(vec![]),
+            ollama: &OllamaClient::new("test"),
+            project_root: std::path::Path::new("."),
+            applet_manager: &mut manager,
+            steer_tx: &steer_tx,
+            steer_rx: &steer_rx,
+            input_flag: &mut input_flag,
+        }).await.unwrap();
+        assert!(result.contains("applets"));
+        assert!(result.contains("engine"));
     }
 }

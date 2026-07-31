@@ -79,7 +79,23 @@ if (Test-Path $AppletsDir) {
     if (Test-Path $DestAppletsDir) {
         Remove-Item -LiteralPath $DestAppletsDir -Recurse -Force
     }
+    # Use robocopy to exclude .git, __pycache__, node_modules, .env, logs
+    $excludes = @(".git", "__pycache__", "node_modules", ".env", "logs", ".venv", "*.pyc")
+    $src = $AppletsDir.TrimEnd('\')
+    $dst = $DestAppletsDir.TrimEnd('\')
+    foreach ($ex in $excludes) {
+        $srcPath = "$src\*\$ex"
+        # robocopy can't exclude files easily, so just copy then remove
+    }
     Copy-Item -LiteralPath $AppletsDir -Destination $DestAppletsDir -Recurse -Force
+    # Clean up excluded directories after copy
+    Get-ChildItem -Path $DestAppletsDir -Directory -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in '.git', '__pycache__', 'node_modules', '.venv', 'logs' } |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $DestAppletsDir -Filter "*.pyc" -Recurse -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $DestAppletsDir -Filter ".env" -Recurse -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host ""

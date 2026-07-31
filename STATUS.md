@@ -42,15 +42,20 @@
                          └ local-only (neuronpedia stubbed)
                          └ requires pre-downloaded data exports
 
-  poopy-tui/       [!]  Discord terminal client with voice + TUI.
-                         └ requires DISCORD_TOKEN in .env
+  poopy-tui/       [✔]  Discord terminal client with voice + TUI.
+                         └ login: token / QR / email+password
+                         └ token persisted to ~/.poopy-tui/token
+                         └ requires DISCORD_TOKEN in .env OR first-run login
 
   models/          [✔]  Modelfile for ayesha personality.
                            └ FROM qwen2.5-coder:14b
 
   launcher/        [✔]  In-engine applet switcher.
                           └ Ctrl+M opens launcher mode
+                          └ Ctrl+P opens page switcher (in-window applets)
                           └ /run, /stop, /apps slash commands
+                          └ foreground applets (flora-cli, poopy-tui) run in
+                            the current window as pages; ctrl+p switches back
                           └ scripts/launcher.py (tray companion)
 
   ── K N O W N   I S S U E S ──

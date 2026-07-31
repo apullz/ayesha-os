@@ -15,13 +15,28 @@ ayesha-os/
 │   ├── neural-strike/   python — SAE interpretability game
 │   └── poopy-tui/       python — discord terminal client (textual)
 ├── ayesha.json          central config (personality, projects, ollama models)
-└── ayesha.bat           shortcut to launch engine
+└── ayesha.bat           dev shortcut — NOT for delivery (see "delivery" below)
 ```
+
+## delivery (IMPORTANT — read this first)
+
+**the standalone exe IS the app.** users run `dist\ayesha-os.exe`, nothing else.
+
+- every AI/agent work session that touches engine or applets MUST end by building the
+  exe: `.\scripts\build-exe.ps1` (it compiles release + bundles applets/models/config).
+- verify the build succeeded and `dist\ayesha-os.exe` is freshly written (timestamp).
+- NEVER tell a user to run `ayesha.bat`, `cargo run`, `cargo build`, or `python app.py`
+  to launch ayesha. those are dev-only tools.
+- if a feature change is in-flight, build the exe LAST so the binary matches the code.
 
 ## key commands
 
 ### engine (rust)
 ```bash
+# build the deliverable exe (users run this, not cargo):
+.\scripts\build-exe.ps1
+
+# dev only — iterate quickly while coding:
 cd engine
 cargo run --release
 ```
@@ -82,8 +97,9 @@ ollama create ayesha -f models/Modelfile
 
 ## gotchas
 
-- no test suites in any project
+- no test suites in any project (engine has `cargo test` — 15 passing)
 - `applets/desktop-cat/desktopcat.py` expects `cat.png` sprite in same dir
 - python projects have no pyproject.toml — deps in requirements.txt only
 - typescript projects need `npm install` before first run
 - engine build requires `C:\msys64\mingw64\bin` in PATH for dlltool (gnu toolchain)
+- applets with `"foreground": true` in ayesha.json (flora-cli, poopy-tui) run in the current terminal window; ctrl+p opens the page switcher. engine/src/applet_runner.rs owns the poll-based input thread; applet_manager::run_in_window suspends it, hands the console to the applet, and respawns it on return.
