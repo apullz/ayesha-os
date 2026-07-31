@@ -176,6 +176,9 @@ impl CodingAgent {
                     if start > content.len() || end > content.len() || start > end {
                         return Err(anyhow::anyhow!("Invalid range for deletion"));
                     }
+                    if !content.is_char_boundary(start) || !content.is_char_boundary(end) {
+                        return Err(anyhow::anyhow!("start/end offsets {} / {} fall inside a multi-byte character", start, end));
+                    }
                     
                     let mut new_content = String::new();
                     new_content.push_str(&content[..start]);
