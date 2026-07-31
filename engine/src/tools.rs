@@ -157,13 +157,13 @@ impl ToolExecutor {
 
         let content = fs::read_to_string(&resolved)?;
 
-        if content.len() > MAX_READ_SIZE {
-            let truncated = &content[..MAX_READ_SIZE];
+        if content.chars().count() > MAX_READ_SIZE {
+            let truncated = crate::util::truncate_chars(&content, MAX_READ_SIZE);
             Ok(format!(
-                "{}\n\n... [truncated at {} bytes, file is {} bytes total]",
+                "{}\n\n... [truncated at {} chars, file is {} chars total]",
                 truncated,
                 MAX_READ_SIZE,
-                content.len()
+                content.chars().count()
             ))
         } else {
             Ok(content)

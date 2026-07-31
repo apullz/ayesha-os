@@ -106,16 +106,125 @@ struct OllamaTagsResponse {
 pub struct OllamaClient {
     client: Client,
     pub model: String,
+    base_url: String,
+}
+
+/// Pure NDJSON stream parser for ollama's /api/chat streaming format.
+/// No I/O — feed it trimmed lines, it accumulates content + tool calls and
+/// tracks think-block state. Unit-testable and shared by the visible and
+/// collect streaming paths so they can never drift apart.
+pub struct StreamParser {
+    pub content: String,
+    pub tool_calls: Vec<ToolCall>,
+    pub done: bool,
+    in_think: bool,
+    recent: String,
+}
+
+#[derive(Debug)]
+pub enum StreamLine {
+    /// (text delta, is_inside_think_block)
+    Content(String, bool),
+    /// final chunk with done=true
+    Done,
+    /// not a content/done line (empty, malformed, etc.)
+    Skip,
+}
+
+impl StreamParser {
+    const RECENT_MAX: usize = 20;
+
+    pub fn new() -> Self {
+        Self {
+            content: String::new(),
+            tool_calls: Vec::new(),
+            done: false,
+            in_think: false,
+            recent: String::new(),
+        }
+    }
+
+    /// Feed one NDJSON line. Returns what should be displayed (if anything).
+    pub fn feed_line(&mut self, line: &str) -> StreamLine {
+        let line = line.trim();
+        if line.is_empty() {
+            return StreamLine::Skip;
+        }
+
+        let json: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(e) => {
+                let preview: String = line.chars().take(80).collect();
+                eprintln!("stream parse error: {} near: {}", e, preview);
+                return StreamLine::Skip;
+            }
+        };
+
+        // Accumulate content deltas
+        if let Some(c) = json["message"]["content"].as_str() {
+            if !c.is_empty() {
+                self.content.push_str(c);
+                self.recent.push_str(c);
+                let n = self.recent.chars().count();
+                if n > Self::RECENT_MAX {
+                    let skip = n - Self::RECENT_MAX;
+                    self.recent = self.recent.chars().skip(skip).collect();
+                }
+
+                // Detect think-block transitions on the recent tail so tag
+                // splits across chunk boundaries (<th / ink>) still register,
+                // but already-closed blocks never re-trigger on full content.
+                let was_in_think = self.in_think;
+                let recent_has_open = self.recent.contains("<think>") || self.recent.contains("[think]");
+                let just_entered = !was_in_think && recent_has_open;
+
+                if !self.in_think && recent_has_open {
+                    self.in_think = true;
+                }
+                if self.in_think
+                    && (self.recent.contains("</think>") || self.recent.contains("[/think]"))
+                {
+                    self.in_think = false;
+                }
+                return StreamLine::Content(c.to_string(), was_in_think || just_entered);
+            }
+        }
+
+        // Accumulate tool calls (ollama sends them in the done chunk)
+        if let Some(tc) = json.get("message").and_then(|m| m.get("tool_calls")) {
+            if let Ok(parsed) = serde_json::from_value::<Vec<ToolCall>>(tc.clone()) {
+                if !parsed.is_empty() {
+                    self.tool_calls = parsed;
+                }
+            }
+        }
+
+        if json.get("done").and_then(|v| v.as_bool()) == Some(true) {
+            self.done = true;
+            return StreamLine::Done;
+        }
+
+        StreamLine::Skip
+    }
+
+    pub fn finish(self) -> StreamResult {
+        StreamResult { content: self.content, tool_calls: self.tool_calls, steering: None }
+    }
 }
 
 impl OllamaClient {
     pub fn new(model: &str) -> Self {
+        Self::new_with_base(model, OLLAMA_BASE)
+    }
+
+    pub fn new_with_base(model: &str, base_url: &str) -> Self {
         Self {
             client: Client::builder()
                 .timeout(std::time::Duration::from_secs(120))
                 .build()
                 .unwrap_or_default(),
             model: model.to_string(),
+            base_url: base_url.to_string(),
         }
     }
 
@@ -137,7 +246,7 @@ impl OllamaClient {
         };
 
         let resp = self.client
-            .post(format!("{}/api/chat", OLLAMA_BASE))
+            .post(format!("{}/api/chat", self.base_url))
             .json(&request)
             .send()
             .await?;
@@ -150,7 +259,7 @@ impl OllamaClient {
 
         let body = resp.text().await?;
         let chat_resp: ChatResponse = serde_json::from_str(&body)
-            .map_err(|e| anyhow::anyhow!("failed to parse ollama response: {}\nbody preview: {}", e, &body[..body.len().min(500)]))?;
+            .map_err(|e| anyhow::anyhow!("failed to parse ollama response: {}\nbody preview: {}", e, crate::util::truncate_chars(&body, 500)))?;
         Ok(chat_resp)
     }
 
@@ -170,7 +279,7 @@ impl OllamaClient {
 
         let mut resp = self
             .client
-            .post(format!("{}/api/chat", OLLAMA_BASE))
+            .post(format!("{}/api/chat", self.base_url))
             .json(&request)
             .send()
             .await?;
@@ -179,9 +288,8 @@ impl OllamaClient {
             anyhow::bail!("ollama http error: {}", e);
         }
 
+        let mut parser = StreamParser::new();
         let mut buf = String::new();
-        let mut content = String::new();
-        let mut tool_calls: Vec<ToolCall> = Vec::new();
 
         while let Some(chunk) = resp.chunk().await? {
             buf.push_str(&String::from_utf8_lossy(&chunk));
@@ -190,41 +298,25 @@ impl OllamaClient {
                 let line = buf[..nl].to_string();
                 buf = buf[nl + 1..].to_string();
 
-                if line.trim().is_empty() {
-                    continue;
-                }
-
-                match serde_json::from_str::<Value>(&line) {
-                    Ok(json) => {
-                        if let Some(c) = json["message"]["content"].as_str() {
-                            if !c.is_empty() {
-                                content.push_str(c);
-                            }
-                        }
-                        if json.get("done").and_then(|v| v.as_bool()) == Some(true) {
-                            if let Some(tc) = json.get("message").and_then(|m| m.get("tool_calls")) {
-                                if let Ok(parsed) = serde_json::from_value::<Vec<ToolCall>>(tc.clone()) {
-                                    tool_calls = parsed;
-                                }
-                            }
-                            return Ok(StreamResult { content, tool_calls, steering: None });
-                        }
-                    }
-                    Err(e) => {
-                        let preview: String = line.chars().take(80).collect();
-                        eprintln!("stream parse error: {} near: {}", e, preview);
-                    }
+                match parser.feed_line(&line) {
+                    StreamLine::Content(_, _) => {}
+                    StreamLine::Done => return Ok(parser.finish()),
+                    StreamLine::Skip => {}
                 }
             }
 
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
-                return Ok(StreamResult { content, tool_calls, steering: Some(input) });
+                return Ok(StreamResult {
+                    content: parser.content,
+                    tool_calls: parser.tool_calls,
+                    steering: Some(input),
+                });
             }
         }
 
         // Stream ended without done flag
-        Ok(StreamResult { content, tool_calls, steering: None })
+        Ok(parser.finish())
     }
 
     /// Stream response from ollama, printing tokens as they arrive (true streaming).
@@ -248,7 +340,7 @@ impl OllamaClient {
 
         let mut resp = self
             .client
-            .post(format!("{}/api/chat", OLLAMA_BASE))
+            .post(format!("{}/api/chat", self.base_url))
             .json(&request)
             .send()
             .await?;
@@ -257,14 +349,8 @@ impl OllamaClient {
             anyhow::bail!("ollama http error: {}", e);
         }
 
+        let mut parser = StreamParser::new();
         let mut buf = String::new();
-        let mut full_content = String::new();
-        let mut tool_calls: Vec<ToolCall> = Vec::new();
-        let mut in_think = false;
-
-        // Track recent content for tag detection across chunk boundaries
-        let mut recent = String::new();
-        const RECENT_MAX: usize = 20;
 
         while let Some(chunk) = resp.chunk().await? {
             buf.push_str(&String::from_utf8_lossy(&chunk));
@@ -273,72 +359,38 @@ impl OllamaClient {
                 let line = buf[..nl].to_string();
                 buf = buf[nl + 1..].to_string();
 
-                if line.trim().is_empty() {
-                    continue;
-                }
-
-                match serde_json::from_str::<Value>(&line) {
-                    Ok(json) => {
-                        if let Some(c) = json["message"]["content"].as_str() {
-                            if !c.is_empty() {
-                                full_content.push_str(c);
-                                recent.push_str(c);
-                                if recent.chars().count() > RECENT_MAX {
-                                    let cut = recent.chars().rev().take(RECENT_MAX).collect::<String>();
-                                    recent = cut;
-                                }
-
-                                // Check for think tag transitions using full accumulated content
-                                let no_think = !full_content.contains("<think>") && !full_content.contains("[think]");
-                                let think_ended = full_content.contains("</think>") || full_content.contains("[/think]");
-
-                                if !in_think && !no_think {
-                                    // just entered thinking — everything from the tag onward
-                                    in_think = true;
-                                }
-
-                                // Check if thinking just ended
-                                if in_think && think_ended {
-                                    in_think = false;
-                                }
-
-                                // Print with appropriate styling
-                                if in_think {
-                                    print!("{}", c.bright_black());
-                                } else {
-                                    print!("{}", c);
-                                }
-                                std::io::stdout().flush().ok();
-                            }
+                match parser.feed_line(&line) {
+                    StreamLine::Content(text, thinking) => {
+                        if thinking {
+                            print!("{}", text.bright_black());
+                        } else {
+                            print!("{}", text);
                         }
-                        if json.get("done").and_then(|v| v.as_bool()) == Some(true) {
-                            if let Some(tc) = json.get("message").and_then(|m| m.get("tool_calls")) {
-                                if let Ok(parsed) = serde_json::from_value::<Vec<ToolCall>>(tc.clone()) {
-                                    tool_calls = parsed;
-                                }
-                            }
-                            if !full_content.is_empty() {
-                                println!();
-                            }
-                            return Ok(StreamResult { content: full_content, tool_calls, steering: None });
+                        std::io::stdout().flush().ok();
+                    }
+                    StreamLine::Done => {
+                        if !parser.content.is_empty() {
+                            println!();
                         }
+                        return Ok(parser.finish());
                     }
-                    Err(e) => {
-                        let preview: String = line.chars().take(80).collect();
-                        eprintln!("stream parse error: {} near: {}", e, preview);
-                    }
+                    StreamLine::Skip => {}
                 }
             }
 
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
                 println!();
-                return Ok(StreamResult { content: full_content, tool_calls, steering: Some(input) });
+                return Ok(StreamResult {
+                    content: parser.content,
+                    tool_calls: parser.tool_calls,
+                    steering: Some(input),
+                });
             }
         }
 
         println!();
-        Ok(StreamResult { content: full_content, tool_calls, steering: None })
+        Ok(parser.finish())
     }
 
     pub async fn list_models() -> Result<Vec<String>> {
@@ -761,5 +813,128 @@ always stay in character. be helpful but keep your personality. now go be cute a
                 }
             }),
         ]
+    }
+}
+
+#[cfg(test)]
+mod stream_parser_tests {
+    use super::*;
+
+    fn feed(parser: &mut StreamParser, lines: &[&str]) {
+        for l in lines {
+            parser.feed_line(l);
+        }
+    }
+
+    #[test]
+    fn accumulates_partial_content_chunks() {
+        let mut p = StreamParser::new();
+        feed(&mut p, &[
+            r#"{"model":"ayesha","message":{"role":"assistant","content":"hi "},"done":false}"#,
+            r#"{"model":"ayesha","message":{"role":"assistant","content":"there"},"done":false}"#,
+            r#"{"model":"ayesha","message":{"role":"assistant","content":"!"},"done":false}"#,
+            r#"{"model":"ayesha","message":{"role":"assistant","content":""},"done":true,"total_duration":1}"#,
+        ]);
+        assert!(p.done);
+        assert_eq!(p.content, "hi there!");
+        assert!(p.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn empty_content_streams_do_not_panic_and_yield_empty() {
+        // This was the original "nothing works" bug class: streams where every
+        // chunk had empty content. Must not panic, must produce empty result.
+        let mut p = StreamParser::new();
+        let mut saw_content = false;
+        for i in 0..200 {
+            let line = format!(
+                r#"{{"message":{{"role":"assistant","content":""}},"done":false,"sample":{}}}"#,
+                i
+            );
+            if let StreamLine::Content(_, _) = p.feed_line(&line) {
+                saw_content = true;
+            }
+        }
+        assert!(!saw_content);
+        assert_eq!(p.feed_line(r#"{"message":{"content":""},"done":true}"#).is_done(), true);
+        let r = p.finish();
+        assert!(r.content.is_empty());
+        assert!(r.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn think_tags_are_flagged() {
+        let mut p = StreamParser::new();
+        // open tag
+        match p.feed_line(r#"{"message":{"content":"ok, let me think "},"done":false}"#) {
+            StreamLine::Content(_, thinking) => assert!(!thinking),
+            _ => panic!("expected content"),
+        }
+        match p.feed_line(r#"{"message":{"content":"<think>"},"done":false}"#) {
+            StreamLine::Content(_, thinking) => assert!(thinking, "after <think> should be thinking"),
+            other => panic!("expected content, got {:?}", other),
+        }
+        match p.feed_line(r#"{"message":{"content":"hmm, the user "},"done":false}"#) {
+            StreamLine::Content(_, thinking) => assert!(thinking),
+            _ => panic!("expected content"),
+        }
+        match p.feed_line(r#"{"message":{"content":"wants tools</think>"},"done":false}"#) {
+            StreamLine::Content(_, thinking) => assert!(thinking, "closing tag processed in same chunk still counts"),
+            _ => panic!("expected content"),
+        }
+        match p.feed_line(r#"{"message":{"content":"here you go"},"done":true}"#) {
+            StreamLine::Content(_, thinking) => assert!(!thinking, "after </think> should not be thinking"),
+            _ => panic!("expected content"),
+        }
+        assert_eq!(p.content, "ok, let me think <think>hmm, the user wants tools</think>here you go");
+    }
+
+    #[test]
+    fn tool_calls_parsed_from_done_chunk() {
+        let mut p = StreamParser::new();
+        p.feed_line(r#"{"message":{"content":"calling tool"},"done":false}"#);
+        let line = r#"{"message":{"content":"","tool_calls":[{"function":{"name":"write_file","arguments":{"path":"C:/x/y.txt","content":"hello"}}}],"role":"assistant"},"done":true}"#;
+        match p.feed_line(line) {
+            StreamLine::Done => {}
+            _ => panic!("expected done"),
+        }
+        assert!(p.done);
+        assert_eq!(p.tool_calls.len(), 1);
+        assert_eq!(p.tool_calls[0].function.name, "write_file");
+        assert_eq!(p.tool_calls[0].function.arguments["path"], "C:/x/y.txt");
+    }
+
+    #[test]
+    fn malformed_line_is_skipped_without_panic() {
+        let mut p = StreamParser::new();
+        match p.feed_line("this is not json at all") {
+            StreamLine::Skip => {}
+            _ => panic!("expected skip"),
+        }
+        assert!(!p.done);
+        assert!(p.content.is_empty());
+    }
+
+    #[test]
+    fn think_detection_across_chunk_boundaries() {
+        // the "<th" arrives in one chunk, "ink>" in the next
+        let mut p = StreamParser::new();
+        match p.feed_line(r#"{"message":{"content":"a <th"},"done":false}"#) {
+            StreamLine::Content(_, t) => assert!(!t),
+            _ => panic!(),
+        }
+        match p.feed_line(r#"{"message":{"content":"ink>b"},"done":false}"#) {
+            StreamLine::Content(_, t) => assert!(t, "should detect think block after boundary split"),
+            _ => panic!(),
+        }
+    }
+
+    trait DoneExt {
+        fn is_done(&self) -> bool;
+    }
+    impl DoneExt for StreamLine {
+        fn is_done(&self) -> bool {
+            matches!(self, StreamLine::Done)
+        }
     }
 }

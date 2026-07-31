@@ -293,7 +293,7 @@ fn get_api_key(provider: &str) -> Option<String> {
                             }
                         },
                         Err(e) => {
-                            let preview = &data_str[..data_str.len().min(80)];
+                            let preview = crate::util::truncate_chars(data_str, 80);
                             eprintln!("stream parse error: {} near: {}", e, preview);
                         }
                     }

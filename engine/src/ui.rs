@@ -60,8 +60,8 @@ pub fn print_banner() {
 // ── tool call / result ────────────────────────────────────
 
 pub fn show_tool_call(name: &str, args: &str) {
-    let truncated = if args.len() > 80 {
-        format!("{}...", &args[..79])
+    let truncated = if args.chars().count() > 80 {
+        format!("{}...", crate::util::truncate_chars(args, 79))
     } else {
         args.to_string()
     };
@@ -73,8 +73,8 @@ pub fn show_tool_call(name: &str, args: &str) {
 
 pub fn show_tool_ok(name: &str, msg: &str) {
     let first = msg.lines().next().unwrap_or(msg);
-    let truncated = if first.len() > 120 {
-        format!("{}...", &first[..119])
+    let truncated = if first.chars().count() > 120 {
+        format!("{}...", crate::util::truncate_chars(first, 119))
     } else {
         first.to_string()
     };

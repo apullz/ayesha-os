@@ -3,6 +3,7 @@ mod cloud;
 mod tools;
 mod sandbox;
 mod ui;
+mod util;
 mod pixel_striker;
 mod memory;
 mod self_analysis;
@@ -12,6 +13,7 @@ mod coding_agent;
 mod model_registry;
 mod applet_manager;
 mod applet_runner;
+mod agent;
 
 use std::io::Write;
 use colored::*;
@@ -33,13 +35,14 @@ enum ActiveBackend {
     Cloud(CloudClient),
 }
 
+/// Heuristic: does this user message likely need tool calls?
+fn might_need_tools(msg: &str) -> bool {
+    agent::needs_tools(msg)
+}
+
 /// Truncate tool results to prevent context overflow
 fn truncate_tool_result(result: &str, max_chars: usize) -> String {
-    if result.len() > max_chars {
-        format!("{}...\n(truncated: showing {} of {} chars)", &result[..max_chars], max_chars, result.len())
-    } else {
-        result.to_string()
-    }
+    agent::truncate_tool_result(result, max_chars)
 }
 
 /// Parse memory markers from ayesha's output and store them automatically.
@@ -233,8 +236,41 @@ fn switch_applet_page(
     }
 }
 
+/// Graceful shutdown: persist memory/history, stop applets, and — critically —
+/// release raw mode so the terminal isn't left in a broken state.
+fn graceful_shutdown(
+    messages: &mut Vec<ChatMessage>,
+    memory: &mut MemoryStore,
+    prompt_history: &mut PromptHistory,
+    manager: &mut AppletManager,
+) {
+    // Auto-parse memory markers from ayesha's last response
+    if let Some(last) = messages.last() {
+        if last.role == "assistant" {
+            let cleaned = parse_and_store_memories(&last.content, memory);
+            if cleaned != last.content {
+                messages.last_mut().unwrap().content = cleaned;
+            }
+        }
+    }
+
+    let _ = memory.save();
+    let _ = prompt_history.save();
+    manager.stop_all();
+    let _ = crossterm::terminal::disable_raw_mode();
+    println!();
+    println!("  {} {}", "●".bright_green(), "ayesha-os shutting down".bright_cyan());
+    println!("  {} {}", "◆".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
+    println!();
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // --selftest: headless E2E smoke test, exit 0 on success
+    if std::env::args().any(|a| a == "--selftest") {
+        return selftest().await;
+    }
+
     winapi::init_console();
 
     let sandbox = Sandbox::default_workspace();
@@ -324,9 +360,22 @@ async fn main() -> anyhow::Result<()> {
     let mut current_model = "ayesha:latest".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
-    // Warm up ollama (ensures model is loaded, no conversation pollution)
+    // Warm up ollama — preload both models into memory so first user interaction is fast.
     {
-        let _ = OllamaClient::list_models().await;
+        let tool_model = tool_model_name.clone();
+        let (_, warmup_rx) = std::sync::mpsc::channel::<String>();
+        let _ = tokio::join!(
+            async {
+                let client = OllamaClient::new("ayesha");
+                let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
+                let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
+            },
+            async {
+                let client = OllamaClient::new(&tool_model);
+                let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
+                let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
+            }
+        );
     }
 
     // Holds steering input that needs to be processed as the next user message
@@ -363,8 +412,9 @@ async fn main() -> anyhow::Result<()> {
         };
 
         // ── control keys (work from normal input and steering interrupts) ──
-        // Ctrl+C → exit
+        // Ctrl+C → exit (graceful: save memory, stop applets, release raw mode)
         if input == "\0ctrl-c" {
+            graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
             break;
         }
         // Ctrl+M → toggle launcher mode
@@ -506,24 +556,7 @@ async fn main() -> anyhow::Result<()> {
         // ── meta-commands ──
         match lower.as_str() {
             "exit" | "quit" | "q" => {
-        // Auto-parse memory markers from ayesha's last response
-        if let Some(last) = messages.last() {
-            if last.role == "assistant" {
-                let cleaned = parse_and_store_memories(&last.content, &mut memory);
-                if cleaned != last.content {
-                    messages.last_mut().unwrap().content = cleaned;
-                }
-            }
-        }
-
-        let _ = memory.save();
-                let _ = prompt_history.save();
-                manager.stop_all();
-                let _ = crossterm::terminal::disable_raw_mode();
-                println!();
-                println!("  {} {}", "●".bright_green(), "ayesha-os shutting down".bright_cyan());
-                println!("  {} {}", "◆".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
-                println!();
+                graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
                 break;
             }
             "help" | "h" | "?" => {
@@ -761,6 +794,7 @@ async fn main() -> anyhow::Result<()> {
 
         // ── agent loop (dual-model: ayesha for personality, qwen for tools) ──
         let msg_count_before = messages.len();
+        let needs_tools = might_need_tools(&user_content);
 
         messages.push(ChatMessage {
             role: "user".to_string(),
@@ -887,7 +921,8 @@ async fn main() -> anyhow::Result<()> {
         }
 
         // Step 2: If ayesha didn't call tools, check if qwen2.5 would
-        if !steer_happened && !first_had_tools {
+        // Skip for pure-chit-chat to save ~2s latency per message.
+        if !steer_happened && !first_had_tools && needs_tools {
             // Try qwen2.5 with tools to see if it wants to call any
             // (invisible — tool model deliberation is not shown to user)
             let qwen_result = tool_client
@@ -897,9 +932,11 @@ async fn main() -> anyhow::Result<()> {
             match qwen_result {
                 Ok(qr) if qr.has_tool_calls() => {
                     // qwen wants to call tools — execute them
+                    // Note: qwen's content is deliberation text, not user-facing.
+                    // Only push tool_calls, not content, to avoid polluting history.
                     messages.push(ChatMessage {
                         role: "assistant".to_string(),
-                        content: qr.content.clone(),
+                        content: String::new(),
                         tool_calls: Some(qr.tool_calls.clone()),
                         tool_call_id: None,
                     });
@@ -981,9 +1018,10 @@ async fn main() -> anyhow::Result<()> {
                         }
 
                         // Push assistant message back (after tool results)
+                        // Empty content — only tool_calls matter for the tool loop.
                         messages.push(ChatMessage {
                             role: "assistant".to_string(),
-                            content: qr.content.clone(),
+                            content: String::new(),
                             tool_calls: Some(current_tool_calls),
                             tool_call_id: None,
                         });
@@ -1004,7 +1042,7 @@ async fn main() -> anyhow::Result<()> {
                                 if nr.has_tool_calls() {
                                     messages.push(ChatMessage {
                                         role: "assistant".to_string(),
-                                        content: nr.content.clone(),
+                                        content: String::new(),
                                         tool_calls: Some(nr.tool_calls.clone()),
                                         tool_call_id: None,
                                     });
@@ -1066,6 +1104,101 @@ async fn main() -> anyhow::Result<()> {
         let _ = prompt_history.save();
     }
 
+    Ok(())
+}
+
+/// Headless E2E smoke test — verifies ollama is reachable, both models respond,
+/// and basic tool execution works. Called via `ayesha-os --selftest`.
+async fn selftest() -> anyhow::Result<()> {
+    let mut pass = 0u32;
+    let mut fail = 0u32;
+    let mut checks: Vec<(String, bool)> = Vec::new();
+
+    let check = |name: &str, result: bool, checks: &mut Vec<(String, bool)>| {
+        checks.push((name.to_string(), result));
+        if result {
+            print!("  \x1b[32m✓\x1b[0m {}", name);
+        } else {
+            print!("  \x1b[31m✗\x1b[0m {}", name);
+        }
+        println!();
+    };
+
+    println!("\n  \x1b[36m◆ ayesha-os selftest\x1b[0m\n");
+
+    // 1. Ollama reachable
+    let ollama_ok = OllamaClient::list_models().await.is_ok();
+    check("ollama reachable at localhost:11434", ollama_ok, &mut checks);
+
+    if !ollama_ok {
+        println!("\n  \x1b[31mobort: ollama not reachable\x1b[0m\n");
+        std::process::exit(1);
+    }
+
+    // 2. Ayesha model responds
+    let ayesha = OllamaClient::new("ayesha");
+    let (_, rx) = std::sync::mpsc::channel::<String>();
+    let msgs = vec![ChatMessage {
+        role: "user".to_string(),
+        content: "say hi in 3 words".to_string(),
+        tool_calls: None,
+        tool_call_id: None,
+    }];
+    let ayesha_resp = ayesha.chat_stream_visible(&msgs, None, &rx).await;
+    let ayesha_ok = ayesha_resp.as_ref().map(|r| !r.content.is_empty()).unwrap_or(false);
+    check(
+        &format!("ayesha model responds{}", if let Err(e) = &ayesha_resp {
+            format!(" (error: {})", e)
+        } else { String::new() }),
+        ayesha_ok,
+        &mut checks,
+    );
+
+    // 3. Qwen model responds
+    let qwen = OllamaClient::new("qwen2.5:7b");
+    let qwen_resp = qwen.chat_stream_collect(&msgs, None, &rx).await;
+    let qwen_ok = qwen_resp.as_ref().map(|r| !r.content.is_empty()).unwrap_or(false);
+    check(
+        &format!("qwen2.5 model responds{}", if let Err(e) = &qwen_resp {
+            format!(" (error: {})", e)
+        } else { String::new() }),
+        qwen_ok,
+        &mut checks,
+    );
+
+    // 4. Tool definitions parse
+    let tools = OllamaClient::tool_definitions();
+    let tools_ok = !tools.is_empty();
+    check(&format!("{} tool definitions loaded", tools.len()), tools_ok, &mut checks);
+
+    // 5. Truncate tool result
+    let trunc_ok = util::truncate_chars("hello world", 5) == "hello";
+    check("truncate_chars works", trunc_ok, &mut checks);
+
+    // 6. StreamParser works
+    let mut parser = ollama::StreamParser::new();
+    parser.feed_line(r#"{"message":{"content":"test"},"done":false}"#);
+    parser.feed_line(r#"{"message":{"content":" ok"},"done":false}"#);
+    parser.feed_line(r#"{"message":{"content":""},"done":true}"#);
+    let parser_ok = parser.content == "test ok" && parser.done;
+    check("StreamParser accumulates content", parser_ok, &mut checks);
+
+    // 7. needs_tools heuristic
+    let needs_tools_ok = agent::needs_tools("read main.rs") && !agent::needs_tools("hi");
+    check("needs_tools heuristic", needs_tools_ok, &mut checks);
+
+    // Summary
+    for (_, ok) in &checks {
+        if *ok { pass += 1; } else { fail += 1; }
+    }
+    println!();
+    if fail == 0 {
+        println!("  \x1b[32mall {} checks passed ✓\x1b[0m\n", pass);
+    } else {
+        println!("  \x1b[33m{} passed, \x1b[31m{} failed\x1b[0m\n", pass, fail);
+    }
+
+    if fail > 0 { std::process::exit(1); }
     Ok(())
 }
 

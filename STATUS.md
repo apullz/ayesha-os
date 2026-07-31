@@ -14,12 +14,13 @@
 
   engine/          [✔]  Agentic coding assistant + jarvis chatbot.
                          CLI persona host with streaming,
-                         model routing, tool-calling (18 tools),
+                         model routing, tool-calling (20 tools),
                          cloud support (openrouter/opencode),
                          pixel striker sprite engine,
                          self-improvement loop, command palette,
                          retro cyberpunk UI, applet manager.
                          └ model: ayesha (qwen2.5-coder:14b base)
+                         └ --selftest for headless E2E verification
 
   core/            [✔]  Gradio web UI, FastAPI mobile API,
                          hivemind client for instance sync.
