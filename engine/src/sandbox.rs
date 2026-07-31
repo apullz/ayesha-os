@@ -155,4 +155,22 @@ mod tests {
         let result = s.resolve("C:\\Windows\\System32");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_check_sensitive_resolved_blocks_ssh() {
+        let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\.ssh\\id_rsa")).is_err());
+    }
+
+    #[test]
+    fn test_check_sensitive_resolved_blocks_netrc() {
+        let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\.netrc")).is_err());
+    }
+
+    #[test]
+    fn test_check_sensitive_resolved_allows_normal() {
+        let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\Documents\\file.txt")).is_ok());
+    }
 }
