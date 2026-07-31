@@ -1220,6 +1220,19 @@ async fn main() -> anyhow::Result<()> {
                         tool_iterations += 1;
                         if tool_iterations > 8 {
                             ui::show_error("max tool iterations (8). stopping.");
+                            // Add synthetic tool results so message history is valid
+                            let last_tcs = messages.last()
+                                .and_then(|m| m.tool_calls.as_ref())
+                                .cloned()
+                                .unwrap_or_default();
+                            for tc in &last_tcs {
+                                messages.push(ChatMessage {
+                                    role: "tool".to_string(),
+                                    content: "error: max tool iterations reached".to_string(),
+                                    tool_calls: None,
+                                    tool_call_id: Some(tc.id.clone()),
+                                });
+                            }
                             break;
                         }
 
@@ -1232,9 +1245,6 @@ async fn main() -> anyhow::Result<()> {
                         if current_tool_calls.is_empty() {
                             break;
                         }
-
-                        // Remove the assistant message with tool calls
-                        messages.pop();
 
                         for tool_call in &current_tool_calls {
                             let name = &tool_call.function.name;
@@ -1291,15 +1301,6 @@ async fn main() -> anyhow::Result<()> {
                             });
                         }
 
-                        // Push assistant message back (after tool results)
-                        // Empty content — only tool_calls matter for the tool loop.
-                        messages.push(ChatMessage {
-                            role: "assistant".to_string(),
-                            content: String::new(),
-                            tool_calls: Some(current_tool_calls),
-                            tool_call_id: None,
-                        });
-
                         // Re-prompt qwen2.5 for next tool calls (invisible)
                         let next_result = tool_client
                             .chat_stream_collect(&messages, Some(&tools), &steer_rx)
@@ -1336,6 +1337,19 @@ async fn main() -> anyhow::Result<()> {
                             }
                             Err(e) => {
                                 ui::show_error(&format!("tool model error: {}", e));
+                                // Add synthetic tool results so message history is valid
+                                let last_tcs = messages.last()
+                                    .and_then(|m| m.tool_calls.as_ref())
+                                    .cloned()
+                                    .unwrap_or_default();
+                                for tc in &last_tcs {
+                                    messages.push(ChatMessage {
+                                        role: "tool".to_string(),
+                                        content: format!("error: tool model failed: {}", e),
+                                        tool_calls: None,
+                                        tool_call_id: Some(tc.id.clone()),
+                                    });
+                                }
                                 break;
                             }
                         }
