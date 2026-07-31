@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 pub fn hex_to_rgb(h: &str) -> [u8; 3] {
     let h = h.trim_start_matches('#');
+    if h.len() < 6 {
+        return [0, 0, 0];
+    }
     let r = u8::from_str_radix(&h[0..2], 16).unwrap_or(0);
     let g = u8::from_str_radix(&h[2..4], 16).unwrap_or(0);
     let b = u8::from_str_radix(&h[4..6], 16).unwrap_or(0);

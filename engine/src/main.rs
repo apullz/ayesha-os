@@ -350,7 +350,7 @@ async fn main() -> anyhow::Result<()> {
     let mut completion_candidates: Vec<String> = vec![
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
-        "stats", "history", "compact", "save", "load", "system", "export", "ping",
+        "stats", "history", "compact", "save", "load", "system", "export", "ping", "reset",
         "joke", "time", "uptime", "config",
         "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
@@ -584,14 +584,28 @@ async fn main() -> anyhow::Result<()> {
                 std::io::stdout().flush()?;
                 continue;
             }
+            "reset" => {
+                messages = vec![
+                    ChatMessage {
+                        role: "system".to_string(),
+                        content: OllamaClient::system_prompt(&user_name),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    },
+                ];
+                memory = MemoryStore::load();
+                ui::show_system("conversation history and memory cleared");
+                continue;
+            }
             "models" => {
                 println!();
                 println!("{}", registry.list_models());
                 continue;
             }
-            "auto" => {
-                registry.set_auto_route(true);
-                ui::show_system("auto-routing enabled");
+            _ if lower == "auto" || lower.starts_with("auto ") => {
+                let enabled = !lower.contains("off") && !lower.contains("disable");
+                registry.set_auto_route(enabled);
+                ui::show_system(if enabled { "auto-routing enabled" } else { "auto-routing disabled" });
                 continue;
             }
             "sync" => {
@@ -682,8 +696,8 @@ async fn main() -> anyhow::Result<()> {
                 registry.detect().await;
                 continue;
             }
-            _ if lower.starts_with("toolmodel ") => {
-                let name = input[10..].trim();
+            _ if lower.starts_with("toolmodel ") || lower == "toolmodel" => {
+                let name = input.get(10..).unwrap_or("").trim();
                 if registry.is_cloud_model(name) {
                     let provider = registry.cloud_provider(name).unwrap_or_default();
                     match CloudClient::new(name, &provider) {
@@ -694,24 +708,22 @@ async fn main() -> anyhow::Result<()> {
                         }
                         Err(e) => ui::show_error(&format!("cloud setup failed: {}", e)),
                     }
-                } else {
+                } else if registry.models.iter().any(|m| m.name == name) {
                     tool_client = ActiveBackend::Ollama(OllamaClient::new(name));
                     tool_model_name = name.to_string();
                     ui::show_system(&format!("tool model: {}", name));
+                } else {
+                    ui::show_error(&format!("model '{}' not found. use 'models' to list available models", name));
                 }
                 continue;
             }
-            _ if lower.starts_with("pull ") => {
-                let name = input[5..].trim();
+            _ if lower.starts_with("pull ") || lower == "pull" => {
+                let name = input.get(5..).unwrap_or("").trim();
                 ui::show_system(&format!("run `ollama pull {}` in another terminal, then `models` to refresh", name));
                 continue;
             }
-            "route" | "routes" => {
-                ui::show_system("usage: /route <query>");
-                continue;
-            }
             _ if lower.starts_with("name ") || lower == "name" => {
-                let name = input[5..].trim().to_string();
+                let name = input.get(5..).unwrap_or("").trim().to_string();
                 if name.is_empty() {
                     ui::show_system("usage: /name <you>");
                 } else {
@@ -736,8 +748,8 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
-            "history" => {
-                let n: usize = input[7..].trim().parse().unwrap_or(10);
+            _ if lower == "history" || lower.starts_with("history ") => {
+                let n: usize = input.get(7..).unwrap_or("").trim().parse().unwrap_or(10);
                 let recent = messages.iter().rev().take(n).rev();
                 for m in recent {
                     let role = if m.role == "user" { "you" } else { "ayesha" };
@@ -764,8 +776,8 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
-            "save" => {
-                let path_str = input[5..].trim();
+            _ if lower == "save" || lower.starts_with("save ") => {
+                let path_str = input.get(5..).unwrap_or("").trim();
                 let path = if path_str.is_empty() {
                     project_root.join("conversation.json")
                 } else {
@@ -783,8 +795,8 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
-            "load" => {
-                let path_str = input[5..].trim();
+            _ if lower == "load" || lower.starts_with("load ") => {
+                let path_str = input.get(5..).unwrap_or("").trim();
                 let path = if path_str.is_empty() {
                     project_root.join("conversation.json")
                 } else {
@@ -816,8 +828,8 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
-            "export" => {
-                let path_str = input[7..].trim();
+            _ if lower == "export" || lower.starts_with("export ") => {
+                let path_str = input.get(7..).unwrap_or("").trim();
                 let path = if path_str.is_empty() {
                     project_root.join("conversation.md")
                 } else {
@@ -866,7 +878,12 @@ async fn main() -> anyhow::Result<()> {
                     "why did the developer go broke? because he used up all his cache.",
                     "what's a computer's least favorite food? spam.",
                 ];
-                let joke = jokes[std::time::Instant::now().elapsed().as_nanos() as usize % jokes.len()];
+                let joke = {
+                    use std::collections::hash_map::RandomState;
+                    use std::hash::{BuildHasher, Hasher};
+                    let key = RandomState::new().build_hasher().finish();
+                    jokes[key as usize % jokes.len()]
+                };
                 println!("\n  {}", joke.bright_yellow());
                 continue;
             }
@@ -891,8 +908,8 @@ async fn main() -> anyhow::Result<()> {
                 ui::show_system(&format!("uptime: {}h {}m {}s", hours, mins, secs));
                 continue;
             }
-            "config" => {
-                let key = input[7..].trim();
+            _ if lower == "config" || lower.starts_with("config ") => {
+                let key = input.get(7..).unwrap_or("").trim();
                 if key.is_empty() {
                     println!("\n\x1b[1;33mConfiguration:\x1b[0m");
                     println!("  user_name: {}", config.get("user_name").and_then(|v| v.as_str()).unwrap_or("(not set)"));
@@ -989,7 +1006,8 @@ async fn main() -> anyhow::Result<()> {
         }
 
         // After match, if was_slash but no command matched, show error
-        if was_slash {
+        // (route is handled below the match block, so exclude it here)
+        if was_slash && !lower.starts_with("route ") && !lower.starts_with("routes ") {
             ui::show_error(&format!("unknown command: /{}. type /help", input));
             continue;
         }
@@ -1479,5 +1497,61 @@ mod tests {
         assert_eq!(parse_applet_phrase(&n, "launch poopy"), None);
         assert_eq!(parse_applet_phrase(&n, "launch a test for me"), None);
         assert_eq!(parse_applet_phrase(&n, "what is the weather"), None);
+    }
+
+    #[test]
+    fn parse_memories_remember() {
+        let mut mem = crate::memory::MemoryStore::default();
+        let result = parse_and_store_memories("hello [REMEMBER: user likes cats] world", &mut mem);
+        assert_eq!(result, "hello  world");
+        assert_eq!(mem.memories.len(), 1);
+        assert_eq!(mem.memories[0].category, "user_pref");
+        assert_eq!(mem.memories[0].content, "user likes cats");
+    }
+
+    #[test]
+    fn parse_memories_preference() {
+        let mut mem = crate::memory::MemoryStore::default();
+        let result = parse_and_store_memories("set [PREFERENCE: theme = dark] now", &mut mem);
+        assert_eq!(result, "set  now");
+        assert_eq!(mem.user_preferences.get("theme"), Some(&"dark".to_string()));
+    }
+
+    #[test]
+    fn parse_memories_fact() {
+        let mut mem = crate::memory::MemoryStore::default();
+        let result = parse_and_store_memories("know [FACT: the sky is blue] please", &mut mem);
+        assert_eq!(result, "know  please");
+        assert_eq!(mem.memories.len(), 1);
+        assert_eq!(mem.memories[0].category, "fact");
+    }
+
+    #[test]
+    fn parse_memories_multiple() {
+        let mut mem = crate::memory::MemoryStore::default();
+        let result = parse_and_store_memories(
+            "[REMEMBER: a] text [FACT: b] more [PREFERENCE: x = y] end", &mut mem
+        );
+        assert!(result.contains("text"));
+        assert!(result.contains("more"));
+        assert!(result.contains("end"));
+        assert_eq!(mem.memories.len(), 2);
+        assert_eq!(mem.user_preferences.get("x"), Some(&"y".to_string()));
+    }
+
+    #[test]
+    fn parse_memories_missing_closing() {
+        let mut mem = crate::memory::MemoryStore::default();
+        let result = parse_and_store_memories("hello [REMEMBER: no close", &mut mem);
+        assert_eq!(result, "hello [REMEMBER: no close");
+        assert_eq!(mem.memories.len(), 0);
+    }
+
+    #[test]
+    fn parse_memories_empty_marker() {
+        let mut mem = crate::memory::MemoryStore::default();
+        let result = parse_and_store_memories("hello [REMEMBER:] world", &mut mem);
+        assert_eq!(result, "hello  world");
+        assert_eq!(mem.memories.len(), 0);
     }
 }

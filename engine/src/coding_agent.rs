@@ -139,6 +139,9 @@ impl CodingAgent {
                     if start > content.len() || end > content.len() || start > end {
                         return Err(anyhow::anyhow!("Invalid range for replacement"));
                     }
+                    if !content.is_char_boundary(start) || !content.is_char_boundary(end) {
+                        return Err(anyhow::anyhow!("start/end offsets {} / {} fall inside a multi-byte character", start, end));
+                    }
                     
                     let mut new_content = String::new();
                     new_content.push_str(&content[..start]);
@@ -347,13 +350,5 @@ impl CodingAgent {
     /// Execute another tool through the coding agent
     async fn execute_tool(&self, _args: &Value) -> Result<String> {
         Ok("tool calls are handled by the main agent loop — just call any tool directly from your response, and it will be executed automatically. no need to use coding_agent for tool delegation.".to_string())
-    }
-}
-
-impl Default for CodingAgent {
-    fn default() -> Self {
-        // This would normally require all dependencies, but for now we'll create a minimal version
-        // In practice, this should be created through the new() method with proper dependencies
-        panic!("CodingAgent should be created with dependencies, not Default");
     }
 }

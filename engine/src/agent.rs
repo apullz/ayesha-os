@@ -42,8 +42,6 @@ pub fn needs_tools(msg: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ollama::ToolCall;
-    use serde_json::json;
 
     #[test]
     fn truncate_short() {

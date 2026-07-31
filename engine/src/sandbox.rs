@@ -33,10 +33,12 @@ impl Sandbox {
             Err(_) => {
                 if let Some(parent) = resolved.parent() {
                     if parent.exists() {
-                        // Check that parent is within sandbox before allowing early return
-                        let parent_canonical = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
-                        if parent_canonical.starts_with(&root_canonical) {
-                            return Ok(resolved);
+                        // Only allow if parent canonicalization succeeds — don't trust un-canonical paths
+                        match parent.canonicalize() {
+                            Ok(parent_canonical) if parent_canonical.starts_with(&root_canonical) => {
+                                return Ok(resolved);
+                            }
+                            _ => {}
                         }
                     }
                 }

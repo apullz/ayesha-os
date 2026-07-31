@@ -285,7 +285,7 @@ impl ModelRegistry {
                 return m;
             }
         }
-        &self.models[0]
+        &self.models[self.active_index]
     }
 
     pub fn set_model(&mut self, name: &str) -> anyhow::Result<()> {

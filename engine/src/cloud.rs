@@ -214,6 +214,7 @@ fn get_api_key(provider: &str) -> Option<String> {
             args: String,
         }
         let mut active_tool_calls: Vec<ActiveToolCall> = Vec::new();
+        let mut done = false;
 
         while let Some(chunk) = resp.chunk().await? {
             buf.push_str(&String::from_utf8_lossy(&chunk));
@@ -227,6 +228,7 @@ fn get_api_key(provider: &str) -> Option<String> {
                     continue;
                 }
                 if trimmed == "data: [DONE]" {
+                    done = true;
                     break;
                 }
                 
@@ -241,12 +243,14 @@ fn get_api_key(provider: &str) -> Option<String> {
                                             if !c.is_empty() {
                                                 full_content.push_str(c);
                                                 recent.push_str(c);
-                                                if recent.len() > RECENT_MAX {
-                                                    recent = recent[recent.len() - RECENT_MAX..].to_string();
+                                                let n = recent.chars().count();
+                                                if n > RECENT_MAX {
+                                                    let skip = n - RECENT_MAX;
+                                                    recent = recent.chars().skip(skip).collect();
                                                 }
 
-                                                let no_think = !full_content.contains("<think>") && !full_content.contains("[think]");
-                                                let think_ended = full_content.contains("</think>") || full_content.contains("[/think]");
+                                                let no_think = !recent.contains("<think>") && !recent.contains("[think]");
+                                                let think_ended = recent.contains("</think>") || recent.contains("[/think]");
 
                                                 if !in_think && !no_think {
                                                     in_think = true;
@@ -302,6 +306,7 @@ fn get_api_key(provider: &str) -> Option<String> {
                     }
                 }
             }
+            if done { break; }
 
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
@@ -391,6 +396,7 @@ fn get_api_key(provider: &str) -> Option<String> {
             args: String,
         }
         let mut active_tool_calls: Vec<ActiveToolCall> = Vec::new();
+        let mut done = false;
 
         while let Some(chunk) = resp.chunk().await? {
             buf.push_str(&String::from_utf8_lossy(&chunk));
@@ -401,7 +407,7 @@ fn get_api_key(provider: &str) -> Option<String> {
 
                 let trimmed = line.trim();
                 if trimmed.is_empty() || trimmed == "data: [DONE]" {
-                    if trimmed == "data: [DONE]" { break; }
+                    if trimmed == "data: [DONE]" { done = true; break; }
                     continue;
                 }
 
@@ -444,6 +450,7 @@ fn get_api_key(provider: &str) -> Option<String> {
                     }
                 }
             }
+            if done { break; }
 
             if let Ok(input) = steer_rx.try_recv() {
                 let mut final_tcs = Vec::new();

@@ -260,7 +260,13 @@ impl AppletManager {
         println!();
         let _ = std::io::stdout().flush();
 
-        let mut child = self.launch_foreground(name)?;
+        let mut child = match self.launch_foreground(name) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = crossterm::terminal::enable_raw_mode();
+                return Err(e);
+            }
+        };
         let _ = child.wait();
 
         // 5. hand the window back to the engine
@@ -270,7 +276,7 @@ impl AppletManager {
             "model", "toolmodel", "pull", "route", "name", "exit",
             "stats", "history", "compact", "save", "load", "system", "export", "ping",
             "joke", "time", "uptime", "config",
-            "memory", "analyze", "evolve", "refine",
+            "memory", "analyze", "evolve", "refine", "reset",
         ].into_iter().map(String::from).collect();
         for name in self.names() {
             candidates.push(name);

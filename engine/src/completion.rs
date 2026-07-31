@@ -76,7 +76,7 @@ impl Completer {
         let mut end = first.len();
         for m in &matches[1..] {
             end = end.min(m.len());
-            for (i, (a, b)) in first[..end].chars().zip(m[..end].chars()).enumerate() {
+            for (i, (a, b)) in first.bytes().take(end).zip(m.bytes().take(end)).enumerate() {
                 if a.to_ascii_lowercase() != b.to_ascii_lowercase() {
                     end = i;
                     break;
