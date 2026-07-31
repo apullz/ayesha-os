@@ -16,6 +16,7 @@ pub fn shade_color(rgb: [u8; 3], factor: f32) -> [u8; 3] {
     ]
 }
 
+#[allow(dead_code)]
 pub fn blend_colors(c1: [u8; 3], c2: [u8; 3], t: f32) -> [u8; 3] {
     [
         (c1[0] as f32 + (c2[0] as f32 - c1[0] as f32) * t) as u8,
@@ -65,6 +66,7 @@ impl Palette {
         }
     }
 
+    #[allow(dead_code)]
     pub fn shade(&self, _name: &str) -> [u8; 3] {
         self.skin
     }

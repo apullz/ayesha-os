@@ -9,6 +9,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppletEntry {
     pub path: String,
+    #[allow(dead_code)]
     pub lang: String,
     pub desc: String,
     #[serde(default)]

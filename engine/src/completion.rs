@@ -20,6 +20,7 @@ impl Completer {
     }
 
     /// Update the candidate list (e.g. after applet names change).
+    #[allow(dead_code)]
     pub fn set_candidates(&mut self, mut candidates: Vec<String>) {
         candidates.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
         candidates.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
@@ -68,6 +69,7 @@ impl Completer {
     }
 
     /// Compute common prefix of all matches (for single-Tab expansion).
+    #[allow(dead_code)]
     pub fn common_prefix(matches: &[String]) -> Option<String> {
         if matches.is_empty() { return None; }
         let first = &matches[0];

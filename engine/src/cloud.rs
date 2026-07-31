@@ -95,11 +95,13 @@ fn get_api_key(provider: &str) -> Option<String> {
     }
 
     /// Check if cloud is configured (API key exists in .env)
+    #[allow(dead_code)]
     pub fn is_configured(provider: &str) -> bool {
         Self::get_api_key(provider).is_some()
     }
 
     /// List available cloud models for display
+    #[allow(dead_code)]
     pub fn available_models() -> Vec<(String, String, Vec<String>)> {
         vec![
             ("nvidia/nemotron-3-super:free".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string(), "agentic".to_string()]),
@@ -111,6 +113,7 @@ fn get_api_key(provider: &str) -> Option<String> {
     }
 
     /// Non-streaming chat (same signature pattern as OllamaClient::chat)
+    #[allow(dead_code)]
     pub async fn chat(
         &self,
         messages: &[ChatMessage],

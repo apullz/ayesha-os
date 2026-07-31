@@ -1,5 +1,6 @@
 /// Events the agent loop sends to the UI layer — decouples agent logic from terminal output.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum UiEvent {
     ToolCall { name: String, args: String },
     ToolOk { name: String, result: String },

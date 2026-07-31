@@ -9,6 +9,7 @@ use std::io::{stdout, Write};
 // dim:       bright_black
 // thinking:  bright_black (dimmed)
 
+#[allow(dead_code)]
 const KAOMOJIS: &[&str] = &[
     "(╯°□°)╯︵ ┻━┻", "(◕ᴗ◕✿)", "(๑•蔷•๑)", "(╥﹏╥)",
     "^_^", ">w<", ":3", "(ᵔᴥᵔ)", "(◕‿◕)",
@@ -116,6 +117,7 @@ pub fn show_error(msg: &str) {
         msg.bright_red());
 }
 
+#[allow(dead_code)]
 pub fn show_processing() {
     print!("  {} {}",
         "◆".bright_cyan(),
@@ -123,6 +125,7 @@ pub fn show_processing() {
     stdout().flush().ok();
 }
 
+#[allow(dead_code)]
 pub fn hide_processing() {
     print!("\r");
     for _ in 0..40 { print!(" "); }
@@ -358,6 +361,7 @@ pub fn print_help() {
 
 // ── response formatting ───────────────────────────────────
 
+#[allow(dead_code)]
 fn color_kaomojis(text: &str) -> String {
     let mut result = text.to_string();
     for k in KAOMOJIS {
@@ -367,6 +371,7 @@ fn color_kaomojis(text: &str) -> String {
     result
 }
 
+#[allow(dead_code)]
 fn format_code_block(code: &str) -> String {
     let mut out = String::new();
     for line in code.lines() {
@@ -379,6 +384,7 @@ fn format_code_block(code: &str) -> String {
     out
 }
 
+#[allow(dead_code)]
 pub fn format_response(text: &str) -> String {
     let mut out = String::new();
     let mut in_code = false;

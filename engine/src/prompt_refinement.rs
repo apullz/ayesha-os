@@ -82,6 +82,7 @@ impl PromptHistory {
         });
     }
 
+    #[allow(dead_code)]
     pub fn success_rate(&self, tool: &str) -> f64 {
         let relevant: Vec<&ToolUsageRecord> = self.records.iter()
             .filter(|r| r.tool_name == tool)
@@ -93,6 +94,7 @@ impl PromptHistory {
         successes / relevant.len() as f64
     }
 
+    #[allow(dead_code)]
     pub fn common_errors(&self, tool: &str) -> Vec<String> {
         self.records.iter()
             .filter(|r| r.tool_name == tool && !r.success)
@@ -156,6 +158,7 @@ be specific - quote the exact prompt changes needed."#,
         )
     }
 
+    #[allow(dead_code)]
     pub fn apply_refinement(&mut self, change: &str, reason: &str) {
         self.prompt_version += 1;
         self.refinements.push(PromptRefinement {

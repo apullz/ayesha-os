@@ -266,6 +266,7 @@ fn graceful_shutdown(
 }
 
 #[tokio::main]
+#[allow(unused_assignments)]
 async fn main() -> anyhow::Result<()> {
     // --selftest: headless E2E smoke test, exit 0 on success
     if std::env::args().any(|a| a == "--selftest") {

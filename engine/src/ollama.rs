@@ -67,6 +67,7 @@ pub struct ChatResponse {
 }
 
 #[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
 pub struct ChatResponseMessage {
     #[serde(default)]
     pub role: String,
@@ -228,6 +229,7 @@ impl OllamaClient {
         }
     }
 
+    #[allow(dead_code)]
     pub fn default_model() -> Self {
         Self::new("ayesha")
     }

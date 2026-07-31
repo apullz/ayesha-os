@@ -91,6 +91,7 @@ impl MemoryStore {
         self.memories.iter().rev().take(n).collect()
     }
 
+    #[allow(dead_code)]
     pub fn by_category(&self, category: &str) -> Vec<&Memory> {
         self.memories
             .iter()
@@ -102,10 +103,12 @@ impl MemoryStore {
         self.user_preferences.insert(key.to_string(), value.to_string());
     }
 
+    #[allow(dead_code)]
     pub fn get_preference(&self, key: &str) -> Option<&str> {
         self.user_preferences.get(key).map(|s| s.as_str())
     }
 
+    #[allow(dead_code)]
     pub fn add_fact(&mut self, fact: &str) {
         if !self.learned_facts.iter().any(|f| f == fact) {
             self.learned_facts.push(fact.to_string());

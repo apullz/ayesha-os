@@ -303,6 +303,7 @@ impl ModelRegistry {
         self.auto_route = enabled;
     }
 
+    #[allow(dead_code)]
     pub fn current(&self) -> &ModelProfile {
         &self.models[self.active_index]
     }

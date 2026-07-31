@@ -222,6 +222,7 @@ pub fn dither_checkerboard(
 }
 
 /// Gradient dithering from top color to bottom color
+#[allow(dead_code)]
 pub fn dither_gradient(
     img: &mut RgbaImage,
     x: u32, y: u32, w: u32, h: u32,

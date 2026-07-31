@@ -11,6 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Coding Agent - Capable of understanding and modifying code in the codebase
+#[allow(dead_code)]
 pub struct CodingAgent {
     sandbox: Sandbox,
     ollama: OllamaClient,
@@ -22,6 +23,7 @@ pub struct CodingAgent {
     project_root: PathBuf,
 }
 
+#[allow(dead_code)]
 impl CodingAgent {
     pub fn new(sandbox: Sandbox, ollama: OllamaClient, memory: MemoryStore, 
                analyzer: SelfAnalyzer, evolver: ToolEvolver, 

@@ -4,6 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CodeAnalysis {
     pub file: String,
     pub issues: Vec<Issue>,
@@ -63,6 +64,7 @@ impl SelfAnalyzer {
         Ok(fs::read_to_string(file)?)
     }
 
+    #[allow(dead_code)]
     pub fn full_source_dump(&self) -> Result<String> {
         let files = self.source_files();
         let mut dump = String::new();
@@ -138,6 +140,7 @@ impl SelfAnalyzer {
         issues
     }
 
+    #[allow(dead_code)]
     pub fn generate_improvement_prompt(&self, source: &str, file_name: &str) -> String {
         let issues = self.analyze_for_improvements(source);
         let issue_list: Vec<String> = issues.iter().map(|i| {
