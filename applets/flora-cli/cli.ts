@@ -119,7 +119,8 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
 
   const currentNode = getNodeFromPath(floraData, pathSegments);
   if (!currentNode) {
-    return { output: "\x1b[31mError: Current path is invalid. Resetting to root.\x1b[0m" };
+    pathSegments = [];
+    return { output: "\x1b[31mError: Current path is invalid. Reset to root.\x1b[0m" };
   }
 
   switch (command) {
