@@ -731,7 +731,9 @@ async fn main() -> anyhow::Result<()> {
                     if let Ok(content) = serde_json::to_string_pretty(&config) {
                         let _ = std::fs::write(&config_path, content);
                     }
-                    messages[0].content = OllamaClient::system_prompt(&name);
+                    if !messages.is_empty() {
+                        messages[0].content = OllamaClient::system_prompt(&name);
+                    }
                     ui::show_system(&format!("okay, {} it is!", name));
                 }
                 continue;
@@ -763,14 +765,37 @@ async fn main() -> anyhow::Result<()> {
             }
             "compact" => {
                 let before = messages.len();
-                // Keep system message + last 4 exchanges (8 messages)
+                // Keep system message + as many recent messages as fit cleanly
                 if messages.len() > 9 {
                     let system = messages[0].clone();
-                    let recent: Vec<_> = messages.iter().rev().take(8).rev().cloned().collect();
+                    // Walk backwards to find a clean cut point (not in the middle of tool calls)
+                    let mut cut = messages.len();
+                    // Start from the end, count up to 8 messages
+                    let mut kept = 0;
+                    let mut i = messages.len();
+                    while i > 1 && kept < 8 {
+                        i -= 1;
+                        kept += 1;
+                        // If this is a tool result, skip all consecutive tool results
+                        // so we don't split a tool-call sequence
+                        if messages[i].role == "tool" {
+                            while i > 1 && messages[i - 1].role == "tool" {
+                                i -= 1;
+                                kept += 1;
+                            }
+                            // Also include the preceding assistant with tool_calls
+                            if i > 1 && messages[i - 1].tool_calls.is_some() {
+                                i -= 1;
+                                kept += 1;
+                            }
+                        }
+                    }
+                    cut = i;
+                    let recent: Vec<_> = messages[cut..].to_vec();
                     messages.clear();
                     messages.push(system);
                     messages.extend(recent);
-                    ui::show_system(&format!("compacted: {} → {} messages (kept system + last 8)", before, messages.len()));
+                    ui::show_system(&format!("compacted: {} → {} messages (kept system + last {})", before, messages.len(), kept));
                 } else {
                     ui::show_system(&format!("already compact ({} messages)", before));
                 }
