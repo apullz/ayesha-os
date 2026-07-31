@@ -325,6 +325,26 @@ def update():
     cursor_speed = math.hypot(mx - prev_mx, my - prev_my)
     prev_mx, prev_my = mx, my
 
+    def draw_frame():
+        root.geometry(f"+{int(cat_x - CAT_ORIGIN_X)}+{int(cat_y - CAT_ORIGIN_Y)}")
+        canvas.delete("all")
+        if show_bubble and bubble_photo:
+            bw = bubble_photo.width()
+            canvas.create_image(CAT_ORIGIN_X, CAT_ORIGIN_Y - DISPLAY_SIZE // 2 - 14,
+                                anchor="s", image=bubble_photo)
+        if show_heart:
+            canvas.create_image(CAT_ORIGIN_X, HEART_H // 2, anchor="center",
+                                image=pil_to_photo(heart_img))
+        canvas.create_image(CAT_ORIGIN_X, CAT_ORIGIN_Y, anchor="center",
+                            image=pil_to_photo(frames[frame_idx % len(frames)]))
+        if current_anim not in NO_COLLAR_ANIMS:
+            angle = COLLAR_ANGLES.get(current_anim, 0)
+            ox, oy = COLLAR_OFFSETS.get(current_anim, (0, 0))
+            top_ext = COLLAR_TOP_EXT.get(current_anim, 0)
+            collar_img = get_collar_img(angle, top_ext)
+            canvas.create_image(CAT_ORIGIN_X + ox, CAT_ORIGIN_Y + 3 + oy, anchor="center",
+                                image=pil_to_photo(collar_img))
+
     if dragging:
         idle_time = 0
         current_anim = "idle"
@@ -367,26 +387,6 @@ def update():
     if show_bubble and bubble_timer >= BUBBLE_SHOW_TIME:
         show_bubble = False
         bubble_timer = 0
-
-    def draw_frame():
-        root.geometry(f"+{int(cat_x - CAT_ORIGIN_X)}+{int(cat_y - CAT_ORIGIN_Y)}")
-        canvas.delete("all")
-        if show_bubble and bubble_photo:
-            bw = bubble_photo.width()
-            canvas.create_image(CAT_ORIGIN_X, CAT_ORIGIN_Y - DISPLAY_SIZE // 2 - 14,
-                                anchor="s", image=bubble_photo)
-        if show_heart:
-            canvas.create_image(CAT_ORIGIN_X, HEART_H // 2, anchor="center",
-                                image=pil_to_photo(heart_img))
-        canvas.create_image(CAT_ORIGIN_X, CAT_ORIGIN_Y, anchor="center",
-                            image=pil_to_photo(frames[frame_idx % len(frames)]))
-        if current_anim not in NO_COLLAR_ANIMS:
-            angle = COLLAR_ANGLES.get(current_anim, 0)
-            ox, oy = COLLAR_OFFSETS.get(current_anim, (0, 0))
-            top_ext = COLLAR_TOP_EXT.get(current_anim, 0)
-            collar_img = get_collar_img(angle, top_ext)
-            canvas.create_image(CAT_ORIGIN_X + ox, CAT_ORIGIN_Y + 3 + oy, anchor="center",
-                                image=pil_to_photo(collar_img))
 
     if distance < cat_speed or distance < 48:
         idle_time += 1
