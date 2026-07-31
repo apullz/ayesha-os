@@ -349,7 +349,7 @@ async fn main() -> anyhow::Result<()> {
     let mut completion_candidates: Vec<String> = vec![
         "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
         "model", "toolmodel", "pull", "route", "name", "exit",
-        "stats", "history", "compact", "memory", "analyze", "evolve", "refine",
+        "stats", "history", "compact", "save", "load", "memory", "analyze", "evolve", "refine",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
         completion_candidates.push(name);
@@ -758,6 +758,47 @@ async fn main() -> anyhow::Result<()> {
                     ui::show_system(&format!("compacted: {} → {} messages (kept system + last 8)", before, messages.len()));
                 } else {
                     ui::show_system(&format!("already compact ({} messages)", before));
+                }
+                continue;
+            }
+            "save" => {
+                let path_str = input[5..].trim();
+                let path = if path_str.is_empty() {
+                    project_root.join("conversation.json")
+                } else {
+                    std::path::PathBuf::from(path_str)
+                };
+                match serde_json::to_string_pretty(&messages) {
+                    Ok(json) => {
+                        if let Err(e) = std::fs::write(&path, json) {
+                            ui::show_error(&format!("failed to save: {}", e));
+                        } else {
+                            ui::show_system(&format!("saved {} messages to {}", messages.len(), path.display()));
+                        }
+                    }
+                    Err(e) => ui::show_error(&format!("serialize error: {}", e)),
+                }
+                continue;
+            }
+            "load" => {
+                let path_str = input[5..].trim();
+                let path = if path_str.is_empty() {
+                    project_root.join("conversation.json")
+                } else {
+                    std::path::PathBuf::from(path_str)
+                };
+                match std::fs::read_to_string(&path) {
+                    Ok(json) => {
+                        match serde_json::from_str::<Vec<ChatMessage>>(&json) {
+                            Ok(loaded) => {
+                                let n = loaded.len();
+                                messages = loaded;
+                                ui::show_system(&format!("loaded {} messages from {}", n, path.display()));
+                            }
+                            Err(e) => ui::show_error(&format!("parse error: {}", e)),
+                        }
+                    }
+                    Err(e) => ui::show_error(&format!("read error: {}", e)),
                 }
                 continue;
             }

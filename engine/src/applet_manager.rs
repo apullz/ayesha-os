@@ -268,7 +268,7 @@ impl AppletManager {
         let mut candidates: Vec<String> = vec![
             "help", "clear", "models", "auto", "sync", "apps", "run", "stop",
             "model", "toolmodel", "pull", "route", "name", "exit",
-            "stats", "history", "compact", "memory", "analyze", "evolve", "refine",
+            "stats", "history", "compact", "save", "load", "memory", "analyze", "evolve", "refine",
         ].into_iter().map(String::from).collect();
         for name in self.names() {
             candidates.push(name);
