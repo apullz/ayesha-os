@@ -512,7 +512,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": { "type": "string", "description": "Absolute path to the file" }
+                            "path": { "type": "string", "description": "Absolute path to the file. NEVER truncate the path. Always provide the full absolute path." }
                         },
                         "required": ["path"]
                     }
@@ -526,7 +526,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": { "type": "string", "description": "Absolute path to the file. NEVER truncate the path. Always provide the full absolute path." },
+                            "path": { "type": "string", "description": "Absolute path to the file. NEVER truncate the path. Always provide the full absolute path. Do not use shell tildes or environment variables — use the literal absolute path." },
                             "content": { "type": "string", "description": "The content to write to the file" }
                         },
                         "required": ["path", "content"]
@@ -541,7 +541,7 @@ always stay in character. be helpful but keep your personality. now go be cute a
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": { "type": "string", "description": "Absolute path to the directory to list" }
+                            "path": { "type": "string", "description": "Absolute path to the directory to list. Use the literal absolute path, not environment variables." }
                         },
                         "required": []
                     }
