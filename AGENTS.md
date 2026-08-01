@@ -93,7 +93,7 @@ ollama create ayesha -f models/Modelfile
 
 ## gotchas
 
-- no test suites in any project (engine has `cargo test` — 55 passing)
+- no test suites in any project (engine has `cargo test` — 56 passing)
 - `applets/desktop-cat/desktopcat.py` uses `oneko_sprite.png` (NOT `cat.png` — that's unused)
 - python projects have no pyproject.toml — deps in requirements.txt only
 - typescript projects need `npm install` before first run
