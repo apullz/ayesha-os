@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { TreePine, Calendar, Eye, Terminal as TerminalIcon, GitFork, BookOpen, Sparkles, ChevronRight, HelpCircle } from "lucide-react";
+import { TreePine, Calendar, Terminal as TerminalIcon, GitFork, BookOpen, ChevronRight, HelpCircle } from "lucide-react";
 import Terminal, { getNodeFromPath } from "./components/Terminal";
 import VisualTree from "./components/VisualTree";
 import FieldGuide from "./components/FieldGuide";

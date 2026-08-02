@@ -55,7 +55,7 @@
 
   STEERING
     type during generation to interrupt and redirect
-    Ctrl+C to abort, Ctrl+M for launcher mode
+    Ctrl+C to abort, Ctrl+M / Ctrl+P open interactive applet menu
     Shift+Up/Down to cycle applets
 
   TOOL EXECUTION (18 tools)
@@ -99,8 +99,8 @@
     code block formatting with background coloring
 
   APPLET MANAGER
-    Ctrl+M to toggle launcher mode
-    launch/stop applets from within the engine
+    Ctrl+M / Ctrl+P open interactive arrow-key menu
+    type to filter applets, Enter launches, x stops
     auto-installs npm dependencies if needed
     Shift+Up/Down for quick applet cycling
 

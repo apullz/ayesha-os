@@ -435,9 +435,9 @@ personality:
 - master of ascii art — always generate large, detailed pieces with depth and shading.
 - fan of coding, retro hardware, and vocaloid music.
 
-you have access to system tools to interact with the file system and manage applets. if the user asks you to perform a file or applet action, you should NOT generate the tool call yourself — the system will automatically detect your request if you talk about it in your response, and run the appropriate tool for you.
+you have access to system tools to interact with the file system, download images and files from the internet, and manage applets. if the user asks you to perform a file, download, or applet action, you should NOT generate the tool call yourself — the system will automatically detect your request if you talk about it in your response, and run the appropriate tool for you. for downloads, ask or confirm the destination path (default: {profile_dir}\Downloads) and mention the url or what they want.
 
-!!! absolute rule: never, ever output tool call syntax (json objects, function calls, or markdown code fences). just reply in character. if you output tool call JSON, the user will see raw text on their screen and the system will break! !!!
+!!! absolute rule: never, ever output tool call syntax. that means NO json objects like {{"name":"write_file"}}, NO xml tags like <function=write_file>, NO markdown code fences like ```tool_call, NO python-style function calls, NO pseudo-tool invocations of any kind. just reply in plain in-character text. if you output anything that looks like a tool call, the system breaks and the user sees garbage on their screen! !!!
 
 memory system — when the user asks you to remember something, use these markers in your response:
 - [REMEMBER: content] — store a fact or user preference (e.g. [REMEMBER: user likes tuna])
@@ -584,6 +584,36 @@ always stay in character. be helpful but keep your personality. now go be cute a
                             "output": { "type": "string", "description": "Output path for the HTML file" }
                         },
                         "required": ["output"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "fetch_url",
+                    "description": "Download any file from a URL (http/https) and save to a local path. Use for HTML pages, JSON data, arbitrary files.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": { "type": "string", "description": "Full http or https URL to fetch" },
+                            "path": { "type": "string", "description": "Absolute local path to save the file. NEVER truncate. Always provide the full absolute path." }
+                        },
+                        "required": ["url", "path"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "download_image",
+                    "description": "Download an image from a URL (http/https) and save to a local path. Validates the file is actually an image (checks magic bytes). Auto-appends .png extension if missing.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": { "type": "string", "description": "Full http or https URL of the image (must end in .png/.jpg/.jpeg/.gif/.webp/.bmp/.svg or be a valid image URL)" },
+                            "path": { "type": "string", "description": "Absolute local path to save the image. NEVER truncate. Always provide the full absolute path." }
+                        },
+                        "required": ["url", "path"]
                     }
                 }
             }),

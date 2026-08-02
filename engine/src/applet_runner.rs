@@ -8,7 +8,7 @@ use crate::completion::Completer;
 /// Spawn the engine's keyboard input thread. Returns a flag that can be used to
 /// suspend the thread (set to false) so a foreground applet can take over the
 /// terminal. The thread is poll-based so the flag is checked even while idle.
-pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String>) -> Arc<AtomicBool> {
+pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String>, menu_flag: Arc<AtomicBool>) -> Arc<AtomicBool> {
     let flag = Arc::new(AtomicBool::new(true));
     let flag2 = flag.clone();
 
@@ -28,22 +28,69 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
             }
             match event::read() {
                 Ok(Event::Key(key)) if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat => {
+                    // Global hotkeys (Ctrl+M, Ctrl+P, Ctrl+C)
                     match (key.code, key.modifiers) {
                         (KeyCode::Char('m'), KeyModifiers::CONTROL) => {
                             if key.kind == KeyEventKind::Press {
                                 if steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
                             }
+                            continue;
                         }
                         (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
                             if key.kind == KeyEventKind::Press {
                                 if steer_tx.send("\0ctrl-p".to_string()).is_err() { break; }
                             }
+                            continue;
                         }
                         (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                             if key.kind == KeyEventKind::Press {
                                 if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
                             }
+                            continue;
                         }
+                        _ => {}
+                    }
+
+                    // If menu mode is active, route navigation/typing keys as control codes
+                    if menu_flag.load(Ordering::Relaxed) {
+                        match key.code {
+                            KeyCode::Up => {
+                                if key.kind == KeyEventKind::Press {
+                                    let _ = steer_tx.send("\0menu-up".to_string());
+                                }
+                            }
+                            KeyCode::Down => {
+                                if key.kind == KeyEventKind::Press {
+                                    let _ = steer_tx.send("\0menu-down".to_string());
+                                }
+                            }
+                            KeyCode::Enter => {
+                                if key.kind == KeyEventKind::Press {
+                                    let _ = steer_tx.send("\0menu-enter".to_string());
+                                }
+                            }
+                            KeyCode::Esc => {
+                                if key.kind == KeyEventKind::Press {
+                                    let _ = steer_tx.send("\0menu-esc".to_string());
+                                }
+                            }
+                            KeyCode::Backspace => {
+                                if key.kind == KeyEventKind::Press {
+                                    let _ = steer_tx.send("\0menu-backspace".to_string());
+                                }
+                            }
+                            KeyCode::Char(c) if c as u8 >= 32 => {
+                                if key.kind == KeyEventKind::Press {
+                                    let _ = steer_tx.send(format!("\0menu-char:{}", c));
+                                }
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+
+                    // Normal mode key handling
+                    match (key.code, key.modifiers) {
                         (KeyCode::Up, KeyModifiers::SHIFT) => {
                             if key.kind == KeyEventKind::Press {
                                 if steer_tx.send("\0shift-up".to_string()).is_err() { break; }

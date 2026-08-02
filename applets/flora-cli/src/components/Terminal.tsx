@@ -52,7 +52,7 @@ function resolvePath(root: PlantNode, currentSegments: string[], targetPath: str
 }
 
 // Recursive helper to build ASCII tree output
-function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = true, maxDepth: number = 999, depth: number = 0): string {
+function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = true, maxDepth: number = 99, depth: number = 0): string {
   let result = "";
   if (node.rank !== "clade" || node.name !== "Plantae") {
     const marker = isLast ? "└── " : "├── ";
@@ -69,7 +69,8 @@ function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = 
       result += buildAsciiTree(child, subIndent, index === keys.length - 1, maxDepth, depth + 1);
     });
   } else if (node.children && Object.keys(node.children).length > 0) {
-    result += `${indent}    \x1b[90m... ${Object.keys(node.children).length} more children\x1b[0m\n`;
+    const childCount = Object.keys(node.children).length;
+    result += `${indent}    \x1b[90m... (${childCount} more children, use tree --depth ${maxDepth + 1} to expand)\x1b[0m\n`;
   }
   return result;
 }
@@ -341,11 +342,17 @@ Taxonomic Ranks of Earth:
           filename = filename.slice(0, -3);
         }
 
-        // Check if filename matches a child species
+        // Check if filename matches a child species (case-insensitive, like CLI)
         let foundSpecies: PlantNode | undefined;
-        if (currentNode.children && currentNode.children[filename]) {
-          foundSpecies = currentNode.children[filename];
-        } else if (currentNode.rank === "species" && currentNode.name.toLowerCase().endsWith(filename.toLowerCase())) {
+        if (currentNode.children) {
+          const matchKey = Object.keys(currentNode.children).find(
+            (k) => k.toLowerCase() === filename.toLowerCase()
+          );
+          if (matchKey) {
+            foundSpecies = currentNode.children[matchKey];
+          }
+        }
+        if (!foundSpecies && currentNode.rank === "species" && currentNode.name.toLowerCase().endsWith(filename.toLowerCase())) {
           foundSpecies = currentNode;
         }
 

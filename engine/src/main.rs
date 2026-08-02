@@ -46,6 +46,42 @@ fn truncate_tool_result(result: &str, max_chars: usize) -> String {
     agent::truncate_tool_result(result, max_chars)
 }
 
+/// Strip pseudo-tool-call syntax out of ayesha's text so that when she slips
+/// into tool JSON/function syntax (despite the system prompt), the fallback
+/// can still show the user a readable reply instead of raw tool garbage.
+fn strip_pseudo_tool_syntax(text: &str) -> String {
+    let mut out = text.to_string();
+    // Remove fenced code blocks (```...```)
+    loop {
+        if let Some(start) = out.find("```") {
+            if let Some(end_rel) = out[start + 3..].find("```") {
+                let end = start + 3 + end_rel + 3;
+                out.replace_range(start..end, "");
+            } else {
+                out.replace_range(start.., "");
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    // Remove { ... } JSON-ish blocks (tool call payloads)
+    loop {
+        if let Some(start) = out.find('{') {
+            if let Some(end_rel) = out[start..].find('}') {
+                let end = start + end_rel + 1;
+                out.replace_range(start..end, "");
+            } else {
+                out.replace_range(start.., "");
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    out.trim().to_string()
+}
+
 /// Parse memory markers from ayesha's output and store them automatically.
 /// Returns the cleaned text with markers stripped.
 fn parse_and_store_memories(text: &str, memory: &mut MemoryStore) -> String {
@@ -221,9 +257,10 @@ fn switch_applet_page(
     steer_tx: &std::sync::mpsc::Sender<String>,
     steer_rx: &std::sync::mpsc::Receiver<String>,
     input_flag: &mut std::sync::Arc<std::sync::atomic::AtomicBool>,
+    menu_flag: &std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) {
     if manager.is_foreground(name) {
-        match manager.run_in_window(name, steer_tx, steer_rx, input_flag) {
+        match manager.run_in_window(name, steer_tx, steer_rx, input_flag, menu_flag) {
             Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", name)),
             Err(e) => ui::show_error(&e),
         }
@@ -358,7 +395,8 @@ async fn main() -> anyhow::Result<()> {
         completion_candidates.push(name);
     }
 
-    let mut input_flag = applet_runner::spawn_input_thread(steer_tx.clone(), completion_candidates);
+    let menu_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut input_flag = applet_runner::spawn_input_thread(steer_tx.clone(), completion_candidates, menu_flag.clone());
 
     ui::print_banner();
     ui::show_system(&memory.summary());
@@ -397,9 +435,21 @@ async fn main() -> anyhow::Result<()> {
     // Holds steering input that needs to be processed as the next user message
     let mut pending_input: Option<String> = None;
 
-    enum InputMode { Normal, Launcher, PageSwitcher }
+    enum InputMode { Normal, AppletMenu }
     let mut input_mode = InputMode::Normal;
     let mut applet_cycle_idx: Option<usize> = None;
+
+    // Build the applet page list once at startup; statuses refresh on each menu open.
+    let mut menu_pages: Vec<(String, String, bool, bool)> = Vec::new();
+    {
+        menu_pages.push(("engine".to_string(), "terminal persona host — that's me".to_string(), true, true));
+        for name in manager.names() {
+            if name == "engine" { continue; }
+            if let Some(e) = manager.entries.get(&name) {
+                menu_pages.push((name.clone(), e.desc.clone(), manager.is_running(&name), e.foreground));
+            }
+        }
+    }
 
     loop {
         // ── read user input ──
@@ -408,19 +458,18 @@ async fn main() -> anyhow::Result<()> {
         } else {
             match input_mode {
                 InputMode::Normal => ui::prompt_line(),
-                InputMode::Launcher => ui::launcher_prompt(),
-                InputMode::PageSwitcher => ui::page_switch_prompt(),
+                InputMode::AppletMenu => ui::menu_prompt(),
             }
             let inp = match steer_rx.recv() {
                 Ok(i) => i,
                 Err(_) => break,
             };
             if inp.is_empty() {
-                // In launcher/page-switcher mode, empty line exits
-                if matches!(input_mode, InputMode::Launcher | InputMode::PageSwitcher) {
+                if matches!(input_mode, InputMode::AppletMenu) {
+                    menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
                     input_mode = InputMode::Normal;
-                    print!("\x1B[2J\x1B[1;1H");
-                    std::io::stdout().flush().ok();
+                    let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
+                    let _ = std::io::stdout().flush();
                 }
                 continue;
             }
@@ -430,34 +479,139 @@ async fn main() -> anyhow::Result<()> {
         // ── control keys (work from normal input and steering interrupts) ──
         // Ctrl+C → exit (graceful: save memory, stop applets, release raw mode)
         if input == "\0ctrl-c" {
+            menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
             graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
             break;
         }
-        // Ctrl+M → toggle launcher mode
-        if input == "\0ctrl-m" {
-            input_mode = InputMode::Launcher;
-            println!("\n{}", manager.list());
-            ui::show_system("type applet name to launch/stop, `back` to exit, `list` to refresh");
-            continue;
-        }
-        // Ctrl+P → page switcher (open applets in this window)
-        if input == "\0ctrl-p" {
-            input_mode = InputMode::PageSwitcher;
-            let mut pages: Vec<(String, String, bool, bool)> = vec![
-                ("engine".to_string(), "terminal persona host — that's me".to_string(), true, true),
-            ];
-            for name in manager.names() {
-                if name == "engine" {
-                    continue;
-                }
-                if let Some(e) = manager.entries.get(&name) {
-                    pages.push((name.clone(), e.desc.clone(), manager.is_running(&name), e.foreground));
+        // Ctrl+M / Ctrl+P → open interactive applet menu
+        if input == "\0ctrl-m" || input == "\0ctrl-p" {
+            input_mode = InputMode::AppletMenu;
+            // Refresh statuses in the page list
+            for entry in menu_pages.iter_mut() {
+                if entry.0 == "engine" {
+                    entry.2 = true;
+                } else {
+                    entry.2 = manager.is_running(&entry.0);
                 }
             }
-            println!("\n{}", ui::draw_page_switcher(&pages));
-            ui::show_system("type a number or name to switch page, `back` to return");
+            let mut menu_idx: usize = 0;
+            let mut menu_filter: String = String::new();
+            // Drain stale keystrokes queued before the menu opened
+            while steer_rx.try_recv().is_ok() {}
+            menu_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+            // Save cursor once before the menu; each redraw restores to this point.
+            let _ = write!(std::io::stdout(), "\x1B[s");
+            let (rendered, _line_count) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+            let _ = write!(std::io::stdout(), "{}", rendered);
+            let _ = std::io::stdout().flush();
+
+            // Inner menu loop
+            let mut selected: Option<String> = None;
+            loop {
+                let menu_input = match steer_rx.recv() {
+                    Ok(i) => i,
+                    Err(_) => break,
+                };
+                match menu_input.as_str() {
+                    "\0ctrl-c" => {
+                        menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
+                        graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
+                        return Ok(());
+                    }
+                    "\0menu-up" => {
+                        if menu_idx > 0 {
+                            menu_idx -= 1;
+                        }
+                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
+                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let _ = write!(std::io::stdout(), "{}", rendered);
+                        let _ = std::io::stdout().flush();
+                    }
+                    "\0menu-down" => {
+                        let filtered_len = menu_pages.iter().filter(|(n, d, _, _)| {
+                            if menu_filter.is_empty() { true }
+                            else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
+                        }).count();
+                        if filtered_len > 0 && menu_idx + 1 < filtered_len {
+                            menu_idx += 1;
+                        }
+                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
+                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let _ = write!(std::io::stdout(), "{}", rendered);
+                        let _ = std::io::stdout().flush();
+                    }
+                    "\0menu-backspace" => {
+                        menu_filter.pop();
+                        menu_idx = 0;
+                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
+                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let _ = write!(std::io::stdout(), "{}", rendered);
+                        let _ = std::io::stdout().flush();
+                    }
+                    "\0menu-esc" => {
+                        break;
+                    }
+                    "\0menu-enter" => {
+                        let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().cloned().filter(|(n, d, _, _)| {
+                            if menu_filter.is_empty() { true }
+                            else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
+                        }).collect();
+                        if let Some((name, _desc, _running, _foreground)) = filtered.get(menu_idx) {
+                            selected = Some(name.clone());
+                        }
+                        break;
+                    }
+                    s if s.starts_with("\0menu-char:") => {
+                        let c = &s["\0menu-char:".len()..];
+                        if menu_filter.is_empty() && c == "x" {
+                            // Stop action
+                            let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().cloned().filter(|(n, d, _, _)| {
+                                if menu_filter.is_empty() { true }
+                                else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
+                            }).collect();
+                            if let Some((name, _, running, _)) = filtered.get(menu_idx) {
+                                if *running {
+                                    match manager.stop(name) {
+                                        Ok(()) => ui::show_system(&format!("stopped {}", name)),
+                                        Err(e) => ui::show_error(&e),
+                                    }
+                                } else {
+                                    ui::show_system(&format!("{} is not running", name));
+                                }
+                                for entry in menu_pages.iter_mut() {
+                                    if entry.0 != "engine" {
+                                        entry.2 = manager.is_running(&entry.0);
+                                    }
+                                }
+                            }
+                        } else {
+                            for ch in c.chars() {
+                                menu_filter.push(ch);
+                            }
+                            menu_idx = 0;
+                        }
+                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
+                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let _ = write!(std::io::stdout(), "{}", rendered);
+                        let _ = std::io::stdout().flush();
+                    }
+                    _ => {}
+                }
+            }
+
+            // Exit menu: clear region and switch off
+            menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
+            let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
+            let _ = std::io::stdout().flush();
+            input_mode = InputMode::Normal;
+
+            // If Enter selected something, take action
+            if let Some(name) = selected {
+                switch_applet_page(&mut manager, &name, &steer_tx, &steer_rx, &mut input_flag, &menu_flag);
+            }
             continue;
         }
+
         // Shift + Up / Shift + Down → cycle applets
         if input == "\0shift-up" || input == "\0shift-down" {
             let applets = manager.names();
@@ -480,78 +634,6 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             continue;
-        }
-
-        // ── handle launcher mode ──
-        if matches!(input_mode, InputMode::Launcher) {
-            match input.as_str() {
-                "back" | "exit" | "/back" => {
-                    input_mode = InputMode::Normal;
-                    print!("\x1B[2J\x1B[1;1H");
-                    std::io::stdout().flush().ok();
-                    continue;
-                }
-                "list" | "apps" => {
-                    println!("\n{}", manager.list());
-                    continue;
-                }
-                "stop" | "stop all" => {
-                    manager.stop_all();
-                    ui::show_system("stopped all applets");
-                    continue;
-                }
-                _ => {
-                    if let Some(name) = input.strip_prefix("stop ") {
-                        match manager.stop(name) {
-                            Ok(()) => ui::show_system(&format!("stopped {}", name)),
-                            Err(e) => ui::show_error(&e),
-                        }
-                    } else if manager.has(&input) {
-                        if manager.is_running(&input) {
-                            match manager.stop(&input) {
-                                Ok(()) => ui::show_system(&format!("stopped {}", input)),
-                                Err(e) => ui::show_error(&e),
-                            }
-                        } else {
-                            match manager.launch(&input) {
-                                Ok(()) => ui::show_system(&format!("launched {}", input)),
-                                Err(e) => ui::show_error(&e),
-                            }
-                        }
-                    } else {
-                        ui::show_error(&format!("unknown applet. type `list` to see available"));
-                    }
-                    continue;
-                }
-            }
-        }
-
-        // ── handle page-switcher mode ──
-        if matches!(input_mode, InputMode::PageSwitcher) {
-            match input.trim() {
-                "" | "back" | "exit" | "/back" | "engine" | "1" => {
-                    input_mode = InputMode::Normal;
-                    print!("\x1B[2J\x1B[1;1H");
-                    std::io::stdout().flush().ok();
-                    continue;
-                }
-                _ => {
-                    if let Ok(n) = input.trim().parse::<usize>() {
-                        let names = manager.names();
-                        if n >= 2 && n - 2 < names.len() {
-                            switch_applet_page(&mut manager, &names[n - 2], &steer_tx, &steer_rx, &mut input_flag);
-                        } else {
-                            ui::show_error(&format!("no page {}", n));
-                        }
-                    } else if manager.has(input.trim()) {
-                        switch_applet_page(&mut manager, input.trim(), &steer_tx, &steer_rx, &mut input_flag);
-                    } else {
-                        ui::show_error(&format!("unknown applet: {}", input.trim()));
-                    }
-                    input_mode = InputMode::Normal;
-                    continue;
-                }
-            }
         }
 
         // ── slash-command handling ──
@@ -642,7 +724,7 @@ async fn main() -> anyhow::Result<()> {
                 let name = input[4..].trim();
                 if manager.has(name) {
                     if manager.is_foreground(name) {
-                        match manager.run_in_window(name, &steer_tx, &steer_rx, &mut input_flag) {
+                        match manager.run_in_window(name, &steer_tx, &steer_rx, &mut input_flag, &menu_flag) {
                             Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", name)),
                             Err(e) => ui::show_error(&e),
                         }
@@ -744,6 +826,7 @@ async fn main() -> anyhow::Result<()> {
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                    menu_flag: &menu_flag,
                 }).await {
                     Ok(r) => println!("\n{}", r),
                     Err(e) => ui::show_error(&e.to_string()),
@@ -964,6 +1047,7 @@ async fn main() -> anyhow::Result<()> {
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                    menu_flag: &menu_flag,
                 }).await {
                     Ok(r) => println!("\n{}", r),
                     Err(e) => ui::show_error(&e.to_string()),
@@ -976,6 +1060,7 @@ async fn main() -> anyhow::Result<()> {
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                    menu_flag: &menu_flag,
                 }).await {
                     Ok(r) => println!("\n{}", r),
                     Err(e) => ui::show_error(&e.to_string()),
@@ -988,6 +1073,7 @@ async fn main() -> anyhow::Result<()> {
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                    menu_flag: &menu_flag,
                 }).await {
                     Ok(r) => println!("\n{}", r),
                     Err(e) => ui::show_error(&e.to_string()),
@@ -1000,6 +1086,7 @@ async fn main() -> anyhow::Result<()> {
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                    menu_flag: &menu_flag,
                 }).await {
                     Ok(r) => println!("\n{}", r),
                     Err(e) => ui::show_error(&e.to_string()),
@@ -1010,7 +1097,7 @@ async fn main() -> anyhow::Result<()> {
                 // If it was a slash command, check applet short names
                 if was_slash && manager.has(&input) {
                     if manager.is_foreground(&input) {
-                        match manager.run_in_window(&input, &steer_tx, &steer_rx, &mut input_flag) {
+                        match manager.run_in_window(&input, &steer_tx, &steer_rx, &mut input_flag, &menu_flag) {
                             Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", input)),
                             Err(e) => ui::show_error(&e),
                         }
@@ -1046,7 +1133,7 @@ async fn main() -> anyhow::Result<()> {
                     Err(e) => ui::show_error(&e),
                 }
             } else {
-                switch_applet_page(&mut manager, &name, &steer_tx, &steer_rx, &mut input_flag);
+                switch_applet_page(&mut manager, &name, &steer_tx, &steer_rx, &mut input_flag, &menu_flag);
             }
             continue;
         }
@@ -1093,7 +1180,7 @@ async fn main() -> anyhow::Result<()> {
 
         // ── agent loop (dual-model: ayesha for personality, qwen for tools) ──
         let msg_count_before = messages.len();
-        let needs_tools = might_need_tools(&user_content);
+        let mut needs_tools = might_need_tools(&user_content);
 
         messages.push(ChatMessage {
             role: "user".to_string(),
@@ -1123,6 +1210,12 @@ async fn main() -> anyhow::Result<()> {
         let first_had_tools = first_result.has_tool_calls();
         let first_tool_calls = first_result.tool_calls.clone();
 
+        // ayesha's raw text plus whether it currently sits in message history.
+        // Used by the safety net below (pseudo-tool-call routing) and the qwen
+        // no-tools fallback, so they're declared at iteration scope.
+        let mut ayesha_text = String::new();
+        let mut ayesha_text_pushed = false;
+
         if first_was_steered {
             ui::show_interrupted();
             pending_input = first_result.steering;
@@ -1144,7 +1237,7 @@ async fn main() -> anyhow::Result<()> {
 
                 ui::show_tool_call(name, &args_str);
 
-                let tool_result = match executor.execute(name, args, &mut ToolContext {
+                            let tool_result = match executor.execute(name, args, &mut ToolContext {
                                 memory: &mut memory,
                                 prompt_history: &mut prompt_history,
                                 analyzer: &analyzer,
@@ -1155,6 +1248,7 @@ async fn main() -> anyhow::Result<()> {
                                 steer_tx: &steer_tx,
                                 steer_rx: &steer_rx,
                                 input_flag: &mut input_flag,
+                                menu_flag: &menu_flag,
                             }).await {
                     Ok(r) => r,
                     Err(e) => {
@@ -1209,13 +1303,33 @@ async fn main() -> anyhow::Result<()> {
             }
         } else {
             // Pure chat response from ayesha — done
-            if !first_result.content.is_empty() {
+            // Safety net: detect pseudo-tool-call attempts and DON'T push them
+            // to messages (they would confuse qwen). The routing happens below.
+            ayesha_text = first_result.content;
+            let attempted_tool_call = ayesha_text.contains("<function=")
+                || ayesha_text.contains("{\"name\":")
+                || ayesha_text.contains("\"action\":")
+                || ayesha_text.contains("write_file(")
+                || ayesha_text.contains("read_file(")
+                || ayesha_text.contains("list_dir(")
+                || ayesha_text.contains("manage_applet(");
+
+            // Track whether ayesha's text is sitting in the history. When it was
+            // a pseudo-tool-call we hold it back and route to qwen; if qwen then
+            // declines to call tools we must still surface the text (stripped of
+            // the tool-ish syntax) so the user isn't left with silence.
+            if attempted_tool_call {
+                ui::show_system("ayesha attempted tool call — routing to qwen");
+                needs_tools = true;
+                // Don't push the raw bad text to messages yet
+            } else if !ayesha_text.is_empty() {
                 messages.push(ChatMessage {
                     role: "assistant".to_string(),
-                    content: first_result.content,
+                    content: ayesha_text.clone(),
                     tool_calls: None,
                     tool_call_id: None,
                 });
+                ayesha_text_pushed = true;
             }
         }
 
@@ -1278,7 +1392,7 @@ async fn main() -> anyhow::Result<()> {
 
                             ui::show_tool_call(name, &args_str);
 
-                            let tool_result = match executor.execute(name, args, &mut ToolContext {
+                let tool_result = match executor.execute(name, args, &mut ToolContext {
                                 memory: &mut memory,
                                 prompt_history: &mut prompt_history,
                                 analyzer: &analyzer,
@@ -1289,6 +1403,7 @@ async fn main() -> anyhow::Result<()> {
                                 steer_tx: &steer_tx,
                                 steer_rx: &steer_rx,
                                 input_flag: &mut input_flag,
+                                menu_flag: &menu_flag,
                             }).await {
                                 Ok(r) => r,
                                 Err(e) => {
@@ -1399,11 +1514,34 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 Ok(_) => {
-                    // qwen didn't call tools either — ayesha's response is final
-                    // (already pushed above)
+                    // qwen didn't call tools either — ayesha's response is final.
+                    // If it was held back (pseudo-tool-call), surface it now
+                    // (stripped of the tool-ish syntax) so the user isn't silent.
+                    if !ayesha_text_pushed && !ayesha_text.is_empty() {
+                        let cleaned = strip_pseudo_tool_syntax(&ayesha_text);
+                        if !cleaned.is_empty() {
+                            messages.push(ChatMessage {
+                                role: "assistant".to_string(),
+                                content: cleaned,
+                                tool_calls: None,
+                                tool_call_id: None,
+                            });
+                        }
+                    }
                 }
                 Err(_) => {
-                    // qwen failed — ayesha's response is final
+                    // qwen failed — ayesha's response is final. Same handling.
+                    if !ayesha_text_pushed && !ayesha_text.is_empty() {
+                        let cleaned = strip_pseudo_tool_syntax(&ayesha_text);
+                        if !cleaned.is_empty() {
+                            messages.push(ChatMessage {
+                                role: "assistant".to_string(),
+                                content: cleaned,
+                                tool_calls: None,
+                                tool_call_id: None,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -1536,6 +1674,31 @@ mod tests {
         assert_eq!(parse_applet_phrase(&n, "launch poopy"), None);
         assert_eq!(parse_applet_phrase(&n, "launch a test for me"), None);
         assert_eq!(parse_applet_phrase(&n, "what is the weather"), None);
+    }
+
+    #[test]
+    fn strip_pseudo_tool_removes_fences() {
+        let input = "sure, here you go:\n```tool_call\n{\"name\":\"write_file\"}\n```\ndone!";
+        let cleaned = strip_pseudo_tool_syntax(input);
+        assert!(!cleaned.contains("```"));
+        assert!(!cleaned.contains("write_file"));
+        assert!(cleaned.contains("sure"));
+        assert!(cleaned.contains("done"));
+    }
+
+    #[test]
+    fn strip_pseudo_tool_removes_json_blocks() {
+        let input = "I'll read it. {\"name\": \"read_file\", \"arguments\": {\"path\": \"x\"}} On it.";
+        let cleaned = strip_pseudo_tool_syntax(input);
+        assert!(!cleaned.contains("{\"name\""));
+        assert!(cleaned.contains("I'll read it"));
+        assert!(cleaned.contains("On it"));
+    }
+
+    #[test]
+    fn strip_pseudo_tool_leaves_plain_text() {
+        let input = "just a normal chat reply, nothing to see here";
+        assert_eq!(strip_pseudo_tool_syntax(input), input);
     }
 
     #[test]

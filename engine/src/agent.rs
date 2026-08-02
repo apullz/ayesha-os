@@ -35,6 +35,9 @@ pub fn needs_tools(msg: &str) -> bool {
         "analyze", "refactor", "fix", "bug", "error", "issue", "problem",
         "http", "https", ".com", ".org", ".rs", ".py", ".ts", ".js",
         "page", "switch", "applet",
+        "download", "fetch", "url", "image", "picture", "photo", "wallpaper",
+        "anime", "dragonball", "pokemon", "ghibli", "manga",
+        "desktop", "documents", "to my",
     ];
     hints.iter().any(|h| lower.contains(h))
 }
@@ -82,6 +85,16 @@ mod tests {
     }
 
     #[test]
+    fn needs_tools_detects_download() {
+        assert!(needs_tools("download a dragonball wallpaper"));
+        assert!(needs_tools("fetch an image"));
+        assert!(needs_tools("download pokemon art"));
+        assert!(needs_tools("get an anime picture"));
+        assert!(needs_tools("save this to my desktop"));
+        assert!(needs_tools("put it in documents"));
+    }
+
+    #[test]
     fn needs_tools_skips_chitchat() {
         assert!(!needs_tools("hi"));
         assert!(!needs_tools("hello"));
@@ -91,6 +104,13 @@ mod tests {
         assert!(!needs_tools("who are you"));
         assert!(!needs_tools("good morning"));
         assert!(!needs_tools("thanks"));
+        // Common words that must NOT trigger the ~2s tool-model round-trip
+        assert!(!needs_tools("i'm home"));
+        assert!(!needs_tools("what's new"));
+        assert!(!needs_tools("make me a sandwich"));
+        assert!(!needs_tools("save the date"));
+        assert!(!needs_tools("that's a nice piece of art"));
+        assert!(!needs_tools("the root of this is simple"));
     }
 
     #[test]

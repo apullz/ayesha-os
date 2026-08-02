@@ -56,3 +56,6 @@ _hf-space/
 # Logs
 *.log
 logs/
+
+# Engine output capture (selftest / banner dumps)
+test-output.txt

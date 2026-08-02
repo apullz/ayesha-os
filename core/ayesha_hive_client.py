@@ -15,8 +15,13 @@ from typing import Dict, Any, Optional
 class AyeshaHiveClient:
     """Client for individual Ayesha instances to sync with the hivemind"""
     
-    def __init__(self, hive_path: str = "/home/user/ayesha_hive",
+    def __init__(self, hive_path: Optional[str] = None,
                  instance_name: Optional[str] = None):
+        if hive_path is None:
+            # Platform-aware default so the hive is found on any machine
+            # (Windows, macOS, Linux) instead of only the original dev box.
+            base = Path.home() / "ayesha_hive"
+            hive_path = str(base)
         self.hive_path = Path(hive_path)
         self.instance_id = instance_name or f"ayesha_{str(uuid.uuid4())[:8]}"
         self.hostname = socket.gethostname()

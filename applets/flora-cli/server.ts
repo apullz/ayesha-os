@@ -97,7 +97,9 @@ Terminal Formatting Instructions:
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    // In production server.cjs is bundled into dist/, so __dirname already
+    // points at the folder containing index.html (CWD-independent).
+    const distPath = __dirname;
     app.use(express.static(distPath));
     app.get('*', (req: any, res: any) => {
       res.sendFile(path.join(distPath, 'index.html'));

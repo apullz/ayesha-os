@@ -14,13 +14,15 @@
 
   engine/          [✔]  Agentic coding assistant + jarvis chatbot.
                          CLI persona host with streaming,
-                         model routing, tool-calling (20 tools),
+                         model routing, tool-calling (22 tools
+                         incl. fetch_url / download_image for
+                         image & file downloads),
                          cloud support (openrouter/opencode),
                          pixel striker sprite engine,
                          self-improvement loop, command palette,
                          retro cyberpunk UI, applet manager,
                          autocomplete (Tab cycling for commands
-                         and applets), 46 unit tests, zero warnings.
+                         and applets), 69 unit tests, zero warnings.
                          └ 25 slash commands:
                             help, clear, models, auto, sync, apps,
                             run, stop, model, toolmodel, pull, route,
@@ -71,9 +73,10 @@
   models/          [✔]  Modelfile for ayesha personality.
                            └ FROM qwen2.5-coder:14b
 
-  launcher/        [✔]  In-engine applet switcher.
-                          └ Ctrl+M opens launcher mode
-                          └ Ctrl+P opens page switcher (in-window applets)
+  launcher/        [✔]  In-engine interactive applet switcher.
+                          └ Ctrl+M / Ctrl+P open arrow-key menu
+                          └ ↑/↓ navigate, type to filter, Enter launch
+                          └ x stops selected applet, Esc/back exits
                           └ /run, /stop, /apps slash commands
                           └ foreground applets (flora-cli, poopy-tui) run in
                             the current window as pages; ctrl+p switches back

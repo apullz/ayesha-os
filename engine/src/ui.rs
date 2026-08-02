@@ -153,41 +153,69 @@ pub fn prompt_line() {
     stdout().flush().ok();
 }
 
-pub fn launcher_prompt() {
-    print!("  {} {} ",
-        "\u{25b6}".bright_yellow().bold(),
-        "launch".bright_yellow());
-    stdout().flush().ok();
-}
-
-pub fn page_switch_prompt() {
+pub fn menu_prompt() {
     print!("  {} {} ",
         "\u{25b6}".bright_cyan().bold(),
-        "switch to".bright_cyan());
+        "launch".bright_cyan());
     stdout().flush().ok();
 }
 
-// ── page switcher overlay (ctrl+p) ─────────────────────────
+// ── interactive applet menu (ctrl+p / ctrl+m) ────────────────
 
-/// Draw a numbered page list. Each page is (name, desc, running, foreground).
-/// Page 1 is always the engine itself.
-pub fn draw_page_switcher(pages: &[(String, String, bool, bool)]) -> String {
+/// Draw an interactive applet menu box. Pages: (name, desc, running, foreground).
+/// Returns (rendered_string, line_count).
+pub fn draw_applet_menu(pages: &[(String, String, bool, bool)], idx: usize, filter: &str) -> (String, usize) {
     let mut out = String::new();
-    let inner_w = 52usize;
-    let title = "page switcher (ctrl+p)";
+    let inner_w = 64usize;
+    let title = "applet launcher (ctrl+p)";
     let dashes = inner_w - 1 - title.len();
     out.push_str(&format!("  ┌─{}{}┐\n", title, "─".repeat(dashes)));
     out.push_str(&format!("  │{}│\n", "─".repeat(inner_w)));
-    for (i, (name, desc, running, _foreground)) in pages.iter().enumerate() {
-        let n = i + 1;
-        let status = if *running { "●" } else { "○" };
-        let marker = if n == 1 { "◄" } else { " " };
-        out.push_str(&format!("  │{:<2} {} {:<14} {:<29} {:<2}│\n", n, status, name, desc, marker));
+
+    let filtered: Vec<(usize, &(String, String, bool, bool))> = pages
+        .iter()
+        .enumerate()
+        .filter(|(_, (name, desc, _, _))| {
+            if filter.is_empty() {
+                true
+            } else {
+                name.to_lowercase().contains(&filter.to_lowercase())
+                    || desc.to_lowercase().contains(&filter.to_lowercase())
+            }
+        })
+        .collect();
+
+    let display_idx = idx.min(filtered.len().saturating_sub(1));
+
+    if filtered.is_empty() {
+        out.push_str(&format!("  │  {:<62}│\n", format!("no matches for '{}'", filter)));
+    } else {
+        for (i, (_orig_i, (name, desc, running, foreground))) in filtered.iter().enumerate() {
+            let selected = i == display_idx;
+            let cursor = if selected { "►" } else { " " };
+            let status = if *running { "●" } else { "○" };
+            let mode_tag = if *foreground { "[window]" } else { "[bg]" };
+            let label = format!("{} {} {:<11} {:<24} {:<8}", cursor, status, name, desc, mode_tag);
+            // pad/truncate label to fit inner content width (62 chars)
+            let truncated = if label.chars().count() > inner_w - 2 {
+                let mut s: String = label.chars().take(inner_w - 5).collect();
+                s.push_str("...");
+                s
+            } else {
+                label
+            };
+            out.push_str(&format!("  │  {:<62}│\n", truncated));
+        }
     }
-    out.push_str(&format!("  │{:<52}│\n", ""));
-    out.push_str(&format!("  │{:<52}│\n", "● running   ○ stopped   ◄ = current page"));
+
+    out.push_str(&format!("  │{}│\n", "─".repeat(inner_w)));
+    let filter_display = if filter.is_empty() { "type to filter...".to_string() } else { format!("filter: {}", filter) };
+    out.push_str(&format!("  │  {:<62}│\n", filter_display));
+    out.push_str(&format!("  │  {:<62}│\n", "● running  ○ stopped  ↑↓ nav  enter launch  x stop  esc back"));
     out.push_str(&format!("  └{}┘\n", "─".repeat(inner_w)));
-    out
+
+    let line_count = out.lines().count();
+    (out, line_count)
 }
 
 #[cfg(test)]
@@ -195,21 +223,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn page_switcher_lines_are_aligned() {
+    fn applet_menu_lines_are_aligned() {
         let pages = vec![
             ("engine".to_string(), "terminal persona host".to_string(), true, true),
             ("flora-cli".to_string(), "scottish flora explorer".to_string(), false, true),
             ("desktop-cat".to_string(), "desktop pet cat".to_string(), true, false),
         ];
-        let out = draw_page_switcher(&pages);
+        let (out, line_count) = draw_applet_menu(&pages, 0, "");
         let lines: Vec<&str> = out.lines().collect();
         assert!(!lines.is_empty());
+        assert_eq!(lines.len(), line_count);
         let expected = lines[0].chars().count();
         for line in &lines {
             assert_eq!(line.chars().count(), expected, "misaligned line: {}", line);
         }
-        assert!(out.contains("◄"));
-        assert!(out.contains("ctrl+p"));
+        assert!(out.contains("►"));
+        assert!(out.contains("applet launcher"));
     }
 }
 

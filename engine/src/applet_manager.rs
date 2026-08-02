@@ -235,6 +235,7 @@ impl AppletManager {
         steer_tx: &mpsc::Sender<String>,
         steer_rx: &mpsc::Receiver<String>,
         input_flag: &mut Arc<AtomicBool>,
+        menu_flag: &Arc<AtomicBool>,
     ) -> Result<(), String> {
         if !self.is_foreground(name) {
             self.launch(name)?;
@@ -281,7 +282,7 @@ impl AppletManager {
         for name in self.names() {
             candidates.push(name);
         }
-        *input_flag = crate::applet_runner::spawn_input_thread(steer_tx.clone(), candidates);
+        *input_flag = crate::applet_runner::spawn_input_thread(steer_tx.clone(), candidates, menu_flag.clone());
         print!("\x1B[2J\x1B[1;1H");
         let _ = std::io::stdout().flush();
         crate::ui::print_banner();

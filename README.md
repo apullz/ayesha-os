@@ -128,6 +128,8 @@ the model can autonomously call tools to complete tasks:
 | `get_tool_stats` | display per-tool success rates with bar charts |
 | `read_clipboard` | read system clipboard (text or image) |
 | `coding_agent` | multi-action coding tool (read/write/edit/analyze/modify/suggest) |
+| `fetch_url` | download any file (html/json/binary) from a URL to a local path (100 MB cap) |
+| `download_image` | download an image from a URL, validate it's really an image, auto-pick extension |
 
 ### streaming + steering
 
@@ -164,7 +166,7 @@ fox> actually, make it recursive
 | `name <you>` | set your display name |
 | `/` | open command palette |
 
-**Ctrl+M** toggles launcher mode for applet management. **Shift+Up/Down** cycles through applets.
+**Ctrl+M** or **Ctrl+P** opens the interactive applet menu — navigate with **↑/↓**, type to filter, **Enter** to launch, **x** to stop the selected applet, **Esc** to exit. **Shift+Up/Down** cycles through applets.
 
 ### pixel striker (built-in sprite engine)
 
