@@ -76,7 +76,21 @@ try:
 except (TypeError, ValueError):
     BUBBLE_INTERVAL = 120
 
-COLLAR_COLOR = (200, 30, 30, 255)
+def _parse_hex(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+THEME = {}
+try:
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            THEME = json.load(f).get("theme", {}).get("palette", {})
+except Exception:
+    pass
+
+COLLAR_RGB = _parse_hex(THEME.get("primary", "#C81E1E"))
+COLLAR_COLOR = (*COLLAR_RGB, 255)
 COLLAR_LEN = 8
 
 COLLAR_ANGLES = {
@@ -130,7 +144,7 @@ def recolor_sprite(img):
             if r > 200 and g > 200 and b > 200:
                 pixels[x, y] = (30, 30, 30, a)
             elif r > 200 and g < 100 and b < 100:
-                pixels[x, y] = (220, 30, 30, a)
+                pixels[x, y] = (*COLLAR_RGB, a)
     return img
 
 def extract_frame(x, y):

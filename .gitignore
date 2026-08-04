@@ -57,5 +57,8 @@ _hf-space/
 *.log
 logs/
 
+# Automation harness local state (queue, reports, backups, logs)
+.automation/
+
 # Engine output capture (selftest / banner dumps)
 test-output.txt

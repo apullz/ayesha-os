@@ -46,6 +46,23 @@
       }
     }
   },
+  "theme": {
+    "name": "kook",
+    "palette": {
+      "background": "#101014",
+      "surface": "#16161C",
+      "text": "#E8E6F0",
+      "primary": "#E75E9D",
+      "accent": "#D782A7",
+      "secondary": "#4C5D79",
+      "success": "#62C884",
+      "warning": "#E0B24E",
+      "error": "#E5536A",
+      "dim": "#6A6478",
+      "border": "#3D3E45",
+      "code_bg": "#1A1A22"
+    }
+  },
   "projects": {
     "engine": { "path": "engine/", "lang": "rust", "desc": "terminal-native persona host with tool-calling" },
     "core": { "path": "core/", "lang": "python", "desc": "hivemind orchestrator with gradio web ui", "run": "python app.py", "port": 7860 },

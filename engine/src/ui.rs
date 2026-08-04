@@ -1,13 +1,11 @@
 use colored::*;
 use std::io::{stdout, Write};
 
-// ── retro cyberpunk color scheme ────────────────────────────
-// primary:   bright_green  (matrix green)
-// secondary: bright_yellow (amber terminal)
-// accent:    bright_cyan
-// error:     bright_red
-// dim:       bright_black
-// thinking:  bright_black (dimmed)
+use crate::theme::{self, Role};
+
+// ── colors come from the active theme (crate::theme) ────────────
+// role map: primary = brand/boxes/prompt, accent = system/highlight,
+// secondary = names/warnings, error = failures, dim = muted, etc.
 
 #[allow(dead_code)]
 const KAOMOJIS: &[&str] = &[
@@ -33,6 +31,7 @@ const BANNER_LINES: &[&str] = &[
 ];
 
 pub fn print_banner() {
+    // keep the classic rainbow logo, then theme the info lines below it
     let colors: &[Color] = &[
         Color::BrightRed,
         Color::BrightYellow,
@@ -48,13 +47,13 @@ pub fn print_banner() {
     }
     println!();
     println!("  {} {}",
-        "◆".bright_green(),
-        "ayesha-os v4.2.0".bright_cyan());
+        theme::paint(Role::Primary, "◆"),
+        theme::bold(Role::Accent, "ayesha-os v4.2.0"));
     println!("  {} {}",
-        "  system online".bright_black(),
-        "(๑蔷๑)".bright_magenta());
+        theme::paint(Role::Dim, "  system online"),
+        theme::paint(Role::Accent, "(๑蔷๑)"));
     println!("  {}",
-        "──────────────────────────────────────────────".bright_black());
+        theme::paint(Role::Dim, "──────────────────────────────────────────────"));
     println!();
 }
 
@@ -67,9 +66,9 @@ pub fn show_tool_call(name: &str, args: &str) {
         args.to_string()
     };
     println!("  {} {} {}",
-        "▶".bright_green().bold(),
-        name.bright_yellow(),
-        truncated.bright_black());
+        theme::bold(Role::Primary, "▶"),
+        theme::paint(Role::Secondary, name),
+        theme::paint(Role::Dim, truncated));
 }
 
 pub fn show_tool_ok(name: &str, msg: &str) {
@@ -80,48 +79,48 @@ pub fn show_tool_ok(name: &str, msg: &str) {
         first.to_string()
     };
     println!("  {} {} {}",
-        "✔".bright_green().bold(),
-        name.bright_yellow(),
-        truncated.bright_black());
+        theme::bold(Role::Success, "✔"),
+        theme::paint(Role::Secondary, name),
+        theme::paint(Role::Dim, truncated));
     for line in msg.lines().skip(1).take(5) {
         println!("  {} {}",
-            "│".bright_black(),
-            line.bright_black());
+            theme::paint(Role::Dim, "│"),
+            theme::paint(Role::Dim, line));
     }
     if msg.lines().count() > 6 {
         println!("  {} {} {}",
-            "│".bright_black(),
-            "+".bright_black(),
-            format!("{} more lines", msg.lines().count() - 6).bright_black());
+            theme::paint(Role::Dim, "│"),
+            theme::paint(Role::Dim, "+"),
+            theme::paint(Role::Dim, format!("{} more lines", msg.lines().count() - 6)));
     }
 }
 
 pub fn show_tool_err(name: &str, msg: &str) {
     println!("  {} {} {}",
-        "✖".bright_red().bold(),
-        name.bright_yellow(),
-        msg.bright_red());
+        theme::bold(Role::Error, "✖"),
+        theme::paint(Role::Secondary, name),
+        theme::paint(Role::Error, msg));
 }
 
 // ── system messages ───────────────────────────────────────
 
 pub fn show_system(msg: &str) {
     println!("  {} {}",
-        "◆".bright_cyan(),
-        msg.bright_cyan());
+        theme::paint(Role::Accent, "◆"),
+        theme::paint(Role::Accent, msg));
 }
 
 pub fn show_error(msg: &str) {
     println!("  {} {}",
-        "✖".bright_red(),
-        msg.bright_red());
+        theme::paint(Role::Error, "✖"),
+        theme::paint(Role::Error, msg));
 }
 
 #[allow(dead_code)]
 pub fn show_processing() {
     print!("  {} {}",
-        "◆".bright_cyan(),
-        "processing...".bright_black());
+        theme::paint(Role::Accent, "◆"),
+        theme::paint(Role::Dim, "processing..."));
     stdout().flush().ok();
 }
 
@@ -135,28 +134,28 @@ pub fn hide_processing() {
 
 pub fn show_routing(model: &str) {
     println!("  {} {} {}",
-        "─".bright_black().repeat(3),
-        model.bright_black(),
-        "─".bright_black().repeat(3));
+        theme::paint(Role::Dim, "─").repeat(3),
+        theme::paint(Role::Dim, model),
+        theme::paint(Role::Dim, "─").repeat(3));
 }
 
 pub fn show_interrupted() {
     println!("  {}",
-        "⏹  interrupted".bright_yellow().bold());
+        theme::bold(Role::Warning, "⏹  interrupted"));
 }
 
 // ── prompt ─────────────────────────────────────────────────
 
 pub fn prompt_line() {
     print!("  {} ",
-        "$".bright_green().bold());
+        theme::bold(Role::Primary, "$"));
     stdout().flush().ok();
 }
 
 pub fn menu_prompt() {
     print!("  {} {} ",
-        "\u{25b6}".bright_cyan().bold(),
-        "launch".bright_cyan());
+        theme::bold(Role::Accent, "\u{25b6}"),
+        theme::paint(Role::Accent, "launch"));
     stdout().flush().ok();
 }
 
@@ -272,6 +271,7 @@ pub fn draw_command_overlay(filter: Option<&str>) {
         ("joke",    "tell a random joke"),
         ("time",    "show current UTC time"),
         ("uptime",  "show session uptime"),
+        ("theme",   "list/switch theme: theme [name]"),
         ("config",  "view/edit config: config [key=value]"),
         ("memory",  "list stored memories"),
         ("analyze", "analyze own source code"),
@@ -293,7 +293,7 @@ pub fn draw_command_overlay(filter: Option<&str>) {
 
     println!();
     println!("  {}",
-        "┌──────────────────────────────────────────────────┐".bright_green());
+        theme::paint(Role::Primary, "┌──────────────────────────────────────────────────┐"));
     let header = if let Some(f) = filter {
         if f.is_empty() {
             "  ◆  command palette".to_string()
@@ -304,30 +304,33 @@ pub fn draw_command_overlay(filter: Option<&str>) {
         "  ◆  command palette".to_string()
     };
     println!("  │  {}",
-        format!("{:<47}│", header.bright_cyan()).bright_green());
+        theme::paint(Role::Primary, format!("{:<47}│", theme::paint(Role::Accent, header))));
 
     if filtered.is_empty() {
         println!("  │  {}",
-            format!("{:<47}│",
-                format!("  no match for '/{}'", filter.unwrap_or("")).bright_black().italic()
-            ).bright_green());
+            theme::paint(Role::Primary,
+                format!("{:<47}│",
+                    theme::paint(Role::Dim, format!("  no match for '/{}'", filter.unwrap_or(""))).italic()
+                )));
     } else {
         println!("  │{}",
-            format!("{:<48}│",
-                "─".repeat(box_w - 4).bright_black()
-            ).bright_green());
+            theme::paint(Role::Primary,
+                format!("{:<48}│",
+                    theme::paint(Role::Dim, "─".repeat(box_w - 4))
+                )));
         let display = if filtered.len() > 10 { &filtered[..10] } else { &filtered };
         for (cmd, desc) in display {
             let line = format!("  │  /{:<10} {:<31}│", cmd, desc);
-            println!("{}", line.bright_green());
+            println!("{}", theme::paint(Role::Primary, line));
         }
         println!("  │{}",
-            format!("{:<48}│",
-                "─".repeat(box_w - 4).bright_black()
-            ).bright_green());
+            theme::paint(Role::Primary,
+                format!("{:<48}│",
+                    theme::paint(Role::Dim, "─".repeat(box_w - 4))
+                )));
     }
     println!("  {}",
-        "└──────────────────────────────────────────────────┘".bright_green());
+        theme::paint(Role::Primary, "└──────────────────────────────────────────────────┘"));
     println!();
 }
 
@@ -336,9 +339,9 @@ pub fn draw_command_overlay(filter: Option<&str>) {
 pub fn print_help() {
     println!();
     println!("  {}",
-        "┌─ commands ──────────────────────────────────┐".bright_green());
+        theme::paint(Role::Primary, "┌─ commands ──────────────────────────────────┐"));
     println!("  {}",
-        "│                                            │".bright_green());
+        theme::paint(Role::Primary, "│                                            │"));
     let help_cmds = [
         ("help",      "show this message"),
         ("exit",      "quit ayesha-os"),
@@ -364,6 +367,7 @@ pub fn print_help() {
         ("joke",      "tell a random joke"),
         ("time",      "show current UTC time"),
         ("uptime",    "show session uptime"),
+        ("theme",     "list/switch theme: theme [name]"),
         ("config",    "view/edit config: config [key=value]"),
         ("memory",    "list stored memories"),
         ("analyze",   "analyze own source code"),
@@ -373,14 +377,14 @@ pub fn print_help() {
     ];
     for (cmd, desc) in &help_cmds {
         println!("  {} {:<14} {}",
-            "│".bright_green(),
-            cmd.bright_cyan(),
-            format!("{:<28}{}", desc.bright_black(), "│").bright_black());
+            theme::paint(Role::Primary, "│"),
+            theme::paint(Role::Accent, cmd),
+            theme::paint(Role::Dim, format!("{:<28}{}", desc, "│")));
     }
     println!("  {}",
-        "│                                            │".bright_green());
+        theme::paint(Role::Primary, "│                                            │"));
     println!("  {}",
-        "├─ tools (auto-called by model) ─────────────┤".bright_green());
+        theme::paint(Role::Primary, "├─ tools (auto-called by model) ─────────────┤"));
     let tool_cmds = [
         ("read_file",    "read any file on disk"),
         ("write_file",   "create or overwrite files"),
@@ -389,14 +393,14 @@ pub fn print_help() {
     ];
     for (cmd, desc) in &tool_cmds {
         println!("  {} {:<14} {}",
-            "│".bright_green(),
-            cmd.bright_cyan(),
-            format!("{:<28}{}", desc.bright_black(), "│").bright_black());
+            theme::paint(Role::Primary, "│"),
+            theme::paint(Role::Accent, cmd),
+            theme::paint(Role::Dim, format!("{:<28}{}", desc, "│")));
     }
     println!("  {}",
-        "│                                            │".bright_green());
+        theme::paint(Role::Primary, "│                                            │"));
     println!("  {}",
-        "├─ auto-memory (markers in responses) ───────┤".bright_green());
+        theme::paint(Role::Primary, "├─ auto-memory (markers in responses) ───────┤"));
     let mem_cmds = [
         ("[REMEMBER: x]",      "store a fact or preference"),
         ("[PREFERENCE: k = v]", "store a key-value preference"),
@@ -404,12 +408,12 @@ pub fn print_help() {
     ];
     for (cmd, desc) in &mem_cmds {
         println!("  {} {:<22} {}",
-            "│".bright_green(),
-            cmd.bright_magenta(),
-            format!("{:<20}{}", desc.bright_black(), "│").bright_black());
+            theme::paint(Role::Primary, "│"),
+            theme::paint(Role::Accent, cmd),
+            theme::paint(Role::Dim, format!("{:<20}{}", desc, "│")));
     }
     println!("  {}",
-        "└────────────────────────────────────────────┘".bright_green());
+        theme::paint(Role::Primary, "└────────────────────────────────────────────┘"));
     println!();
     std::io::stdout().flush().ok();
 }
@@ -420,7 +424,7 @@ pub fn print_help() {
 fn color_kaomojis(text: &str) -> String {
     let mut result = text.to_string();
     for k in KAOMOJIS {
-        let colored = format!("{}", k.bright_magenta());
+        let colored = format!("{}", theme::paint(Role::Accent, k));
         result = result.replace(k, &colored);
     }
     result
@@ -432,8 +436,8 @@ fn format_code_block(code: &str) -> String {
     for line in code.lines() {
         out.push_str(&format!(
             "  {} {}\n",
-            "▐".bright_black(),
-            line.on_bright_black()
+            theme::paint(Role::Dim, "▐"),
+            theme::code_line(line)
         ));
     }
     out
@@ -463,7 +467,7 @@ pub fn format_response(text: &str) -> String {
             if trimmed.is_empty() {
                 out.push('\n');
             } else if trimmed.starts_with("#") {
-                out.push_str(&format!("{}\n", trimmed.bright_cyan().bold()));
+                out.push_str(&format!("{}\n", theme::bold(Role::Accent, trimmed)));
             } else {
                 out.push_str(&format!("{}\n", line));
             }

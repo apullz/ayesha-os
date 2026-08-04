@@ -1,0 +1,49 @@
+{
+  "github": {
+    "repo": "apullz/ayesha-os",
+    "branch": "master",
+    "token_env": "GITHUB_TOKEN",
+    "auto_push": true,
+    "auto_pull": true,
+    "sync_interval": 300,
+    "watch_patterns": [
+      "*.py",
+      "*.json",
+      "*.md"
+    ]
+  },
+  "huggingface": {
+    "space_id": "apullz/ayesha-spaces",
+    "model_id": "apullz/ayesha",
+    "token_env": "HF_TOKEN",
+    "auto_sync": true,
+    "sync_interval": 60,
+    "sync_models": false,
+    "sync_spaces": true
+  },
+  "local": {
+    "watch_dir": "",
+    "state_dir": ".tri_mind_state",
+    "auto_watch": true,
+    "sync_interval": 30,
+    "exclude_patterns": [
+      "__pycache__",
+      "*.pyc",
+      ".git",
+      "node_modules",
+      "*.egg-info",
+      ".env",
+      ".env.*",
+      "target"
+    ]
+  },
+  "conflict": {
+    "strategy": "last_write_wins",
+    "auto_resolve": true,
+    "log_conflicts": true,
+    "conflict_dir": ".tri_mind_conflicts"
+  },
+  "sync_enabled": true,
+  "log_level": "INFO",
+  "config_path": "tri_mind_sync.json"
+}

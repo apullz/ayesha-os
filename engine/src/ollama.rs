@@ -1,9 +1,9 @@
-use colored::Colorize;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use anyhow::Result;
 use std::time::Duration;
+use crate::theme::{self, Role};
 
 const OLLAMA_BASE: &str = "http://localhost:11434";
 
@@ -364,7 +364,7 @@ impl OllamaClient {
                 match parser.feed_line(&line) {
                     StreamLine::Content(text, thinking) => {
                         if thinking {
-                            print!("{}", text.bright_black());
+                            print!("{}", theme::paint(Role::Dim, &text.to_string()));
                         } else {
                             print!("{}", text);
                         }

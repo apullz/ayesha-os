@@ -232,6 +232,46 @@ try:
 except Exception:
     CONFIG = {}
 
+# ── theme (driven by ayesha.json → theme.palette) ────────────────────────
+_DEFAULT_PALETTE = {
+    "background": "#0a0a0f", "surface": "#0d0d14", "text": "#e0e0e0",
+    "primary": "#00ffff", "accent": "#ff66ff", "secondary": "#ff00ff",
+    "success": "#00ff88", "dim": "#b0b0b0", "border": "#1a1a2e",
+}
+PAL = {**_DEFAULT_PALETTE, **(CONFIG.get("theme", {}).get("palette") or {})}
+
+
+def _rgb(hexstr):
+    h = hexstr.lstrip("#")
+    return ", ".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))
+
+
+# cyberpunk tokens baked into the CSS → palette roles
+_CSS_SWAP = {
+    "#0a0a0f": PAL["background"],
+    "#0d0d14": PAL["surface"],
+    "#12121c": PAL["surface"],
+    "#14101a": PAL["surface"],
+    "#1a1a2e": PAL["border"],
+    "#00ffff": PAL["primary"],
+    "#ff00ff": PAL["secondary"],
+    "#ff66ff": PAL["accent"],
+    "#ffccff": PAL["text"],
+    "#e0e0e0": PAL["text"],
+    "#b0b0b0": PAL["dim"],
+    "#00ff88": PAL["success"],
+}
+
+
+def _apply_palette(css):
+    for old, new in _CSS_SWAP.items():
+        css = css.replace(old, new)
+    css = css.replace("rgba(0, 255, 255", f"rgba({_rgb(PAL['primary'])}")
+    css = css.replace("rgba(255, 0, 255", f"rgba({_rgb(PAL['secondary'])}")
+    css = css.replace("rgba(0, 255, 136", f"rgba({_rgb(PAL['success'])}")
+    return css
+
+
 CUSTOM_CSS = """
 /* ═══════════════════════════════════════════════════════════════════
    AYESHA CYBERPUNK THEME
@@ -453,6 +493,8 @@ textarea:focus, .input-text textarea:focus {
 }
 """
 
+CUSTOM_CSS = _apply_palette(CUSTOM_CSS)
+
 
 def build_sidebar():
     """Build the info sidebar HTML"""
@@ -464,7 +506,7 @@ def build_sidebar():
     return f"""
     <div class="info-panel">
         <h3>⚡ ayesha v{version}</h3>
-        <p style="color: #ff66ff;">otaku genki ai — lowercase only</p>
+        <p style="color: {PAL['accent']};">otaku genki ai — lowercase only</p>
         <br>
         <h3>🧬 personality layers</h3>
         <ul>
@@ -482,7 +524,7 @@ def build_sidebar():
         <h3>📡 session</h3>
         <p>user: <span class="highlight">{user}</span></p>
         <p>messages: <span class="highlight" id="msg-count">0</span></p>
-        <p>status: <span style="color: #00ff88;">● online</span></p>
+        <p>status: <span style="color: {PAL['success']};">● online</span></p>
     </div>
     """
 
@@ -535,49 +577,49 @@ with gr.Blocks(
         secondary_hue="purple",
         neutral_hue="slate",
     ).set(
-        body_background_fill="#0a0a0f",
-        body_background_fill_dark="#0a0a0f",
-        block_background_fill="#0d0d14",
-        block_background_fill_dark="#0d0d14",
-        block_border_color="#1a1a2e",
-        block_border_color_dark="#1a1a2e",
-        block_label_text_color="#888888",
-        block_label_text_color_dark="#888888",
-        block_title_text_color="#00ffff",
-        block_title_text_color_dark="#00ffff",
-        input_background_fill="#0d0d14",
-        input_background_fill_dark="#0d0d14",
-        input_border_color="#1a1a2e",
-        input_border_color_dark="#1a1a2e",
-        input_border_color_focus="#00ffff",
-        input_border_color_focus_dark="#00ffff",
-        button_primary_background_fill="#00ffff",
-        button_primary_background_fill_dark="#00ffff",
-        button_primary_text_color="#0a0a0f",
-        button_primary_text_color_dark="#0a0a0f",
+        body_background_fill=PAL["background"],
+        body_background_fill_dark=PAL["background"],
+        block_background_fill=PAL["surface"],
+        block_background_fill_dark=PAL["surface"],
+        block_border_color=PAL["border"],
+        block_border_color_dark=PAL["border"],
+        block_label_text_color=PAL["dim"],
+        block_label_text_color_dark=PAL["dim"],
+        block_title_text_color=PAL["primary"],
+        block_title_text_color_dark=PAL["primary"],
+        input_background_fill=PAL["surface"],
+        input_background_fill_dark=PAL["surface"],
+        input_border_color=PAL["border"],
+        input_border_color_dark=PAL["border"],
+        input_border_color_focus=PAL["primary"],
+        input_border_color_focus_dark=PAL["primary"],
+        button_primary_background_fill=PAL["primary"],
+        button_primary_background_fill_dark=PAL["primary"],
+        button_primary_text_color=PAL["background"],
+        button_primary_text_color_dark=PAL["background"],
         button_secondary_background_fill="transparent",
         button_secondary_background_fill_dark="transparent",
-        button_secondary_border_color="#00ffff",
-        button_secondary_border_color_dark="#00ffff",
-        button_secondary_text_color="#00ffff",
-        button_secondary_text_color_dark="#00ffff",
-        checkbox_background_color="#0d0d14",
-        checkbox_background_color_dark="#0d0d14",
-        slider_color="#00ffff",
-        slider_color_dark="#00ffff",
-        cta_background_fill="#ff00ff",
-        cta_background_fill_dark="#ff00ff",
-        cta_text_color="#0a0a0f",
-        cta_text_color_dark="#0a0a0f",
-        cta_background_fill_hover="#ff33ff",
-        cta_background_fill_hover_dark="#ff33ff",
+        button_secondary_border_color=PAL["primary"],
+        button_secondary_border_color_dark=PAL["primary"],
+        button_secondary_text_color=PAL["primary"],
+        button_secondary_text_color_dark=PAL["primary"],
+        checkbox_background_color=PAL["surface"],
+        checkbox_background_color_dark=PAL["surface"],
+        slider_color=PAL["primary"],
+        slider_color_dark=PAL["primary"],
+        cta_background_fill=PAL["accent"],
+        cta_background_fill_dark=PAL["accent"],
+        cta_text_color=PAL["background"],
+        cta_text_color_dark=PAL["background"],
+        cta_background_fill_hover=PAL["accent"],
+        cta_background_fill_hover_dark=PAL["accent"],
     ),
 ) as demo:
     # Header
-    gr.HTML("""
+    gr.HTML(f"""
         <div style="text-align: center; padding: 20px 0 10px 0;">
             <h1 style="
-                color: #00ffff;
+                color: {PAL['primary']};
                 font-size: 2.5em;
                 letter-spacing: 6px;
                 text-transform: uppercase;
@@ -586,13 +628,13 @@ with gr.Blocks(
                 font-family: 'Fira Code', 'Cascadia Code', monospace;
             ">AYESHA</h1>
             <p style="
-                color: #ff66ff;
+                color: {PAL['accent']};
                 font-size: 0.9em;
                 letter-spacing: 3px;
                 text-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
                 margin: 5px 0 0 0;
                 font-family: 'Fira Code', monospace;
-            ">personality engine v""" + str(CONFIG.get("version", "?")) + """</p>
+            ">personality engine v{CONFIG.get('version', '?')}</p>
             <p style="
                 color: #555;
                 font-size: 0.75em;

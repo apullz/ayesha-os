@@ -1,17 +1,33 @@
 {
   ".gitignore": {
     "rel_path": ".gitignore",
-    "size": 413,
-    "modified_at": "2026-07-26T11:29:40.186646",
-    "sha256": "6ec76401b1896efc0f5de0cf711e17aa6cf760ff2d9b20be0add7eb1aa935c18",
+    "size": 718,
+    "modified_at": "2026-08-02T17:06:45.652702",
+    "sha256": "0daa2dc704993172092da4fec068025426bb13953d2d00e2f0ad151efe6a9427",
+    "source": "local",
+    "status": "synced"
+  },
+  ".timer-end": {
+    "rel_path": ".timer-end",
+    "size": 21,
+    "modified_at": "2026-07-31T06:55:05.830390",
+    "sha256": "9cdc87fa91883a9dcaa639837e31fee7a2ae75305e87c904cbd9014fb6a3b05c",
+    "source": "local",
+    "status": "synced"
+  },
+  ".timer-start": {
+    "rel_path": ".timer-start",
+    "size": 21,
+    "modified_at": "2026-07-31T06:55:05.825387",
+    "sha256": "36ee46ed4acbb1bf8b14f49d28ab1f05a4f38b6c8523cfad8da4d6c1b3917927",
     "source": "local",
     "status": "synced"
   },
   "AGENTS.md": {
     "rel_path": "AGENTS.md",
-    "size": 3383,
-    "modified_at": "2026-07-26T14:29:46.875573",
-    "sha256": "0d13ef0fd9c91c448fc3c204af61eaa6f6666008bdd3dfbb2842ebdf549d1a8d",
+    "size": 3878,
+    "modified_at": "2026-08-01T19:03:52.438727",
+    "sha256": "73247b33ed5878d29022e778dfe155854fcb083eafb0bae59570f4ef7fad1d64",
     "source": "local",
     "status": "synced"
   },
@@ -25,17 +41,9 @@
   },
   "ayesha.json": {
     "rel_path": "ayesha.json",
-    "size": 3505,
-    "modified_at": "2026-07-28T05:13:07.635567",
-    "sha256": "3ec17bebc542ecb993b2b2b01aecccfc380e726e566997f845433df208e25020",
-    "source": "local",
-    "status": "synced"
-  },
-  "desktopcat-portable.zip": {
-    "rel_path": "desktopcat-portable.zip",
-    "size": 1975024,
-    "modified_at": "2026-07-29T14:59:42.464439",
-    "sha256": "60121099c1a8610d67d04374876afb8f83be3f6d9db6bebb925f737dd54375c0",
+    "size": 3600,
+    "modified_at": "2026-08-02T18:40:12.679627",
+    "sha256": "b8770f1e7830b9952267f3f81a39b9ff231aab9bbf7fb08464d4e605a36b820a",
     "source": "local",
     "status": "synced"
   },
@@ -57,33 +65,129 @@
   },
   "README.md": {
     "rel_path": "README.md",
-    "size": 8436,
-    "modified_at": "2026-07-26T11:29:40.18873",
-    "sha256": "42aab7841bd2bcb01725e44cad3b5725d78b4de236e6f1d4a4785933c852a4cb",
+    "size": 11708,
+    "modified_at": "2026-08-01T19:03:37.291512",
+    "sha256": "6dde7e4b90f0f4f9cddc8c2778a282adf835348f205fd4e2709ae7c2791ec6ec",
     "source": "local",
     "status": "synced"
   },
   "STATUS.md": {
     "rel_path": "STATUS.md",
-    "size": 3527,
-    "modified_at": "2026-07-26T11:29:40.190018",
-    "sha256": "6038faa798dd1a2c729be5c63f5259a333796c058b112a6f43245052e48b2ee7",
+    "size": 5586,
+    "modified_at": "2026-08-01T19:03:32.398417",
+    "sha256": "f5886e24f8eb8c727b839d4880cb55a7b1ec6bf892f0661e3871f0b8738f2562",
+    "source": "local",
+    "status": "synced"
+  },
+  "test-output.txt": {
+    "rel_path": "test-output.txt",
+    "size": 616,
+    "modified_at": "2026-08-01T06:47:37.393171",
+    "sha256": "27c591465b2108118ae4bd13fa43019b736401f0158f7b894ba1fa4eea9eaa79",
+    "source": "local",
+    "status": "synced"
+  },
+  "tri_mind_sync.json": {
+    "rel_path": "tri_mind_sync.json",
+    "size": 1010,
+    "modified_at": "2026-08-04T20:34:05.044577",
+    "sha256": "dd9aa0cacf81d192b31ecee8eccbce99baa0dafd5a711b03dba2eb1b9b10dd99",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\state.json": {
+    "rel_path": ".automation\\state.json",
+    "size": 4665,
+    "modified_at": "2026-08-02T17:04:40.215384",
+    "sha256": "81f0bcc46daa6d483f9ac16898f85283e97536f41d42edf0e71a271505197d64",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\harness.log": {
+    "rel_path": ".automation\\logs\\harness.log",
+    "size": 2479,
+    "modified_at": "2026-08-02T17:07:01.867439",
+    "sha256": "84ab3b596a0eca6453d047fe7813461c20b96b524f6c0eb048226f85ed5a0b72",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\run-20260802-170423.log": {
+    "rel_path": ".automation\\logs\\run-20260802-170423.log",
+    "size": 588,
+    "modified_at": "2026-08-02T17:04:40.219383",
+    "sha256": "5979de631b302c55e117e58693d084f78955f28637a30b1228588692f2457f37",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\run-20260802-170449.log": {
+    "rel_path": ".automation\\logs\\run-20260802-170449.log",
+    "size": 218,
+    "modified_at": "2026-08-02T17:05:14.271631",
+    "sha256": "a2f7f289ca4e1d93f3924ceb94aab3b46fdaf865bf0ceaa9a4da3039c4b0b9b0",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\run-20260802-170529.log": {
+    "rel_path": ".automation\\logs\\run-20260802-170529.log",
+    "size": 350,
+    "modified_at": "2026-08-02T17:05:43.995248",
+    "sha256": "6609f00551483ee2bcf01846c63583e3166581d24e3fa0bb9848b2c988eb479c",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\run-20260802-170551.log": {
+    "rel_path": ".automation\\logs\\run-20260802-170551.log",
+    "size": 466,
+    "modified_at": "2026-08-02T17:06:00.323039",
+    "sha256": "6b5617f2bb125cacda0f2e1abc024fa0ff2e7c2edee98859f4fb04653b567d66",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\run-20260802-170607.log": {
+    "rel_path": ".automation\\logs\\run-20260802-170607.log",
+    "size": 506,
+    "modified_at": "2026-08-02T17:06:15.387208",
+    "sha256": "d5b21bd3efeab22a8776093e619dfd505d7e0594ce74995c2d72be037a083961",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\logs\\run-20260802-170651.log": {
+    "rel_path": ".automation\\logs\\run-20260802-170651.log",
+    "size": 351,
+    "modified_at": "2026-08-02T17:07:01.867439",
+    "sha256": "fb5faaefeb8e6e3357baafb37bf99d798e311acd5104a0c7af84932f54262bb6",
+    "source": "local",
+    "status": "synced"
+  },
+  ".automation\\tasks\\README.txt": {
+    "rel_path": ".automation\\tasks\\README.txt",
+    "size": 1195,
+    "modified_at": "2026-08-02T17:06:45.176457",
+    "sha256": "faa3352c23657d0e5f5b21226a80f5ca5faeb8c4ab728744de8d8c8ec5cdbfaf",
+    "source": "local",
+    "status": "synced"
+  },
+  ".github\\workflows\\harness.yml": {
+    "rel_path": ".github\\workflows\\harness.yml",
+    "size": 1282,
+    "modified_at": "2026-08-03T10:35:10.640430",
+    "sha256": "4bcf40648d194dd37a3015249c61563ec538e3a595570dd67a73935d05867e27",
     "source": "local",
     "status": "synced"
   },
   ".tri_mind_state\\engine_state.json": {
     "rel_path": ".tri_mind_state\\engine_state.json",
     "size": 400,
-    "modified_at": "2026-07-29T15:57:40.980101",
-    "sha256": "6ebc3713dfda0fe3b01a4d867c0434010013d50b6b6d27d4fe46ab3551f157be",
+    "modified_at": "2026-08-04T20:33:00.571557",
+    "sha256": "c2755bd13e83b68ab04f4247466cccdb9d4a5c26fbd99248cb15d4beb079469b",
     "source": "local",
     "status": "synced"
   },
   ".tri_mind_state\\local_manifests.json": {
     "rel_path": ".tri_mind_state\\local_manifests.json",
-    "size": 88611,
-    "modified_at": "2026-07-30T06:56:07.341609",
-    "sha256": "a9b180131bdf0352a46c0bffd8d988d01299af555e60c95dfb81ac647d6d1fb1",
+    "size": 65096,
+    "modified_at": "2026-08-04T20:33:11.312707",
+    "sha256": "5a9cf21939fdf0e84070f502a02498afb1cf237be24ca3eeba139fc0a7dd2717",
     "source": "local",
     "status": "synced"
   },
@@ -97,9 +201,9 @@
   },
   "applets\\desktop-cat\\desktopcat.py": {
     "rel_path": "applets\\desktop-cat\\desktopcat.py",
-    "size": 12273,
-    "modified_at": "2026-07-26T11:29:40.223291",
-    "sha256": "05cf2262c5888bbf70ada80bd7f99e542c7c0eb9bc151e547a92d5006e0a0667",
+    "size": 16309,
+    "modified_at": "2026-08-02T18:51:38.086992",
+    "sha256": "1680ca2e89abb914179ad55d583be895c36cb9614c1ec7047bbe56b6f90aef9e",
     "source": "local",
     "status": "synced"
   },
@@ -162,40 +266,48 @@
   "applets\\flora-cli\\.gitignore": {
     "rel_path": "applets\\flora-cli\\.gitignore",
     "size": 81,
-    "modified_at": "2026-07-26T11:29:40.23294",
+    "modified_at": "2026-07-26T11:29:40.232940",
     "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\cli.ts": {
     "rel_path": "applets\\flora-cli\\cli.ts",
-    "size": 16472,
-    "modified_at": "2026-07-26T11:29:40.235826",
-    "sha256": "090d0e8e3090683fe6dcaeb27e413082197ff61a06dab68ce38da6474c65c29a",
+    "size": 20337,
+    "modified_at": "2026-08-02T18:44:24.071604",
+    "sha256": "da42f9e0504d3432088281e486ec910ce03c46366c45d8b40577d5dd68dee36c",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\index.html": {
     "rel_path": "applets\\flora-cli\\index.html",
-    "size": 324,
-    "modified_at": "2026-07-26T11:29:40.236829",
-    "sha256": "14b01fd6e63b0e4e24d9e9f294720c6569bd5efe01342eb1c1db04f2c60c3e1a",
+    "size": 334,
+    "modified_at": "2026-07-31T10:08:11.636870",
+    "sha256": "df8b36dc0d6fd71df0be26502389a3ecf67282fbcbbef072955640bb17b9fa99",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\metadata.json": {
     "rel_path": "applets\\flora-cli\\metadata.json",
-    "size": 355,
-    "modified_at": "2026-07-26T11:29:40.236829",
-    "sha256": "39a4bf990fd36e05fb867464600dbb43db05848d00a8bbde2f3e5343c734a5c0",
+    "size": 339,
+    "modified_at": "2026-07-31T07:11:51.512452",
+    "sha256": "1fc5ba0d76ed8fd807bc6705a9bd93fdad13aebb0ab188dd6d1f4dee3006860c",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\flora-cli\\package-lock.json": {
+    "rel_path": "applets\\flora-cli\\package-lock.json",
+    "size": 137388,
+    "modified_at": "2026-07-31T08:46:36.527604",
+    "sha256": "064338b8d11f7774b4dec76b82b7f6fefb5edf8265287cffa45ac9feff650fd4",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\package.json": {
     "rel_path": "applets\\flora-cli\\package.json",
-    "size": 1013,
-    "modified_at": "2026-07-26T11:29:40.238343",
-    "sha256": "cd140a04bfb0416c6d92d836ac042333dab0ccb29f484b4c1d78113a6b693d98",
+    "size": 1009,
+    "modified_at": "2026-07-31T07:11:30.375899",
+    "sha256": "4782511bedee0fdc453ec1c9f1458c7049378da9594c8bb95d604d4b8fc87d2a",
     "source": "local",
     "status": "synced"
   },
@@ -209,9 +321,9 @@
   },
   "applets\\flora-cli\\server.ts": {
     "rel_path": "applets\\flora-cli\\server.ts",
-    "size": 3224,
-    "modified_at": "2026-07-26T11:29:40.238343",
-    "sha256": "8a02c0faf9c1e69c3d5bbb736ad7dbb007f336be22b67ecd18ef72e7e99e6f3f",
+    "size": 4544,
+    "modified_at": "2026-08-01T16:54:19.300406",
+    "sha256": "8b9bc9cdc14461f3a5bafa6e49c0c6790637cd36358604f67ef38a4d8e99079e",
     "source": "local",
     "status": "synced"
   },
@@ -225,17 +337,57 @@
   },
   "applets\\flora-cli\\vite.config.ts": {
     "rel_path": "applets\\flora-cli\\vite.config.ts",
-    "size": 730,
-    "modified_at": "2026-07-26T11:29:40.251348",
-    "sha256": "b990c4afdfb5195bdc994739210dbfeb0b5eece38bd0caf2a76d44b2ee97c6bb",
+    "size": 728,
+    "modified_at": "2026-08-01T16:54:29.313258",
+    "sha256": "4842aa03485f26bee8bc863763162bdb8942c3539f00719bfb7b63a39e9b9063",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\flora-cli\\dist\\index.html": {
+    "rel_path": "applets\\flora-cli\\dist\\index.html",
+    "size": 432,
+    "modified_at": "2026-08-01T16:56:22.700274",
+    "sha256": "443bb702574929931ab396a64d40b0fc81362beac4f13f1ec0c28459578b8fa6",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\flora-cli\\dist\\server.cjs": {
+    "rel_path": "applets\\flora-cli\\dist\\server.cjs",
+    "size": 4926,
+    "modified_at": "2026-08-01T16:56:22.804242",
+    "sha256": "aa076e591d2c1791371dd794eacf2f31ec55ad41e2efa779b7974b81e6aaac01",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\flora-cli\\dist\\server.cjs.map": {
+    "rel_path": "applets\\flora-cli\\dist\\server.cjs.map",
+    "size": 6857,
+    "modified_at": "2026-08-01T16:56:22.803729",
+    "sha256": "614215a68b52f9f6f00ca97441201aecbf3bde426f9637c71074d417ac9d40f3",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\flora-cli\\dist\\assets\\index-B364Obyr.js": {
+    "rel_path": "applets\\flora-cli\\dist\\assets\\index-B364Obyr.js",
+    "size": 285130,
+    "modified_at": "2026-08-01T16:56:22.700274",
+    "sha256": "986d64418cdb5560728f712cfae884de9791a5c4f7b276d53b780febb2dce41b",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\flora-cli\\dist\\assets\\index-BXm9VFc7.css": {
+    "rel_path": "applets\\flora-cli\\dist\\assets\\index-BXm9VFc7.css",
+    "size": 34815,
+    "modified_at": "2026-08-01T16:56:22.700274",
+    "sha256": "8ce078be9c282c6abe5228a479064f2611c0cca5e1aaafbdc599e4cd853817cc",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\src\\App.tsx": {
     "rel_path": "applets\\flora-cli\\src\\App.tsx",
-    "size": 9882,
-    "modified_at": "2026-07-26T11:29:40.240832",
-    "sha256": "cbdd2371625749e61b800608bf6674bc43b47c940968536d70026e2720328725",
+    "size": 9867,
+    "modified_at": "2026-08-01T16:54:33.829011",
+    "sha256": "80db90dfcce20fd85081d9d23473c950d1b098d10e76a4cd352cfc98f6dffe44",
     "source": "local",
     "status": "synced"
   },
@@ -265,24 +417,24 @@
   },
   "applets\\flora-cli\\src\\components\\FieldGuide.tsx": {
     "rel_path": "applets\\flora-cli\\src\\components\\FieldGuide.tsx",
-    "size": 17368,
-    "modified_at": "2026-07-26T11:29:40.242357",
-    "sha256": "9aa079fe08649e374d3e4c282d4cff98c4a1040493de190456edf54bb33ecd13",
+    "size": 17438,
+    "modified_at": "2026-07-31T10:13:28.561790",
+    "sha256": "905fc10c29e963397dbb596d1cef5a4a954af8b4d27c956ede86bde170e0dc95",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\src\\components\\Terminal.tsx": {
     "rel_path": "applets\\flora-cli\\src\\components\\Terminal.tsx",
-    "size": 24191,
-    "modified_at": "2026-07-26T11:29:40.244193",
-    "sha256": "0622201cc0eb9c2d52b4064bd0827a7481001de77dad973437553f06cc618740",
+    "size": 26058,
+    "modified_at": "2026-08-01T16:53:53.430708",
+    "sha256": "8099ed4b5650b2af6f3b0731af2cb3f43f576a664e6bea6eadb196903870f00c",
     "source": "local",
     "status": "synced"
   },
   "applets\\flora-cli\\src\\components\\VisualTree.tsx": {
     "rel_path": "applets\\flora-cli\\src\\components\\VisualTree.tsx",
     "size": 24970,
-    "modified_at": "2026-07-26T11:29:40.2452",
+    "modified_at": "2026-07-26T11:29:40.245200",
     "sha256": "efad3582a82c338603958b9e543d16ce93693b43214fab327cdf15c8cf43e241",
     "source": "local",
     "status": "synced"
@@ -295,187 +447,35 @@
     "source": "local",
     "status": "synced"
   },
-  "applets\\neural-strike\\config.py": {
-    "rel_path": "applets\\neural-strike\\config.py",
-    "size": 1957,
-    "modified_at": "2026-07-26T11:29:40.256667",
-    "sha256": "3feb9d3b50b1d6a576d5250e1d17ad470f812a116fe691350b28754671252b4c",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\main.py": {
-    "rel_path": "applets\\neural-strike\\main.py",
-    "size": 1320,
-    "modified_at": "2026-07-26T11:29:40.268609",
-    "sha256": "3b7c1a111ef9e4403890185fdd63b2b5482a7c96f0099797cf1ba72b33a2df8f",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\README.md": {
-    "rel_path": "applets\\neural-strike\\README.md",
-    "size": 5401,
-    "modified_at": "2026-07-26T11:29:40.253313",
-    "sha256": "312094a0c4681ad2f8d61c920538ed851acc424a0ad33bd7c28531ef9e729841",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\requirements.txt": {
-    "rel_path": "applets\\neural-strike\\requirements.txt",
-    "size": 53,
-    "modified_at": "2026-07-26T11:29:40.269307",
-    "sha256": "4b9f2145016b2ab051c0f3f9b66559f5e96901400aa8bfdc22c2f63593e34bff",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\run.bat": {
-    "rel_path": "applets\\neural-strike\\run.bat",
-    "size": 211,
-    "modified_at": "2026-07-26T11:29:40.26981",
-    "sha256": "cf4cec397d47018db8075cd2ced452f3a44607495f2e83719027b91ab5d8299e",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\assets\\theme.qss": {
-    "rel_path": "applets\\neural-strike\\assets\\theme.qss",
-    "size": 6168,
-    "modified_at": "2026-07-26T11:29:40.255317",
-    "sha256": "81dd4f9e8fbb2510f4f88edd71fda554c7af0d8566861ba9a1b724f9c22daa0e",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\data\\database.py": {
-    "rel_path": "applets\\neural-strike\\data\\database.py",
-    "size": 7705,
-    "modified_at": "2026-07-26T11:29:40.259825",
-    "sha256": "103289d35f2f9135cd53651835607268112599fa0b7770863301aa802253d8cb",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\data\\exported_features.json": {
-    "rel_path": "applets\\neural-strike\\data\\exported_features.json",
-    "size": 1099615,
-    "modified_at": "2026-07-26T11:29:40.265814",
-    "sha256": "b3eeaa879ce2c8e11e6dcf62850b0f133b173de3f19b8a4723ce0cb9867a5edc",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\data\\neural_strike.db": {
-    "rel_path": "applets\\neural-strike\\data\\neural_strike.db",
-    "size": 45056,
-    "modified_at": "2026-07-26T11:29:40.266316",
-    "sha256": "cc03f23a16ac63e189dabddeb5a027c88c83083787f1f2bad66c03551a9a879b",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\data\\neuronpedia_client.py": {
-    "rel_path": "applets\\neural-strike\\data\\neuronpedia_client.py",
-    "size": 3150,
-    "modified_at": "2026-07-26T11:29:40.267828",
-    "sha256": "8fa3e80969d44ff1d46d03abaaa980a27b38d932724c5de3065abd2e5d5f1de0",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\data\\__init__.py": {
-    "rel_path": "applets\\neural-strike\\data\\__init__.py",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.257821",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\ui\\effects.py": {
-    "rel_path": "applets\\neural-strike\\ui\\effects.py",
-    "size": 5157,
-    "modified_at": "2026-07-26T11:29:40.272547",
-    "sha256": "88154a457ba06b79298b8272ea841ef602ad8946adc24d27db1fd85491fc45bd",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\ui\\feature_inspector.py": {
-    "rel_path": "applets\\neural-strike\\ui\\feature_inspector.py",
-    "size": 7758,
-    "modified_at": "2026-07-26T11:29:40.27355",
-    "sha256": "f4208f6434af89554a7d7141f9f246f54eb0ef45529fb378d0d6d6adcbaac976",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\ui\\main_window.py": {
-    "rel_path": "applets\\neural-strike\\ui\\main_window.py",
-    "size": 16173,
-    "modified_at": "2026-07-26T11:29:40.274307",
-    "sha256": "6019b36502eddb293a2fd4e49ef0e63e238ffec2ad15193a993d2ef38b539cc3",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\ui\\token_scanner.py": {
-    "rel_path": "applets\\neural-strike\\ui\\token_scanner.py",
-    "size": 6126,
-    "modified_at": "2026-07-26T11:29:40.275309",
-    "sha256": "ec1920df55cd946b53b7014bfed55bf92f24b06dcb982bda23d1f78022a6e82e",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\ui\\umap_viewport.py": {
-    "rel_path": "applets\\neural-strike\\ui\\umap_viewport.py",
-    "size": 10444,
-    "modified_at": "2026-07-26T11:29:40.276309",
-    "sha256": "35cdc97bcb4ca62c4bc646544a1339090903e7ed57ad91ed38eaa69ebe0eab25",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\neural-strike\\ui\\__init__.py": {
-    "rel_path": "applets\\neural-strike\\ui\\__init__.py",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.271319",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "source": "local",
-    "status": "synced"
-  },
   "applets\\poopy-tui\\.gitignore": {
     "rel_path": "applets\\poopy-tui\\.gitignore",
-    "size": 46,
-    "modified_at": "2026-07-26T06:50:46.288945",
-    "sha256": "5e7e62d702a15ebdf4486842bea60ff5bd95d01b2b072a71fb42a02e49178977",
+    "size": 68,
+    "modified_at": "2026-07-31T02:48:55.597871",
+    "sha256": "423845de5d8b37d2136966ef603ea7125ea3edbbb7b14faaef0db3b2458be4b4",
     "source": "local",
     "status": "synced"
   },
   "applets\\poopy-tui\\auth.py": {
     "rel_path": "applets\\poopy-tui\\auth.py",
-    "size": 8605,
-    "modified_at": "2026-07-28T04:58:44.932243",
-    "sha256": "0ebf2d5f0f3a60aed911fb3f4fa9f1576839b8bd07fb1b98586c3d77d99155d4",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\poopy-tui\\bot.py": {
-    "rel_path": "applets\\poopy-tui\\bot.py",
-    "size": 8456,
-    "modified_at": "2026-07-28T05:01:00.705534",
-    "sha256": "7db7818bca1c7165af1c39766d8ff72b0c2dec83a2e420d02210b248d0f9f23e",
+    "size": 9428,
+    "modified_at": "2026-07-31T11:02:50.101448",
+    "sha256": "26c96a874e1e5acc48f9361de44e7235560b1561bbd66f170ff1fdf7fb65708f",
     "source": "local",
     "status": "synced"
   },
   "applets\\poopy-tui\\client.py": {
     "rel_path": "applets\\poopy-tui\\client.py",
-    "size": 11241,
-    "modified_at": "2026-07-28T04:58:47.174701",
-    "sha256": "464c968f49cbfc20bccfb0a47bd74a1f2ed63bd3d3f61379c9c9a5429213949f",
+    "size": 11421,
+    "modified_at": "2026-08-01T16:52:45.556857",
+    "sha256": "b5edd0ab1b1dbbc53c54aa957083028f6ee1f8c70db9a7764e8ff7b7677da2ba",
     "source": "local",
     "status": "synced"
   },
   "applets\\poopy-tui\\config.py": {
     "rel_path": "applets\\poopy-tui\\config.py",
-    "size": 205,
-    "modified_at": "2026-07-28T04:58:42.179744",
-    "sha256": "b38c25b73d1040ea6cdd646dd84a4014548de7fe39311c29be3e8aefccfcd701",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\poopy-tui\\crash_runner.py": {
-    "rel_path": "applets\\poopy-tui\\crash_runner.py",
-    "size": 636,
-    "modified_at": "2026-07-26T10:18:59.456616",
-    "sha256": "0f552b07efa0f5b8fb4b7f2cfcfa161e4695581e1acc8751560b74f2a313d933",
+    "size": 1185,
+    "modified_at": "2026-08-01T16:53:20.319352",
+    "sha256": "71157fcd983a87671e01ae6c091e76cffcc282a28fb88049be4abd45435125d0",
     "source": "local",
     "status": "synced"
   },
@@ -495,11 +495,19 @@
     "source": "local",
     "status": "synced"
   },
+  "applets\\poopy-tui\\pytest.ini": {
+    "rel_path": "applets\\poopy-tui\\pytest.ini",
+    "size": 75,
+    "modified_at": "2026-08-02T12:37:49.968473",
+    "sha256": "da9808d584f4d7bf9f89efb0e294727a7abd06903d9ae8fbc45f5dd93c59b684",
+    "source": "local",
+    "status": "synced"
+  },
   "applets\\poopy-tui\\README.md": {
     "rel_path": "applets\\poopy-tui\\README.md",
-    "size": 231,
-    "modified_at": "2026-07-26T07:08:34.865621",
-    "sha256": "5c571a482fb774fb04e45268f4e80387f07987e4f1d6d6e22a9f78a2ca9c99d4",
+    "size": 968,
+    "modified_at": "2026-07-31T02:48:57.797197",
+    "sha256": "99170ba2ee4ee21f05c37bcc98fd5271b3f694cd8fc740d358a9ebbe0034345d",
     "source": "local",
     "status": "synced"
   },
@@ -511,35 +519,67 @@
     "source": "local",
     "status": "synced"
   },
-  "applets\\poopy-tui\\test_client.py": {
-    "rel_path": "applets\\poopy-tui\\test_client.py",
-    "size": 1375,
-    "modified_at": "2026-07-26T08:36:21.98793",
-    "sha256": "d3b9a878e047fe6400be163d668f52ed58360da4af04206dbc73b689f76e98af",
-    "source": "local",
-    "status": "synced"
-  },
-  "applets\\poopy-tui\\test_token.txt": {
-    "rel_path": "applets\\poopy-tui\\test_token.txt",
-    "size": 72,
-    "modified_at": "2026-07-26T08:33:09.899839",
-    "sha256": "1e7e53306c2d027bfc3658138796efb1ec3ee8077ac21dfd5b6ac421ae3d440a",
+  "applets\\poopy-tui\\test_navigation.py": {
+    "rel_path": "applets\\poopy-tui\\test_navigation.py",
+    "size": 13723,
+    "modified_at": "2026-08-02T13:18:09.358544",
+    "sha256": "b0fc8be5409b11666791fc391e0ef24664fbb0c2f3ebc6fbfb1f60d1b535c0a9",
     "source": "local",
     "status": "synced"
   },
   "applets\\poopy-tui\\tui.py": {
     "rel_path": "applets\\poopy-tui\\tui.py",
-    "size": 48392,
-    "modified_at": "2026-07-28T04:59:20.920579",
-    "sha256": "0cf765a93fc19a09f912690811403632d206285f0a9a8552a3c3331f0e4186ed",
+    "size": 70033,
+    "modified_at": "2026-08-02T18:50:20.502792",
+    "sha256": "2a1877a0bdea6ab00574237c5b2efd68a4bc4fad916bdda0dfeffc65a29b107c",
     "source": "local",
     "status": "synced"
   },
   "applets\\poopy-tui\\voice.py": {
     "rel_path": "applets\\poopy-tui\\voice.py",
-    "size": 6626,
-    "modified_at": "2026-07-28T04:58:49.948378",
-    "sha256": "35329dee98215df2471a0741e27ea8a05ed76a1f7050f4ed00f9665dfb616a38",
+    "size": 6606,
+    "modified_at": "2026-08-01T16:53:04.867603",
+    "sha256": "ce16632ed2c5232ae127e4b6b7576c3810f4a60c41fa1db0fcc988729c49bae7",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\poopy-tui\\.pytest_cache\\.gitignore": {
+    "rel_path": "applets\\poopy-tui\\.pytest_cache\\.gitignore",
+    "size": 37,
+    "modified_at": "2026-08-02T12:38:23.690505",
+    "sha256": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\poopy-tui\\.pytest_cache\\CACHEDIR.TAG": {
+    "rel_path": "applets\\poopy-tui\\.pytest_cache\\CACHEDIR.TAG",
+    "size": 191,
+    "modified_at": "2026-08-02T12:38:23.690505",
+    "sha256": "37dc88ef9a0abeddbe81053a6dd8fdfb13afb613045ea1eb4a5c815a74a3bde4",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\poopy-tui\\.pytest_cache\\README.md": {
+    "rel_path": "applets\\poopy-tui\\.pytest_cache\\README.md",
+    "size": 302,
+    "modified_at": "2026-08-02T12:38:23.689506",
+    "sha256": "73fd6fccdd802c419a6b2d983d6c3173b7da97558ac4b589edec2dfe443db9ad",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\poopy-tui\\.pytest_cache\\v\\cache\\lastfailed": {
+    "rel_path": "applets\\poopy-tui\\.pytest_cache\\v\\cache\\lastfailed",
+    "size": 67,
+    "modified_at": "2026-08-02T13:18:30.402256",
+    "sha256": "a715d278e5467b63a1c063bfed48b06597dcb67865768b7fa03613125f88e13b",
+    "source": "local",
+    "status": "synced"
+  },
+  "applets\\poopy-tui\\.pytest_cache\\v\\cache\\nodeids": {
+    "rel_path": "applets\\poopy-tui\\.pytest_cache\\v\\cache\\nodeids",
+    "size": 1259,
+    "modified_at": "2026-08-02T18:51:14.948426",
+    "sha256": "d01fe1200b60064414bca64160ca03b9e6202f1be19dc346492188d821d4b759",
     "source": "local",
     "status": "synced"
   },
@@ -551,10 +591,18 @@
     "source": "local",
     "status": "synced"
   },
+  "applets\\poopy-tui\\logs\\messages.jsonl": {
+    "rel_path": "applets\\poopy-tui\\logs\\messages.jsonl",
+    "size": 257,
+    "modified_at": "2026-08-01T17:06:15.395555",
+    "sha256": "fde1d59134c883c385ae5acc5d68186a59f9ee1faf4b715f726eaa8290e0cbc2",
+    "source": "local",
+    "status": "synced"
+  },
   "core\\.gitattributes": {
     "rel_path": "core\\.gitattributes",
     "size": 1554,
-    "modified_at": "2026-07-26T11:29:40.309",
+    "modified_at": "2026-07-26T11:29:40.309000",
     "sha256": "88023d0a029a0c409b30c03b689c68605b559f5cefe06376e4a26b38ed795269",
     "source": "local",
     "status": "synced"
@@ -569,57 +617,25 @@
   },
   "core\\app.py": {
     "rel_path": "core\\app.py",
-    "size": 2276,
-    "modified_at": "2026-07-26T11:29:40.314134",
-    "sha256": "8c115495331bda26c0ad7ecb48834c4042972499f0df93aeab900e5a02d2978f",
+    "size": 25570,
+    "modified_at": "2026-08-02T18:41:57.566036",
+    "sha256": "8fab50a443ccf51596f5e535d74deaa68b96ed9735491ae4dbb9e2e6915083e8",
     "source": "local",
     "status": "synced"
   },
   "core\\ayesha_hive_client.py": {
     "rel_path": "core\\ayesha_hive_client.py",
-    "size": 8846,
-    "modified_at": "2026-07-26T11:29:40.315138",
-    "sha256": "84eb265391cdfed32c35dd371aeaed80f7d55ac496a729732909428ca8df51d0",
+    "size": 9101,
+    "modified_at": "2026-08-01T16:54:53.779535",
+    "sha256": "54a7b76974156f25a0e5ea9478f612cb27cb0f51010e80151146b53cfb61128b",
     "source": "local",
     "status": "synced"
   },
   "core\\ayesha_mobile_api.py": {
     "rel_path": "core\\ayesha_mobile_api.py",
-    "size": 13271,
-    "modified_at": "2026-07-26T11:29:40.316293",
-    "sha256": "9c000ae14d25450e104bfedb86a5b760bf3c40fa2c49150e536a9f0e8bb39949",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\ayesha_sync.py": {
-    "rel_path": "core\\ayesha_sync.py",
-    "size": 11171,
-    "modified_at": "2026-07-26T11:29:40.316293",
-    "sha256": "b6cbf36734980c4c430d5fa068995ba9bafc4006de117b70da4ca269f24256d3",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\buildozer.spec": {
-    "rel_path": "core\\buildozer.spec",
-    "size": 2527,
-    "modified_at": "2026-07-26T11:29:40.318483",
-    "sha256": "878fbb68d33471e40b48999a88a2821bc6ce4bbc6c4d5fbc498d298beb1742cc",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\manifest.json": {
-    "rel_path": "core\\manifest.json",
-    "size": 123,
-    "modified_at": "2026-07-26T11:29:40.318483",
-    "sha256": "cc6c94d5995caa5cc2bdd93319bb4b04840138900d4afa773debe43472cfa6d6",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\mobile_app.py": {
-    "rel_path": "core\\mobile_app.py",
-    "size": 2326,
-    "modified_at": "2026-07-26T11:29:40.319487",
-    "sha256": "631d0b0ef63840a696dd70c33386f5a6c271e802b5a9cd2bd275f9d49542d510",
+    "size": 13570,
+    "modified_at": "2026-07-31T01:32:21.043063",
+    "sha256": "9af63155905a6dccc89d92ae683ebda1e5bf7b7db32f13e130d056df39c7fe3b",
     "source": "local",
     "status": "synced"
   },
@@ -633,65 +649,33 @@
   },
   "core\\README.md": {
     "rel_path": "core\\README.md",
-    "size": 5201,
-    "modified_at": "2026-07-26T11:29:40.31363",
-    "sha256": "02a1df763595690fbaf33129c85627da130d8ee5b20cce7bed1f714d84a27a52",
+    "size": 3518,
+    "modified_at": "2026-07-30T07:13:33.933074",
+    "sha256": "87210e2aac3928eff7ecce1f9e07484a3e0b0c3d5b470657be3879dbf96265b4",
     "source": "local",
     "status": "synced"
   },
   "core\\requirements.txt": {
     "rel_path": "core\\requirements.txt",
-    "size": 133,
-    "modified_at": "2026-07-26T11:29:40.321486",
-    "sha256": "da51510d8c28843904c5d8436d0d2b394f3ea70b714b057e2e371ac98e017609",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\setup.py": {
-    "rel_path": "core\\setup.py",
-    "size": 2131,
-    "modified_at": "2026-07-26T11:29:40.322487",
-    "sha256": "a5cc8b99fd06411990f93890f2adaa9ac9defac12b226ad15d6396c0e50c45be",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\status.txt": {
-    "rel_path": "core\\status.txt",
-    "size": 62,
-    "modified_at": "2026-07-26T11:29:40.322993",
-    "sha256": "2044a00e8598c67ccf703fa6eb4445f1d44c379179a232ad81aba7d38b52b7d9",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\tri_node_mind.py": {
-    "rel_path": "core\\tri_node_mind.py",
-    "size": 15050,
-    "modified_at": "2026-07-26T11:29:40.323993",
-    "sha256": "520f31ef613b8cac39be1f01f871ad30477318eec96053f9c426e93a480bf76c",
-    "source": "local",
-    "status": "synced"
-  },
-  "core\\.github\\workflows\\build-apk.yml": {
-    "rel_path": "core\\.github\\workflows\\build-apk.yml",
-    "size": 1585,
-    "modified_at": "2026-07-26T11:29:40.311505",
-    "sha256": "4f52efbea8bc9d1abebd05d249c0800e859f7a89ee5303c03fe229eb8c4804fd",
+    "size": 85,
+    "modified_at": "2026-07-30T07:11:08.758503",
+    "sha256": "d1a6af1984ba57a0c319616ed542a4c9667ab4bdedff77e915da0169a1066cc1",
     "source": "local",
     "status": "synced"
   },
   "dist\\ayesha-os.exe": {
     "rel_path": "dist\\ayesha-os.exe",
-    "size": 8996352,
-    "modified_at": "2026-07-30T06:47:45.026625",
-    "sha256": "91cdef2cb8a7ea1365bf662a9cc84d02589de6ea2df24302994a472867941fad",
+    "size": 11117568,
+    "modified_at": "2026-08-02T18:52:16.543469",
+    "sha256": "92fee2022941738259a4bdf4464c7f44871443992e025c65c1ae624c71c231b9",
     "source": "local",
     "status": "synced"
   },
   "dist\\ayesha.json": {
     "rel_path": "dist\\ayesha.json",
-    "size": 3505,
-    "modified_at": "2026-07-28T05:13:07.635567",
-    "sha256": "3ec17bebc542ecb993b2b2b01aecccfc380e726e566997f845433df208e25020",
+    "size": 3600,
+    "modified_at": "2026-08-02T18:40:12.679627",
+    "sha256": "b8770f1e7830b9952267f3f81a39b9ff231aab9bbf7fb08464d4e605a36b820a",
     "source": "local",
     "status": "synced"
   },
@@ -713,9 +697,9 @@
   },
   "dist\\applets\\desktop-cat\\desktopcat.py": {
     "rel_path": "dist\\applets\\desktop-cat\\desktopcat.py",
-    "size": 12273,
-    "modified_at": "2026-07-26T11:29:40.223291",
-    "sha256": "05cf2262c5888bbf70ada80bd7f99e542c7c0eb9bc151e547a92d5006e0a0667",
+    "size": 16309,
+    "modified_at": "2026-08-02T18:51:38.086992",
+    "sha256": "1680ca2e89abb914179ad55d583be895c36cb9614c1ec7047bbe56b6f90aef9e",
     "source": "local",
     "status": "synced"
   },
@@ -778,40 +762,48 @@
   "dist\\applets\\flora-cli\\.gitignore": {
     "rel_path": "dist\\applets\\flora-cli\\.gitignore",
     "size": 81,
-    "modified_at": "2026-07-26T11:29:40.23294",
+    "modified_at": "2026-07-26T11:29:40.232940",
     "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\cli.ts": {
     "rel_path": "dist\\applets\\flora-cli\\cli.ts",
-    "size": 16472,
-    "modified_at": "2026-07-26T11:29:40.235826",
-    "sha256": "090d0e8e3090683fe6dcaeb27e413082197ff61a06dab68ce38da6474c65c29a",
+    "size": 20337,
+    "modified_at": "2026-08-02T18:44:24.071604",
+    "sha256": "da42f9e0504d3432088281e486ec910ce03c46366c45d8b40577d5dd68dee36c",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\index.html": {
     "rel_path": "dist\\applets\\flora-cli\\index.html",
-    "size": 324,
-    "modified_at": "2026-07-26T11:29:40.236829",
-    "sha256": "14b01fd6e63b0e4e24d9e9f294720c6569bd5efe01342eb1c1db04f2c60c3e1a",
+    "size": 334,
+    "modified_at": "2026-07-31T10:08:11.636870",
+    "sha256": "df8b36dc0d6fd71df0be26502389a3ecf67282fbcbbef072955640bb17b9fa99",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\metadata.json": {
     "rel_path": "dist\\applets\\flora-cli\\metadata.json",
-    "size": 355,
-    "modified_at": "2026-07-26T11:29:40.236829",
-    "sha256": "39a4bf990fd36e05fb867464600dbb43db05848d00a8bbde2f3e5343c734a5c0",
+    "size": 339,
+    "modified_at": "2026-07-31T07:11:51.512452",
+    "sha256": "1fc5ba0d76ed8fd807bc6705a9bd93fdad13aebb0ab188dd6d1f4dee3006860c",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\flora-cli\\package-lock.json": {
+    "rel_path": "dist\\applets\\flora-cli\\package-lock.json",
+    "size": 137388,
+    "modified_at": "2026-07-31T08:46:36.527604",
+    "sha256": "064338b8d11f7774b4dec76b82b7f6fefb5edf8265287cffa45ac9feff650fd4",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\package.json": {
     "rel_path": "dist\\applets\\flora-cli\\package.json",
-    "size": 1013,
-    "modified_at": "2026-07-26T11:29:40.238343",
-    "sha256": "cd140a04bfb0416c6d92d836ac042333dab0ccb29f484b4c1d78113a6b693d98",
+    "size": 1009,
+    "modified_at": "2026-07-31T07:11:30.375899",
+    "sha256": "4782511bedee0fdc453ec1c9f1458c7049378da9594c8bb95d604d4b8fc87d2a",
     "source": "local",
     "status": "synced"
   },
@@ -825,9 +817,9 @@
   },
   "dist\\applets\\flora-cli\\server.ts": {
     "rel_path": "dist\\applets\\flora-cli\\server.ts",
-    "size": 3224,
-    "modified_at": "2026-07-26T11:29:40.238343",
-    "sha256": "8a02c0faf9c1e69c3d5bbb736ad7dbb007f336be22b67ecd18ef72e7e99e6f3f",
+    "size": 4544,
+    "modified_at": "2026-08-01T16:54:19.300406",
+    "sha256": "8b9bc9cdc14461f3a5bafa6e49c0c6790637cd36358604f67ef38a4d8e99079e",
     "source": "local",
     "status": "synced"
   },
@@ -841,17 +833,57 @@
   },
   "dist\\applets\\flora-cli\\vite.config.ts": {
     "rel_path": "dist\\applets\\flora-cli\\vite.config.ts",
-    "size": 730,
-    "modified_at": "2026-07-26T11:29:40.251348",
-    "sha256": "b990c4afdfb5195bdc994739210dbfeb0b5eece38bd0caf2a76d44b2ee97c6bb",
+    "size": 728,
+    "modified_at": "2026-08-01T16:54:29.313258",
+    "sha256": "4842aa03485f26bee8bc863763162bdb8942c3539f00719bfb7b63a39e9b9063",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\flora-cli\\dist\\index.html": {
+    "rel_path": "dist\\applets\\flora-cli\\dist\\index.html",
+    "size": 432,
+    "modified_at": "2026-08-01T16:56:22.700274",
+    "sha256": "443bb702574929931ab396a64d40b0fc81362beac4f13f1ec0c28459578b8fa6",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\flora-cli\\dist\\server.cjs": {
+    "rel_path": "dist\\applets\\flora-cli\\dist\\server.cjs",
+    "size": 4926,
+    "modified_at": "2026-08-01T16:56:22.804242",
+    "sha256": "aa076e591d2c1791371dd794eacf2f31ec55ad41e2efa779b7974b81e6aaac01",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\flora-cli\\dist\\server.cjs.map": {
+    "rel_path": "dist\\applets\\flora-cli\\dist\\server.cjs.map",
+    "size": 6857,
+    "modified_at": "2026-08-01T16:56:22.803729",
+    "sha256": "614215a68b52f9f6f00ca97441201aecbf3bde426f9637c71074d417ac9d40f3",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\flora-cli\\dist\\assets\\index-B364Obyr.js": {
+    "rel_path": "dist\\applets\\flora-cli\\dist\\assets\\index-B364Obyr.js",
+    "size": 285130,
+    "modified_at": "2026-08-01T16:56:22.700274",
+    "sha256": "986d64418cdb5560728f712cfae884de9791a5c4f7b276d53b780febb2dce41b",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\flora-cli\\dist\\assets\\index-BXm9VFc7.css": {
+    "rel_path": "dist\\applets\\flora-cli\\dist\\assets\\index-BXm9VFc7.css",
+    "size": 34815,
+    "modified_at": "2026-08-01T16:56:22.700274",
+    "sha256": "8ce078be9c282c6abe5228a479064f2611c0cca5e1aaafbdc599e4cd853817cc",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\src\\App.tsx": {
     "rel_path": "dist\\applets\\flora-cli\\src\\App.tsx",
-    "size": 9882,
-    "modified_at": "2026-07-26T11:29:40.240832",
-    "sha256": "cbdd2371625749e61b800608bf6674bc43b47c940968536d70026e2720328725",
+    "size": 9867,
+    "modified_at": "2026-08-01T16:54:33.829011",
+    "sha256": "80db90dfcce20fd85081d9d23473c950d1b098d10e76a4cd352cfc98f6dffe44",
     "source": "local",
     "status": "synced"
   },
@@ -881,24 +913,24 @@
   },
   "dist\\applets\\flora-cli\\src\\components\\FieldGuide.tsx": {
     "rel_path": "dist\\applets\\flora-cli\\src\\components\\FieldGuide.tsx",
-    "size": 17368,
-    "modified_at": "2026-07-26T11:29:40.242357",
-    "sha256": "9aa079fe08649e374d3e4c282d4cff98c4a1040493de190456edf54bb33ecd13",
+    "size": 17438,
+    "modified_at": "2026-07-31T10:13:28.561790",
+    "sha256": "905fc10c29e963397dbb596d1cef5a4a954af8b4d27c956ede86bde170e0dc95",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\src\\components\\Terminal.tsx": {
     "rel_path": "dist\\applets\\flora-cli\\src\\components\\Terminal.tsx",
-    "size": 24191,
-    "modified_at": "2026-07-26T11:29:40.244193",
-    "sha256": "0622201cc0eb9c2d52b4064bd0827a7481001de77dad973437553f06cc618740",
+    "size": 26058,
+    "modified_at": "2026-08-01T16:53:53.430708",
+    "sha256": "8099ed4b5650b2af6f3b0731af2cb3f43f576a664e6bea6eadb196903870f00c",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\flora-cli\\src\\components\\VisualTree.tsx": {
     "rel_path": "dist\\applets\\flora-cli\\src\\components\\VisualTree.tsx",
     "size": 24970,
-    "modified_at": "2026-07-26T11:29:40.2452",
+    "modified_at": "2026-07-26T11:29:40.245200",
     "sha256": "efad3582a82c338603958b9e543d16ce93693b43214fab327cdf15c8cf43e241",
     "source": "local",
     "status": "synced"
@@ -911,187 +943,35 @@
     "source": "local",
     "status": "synced"
   },
-  "dist\\applets\\neural-strike\\config.py": {
-    "rel_path": "dist\\applets\\neural-strike\\config.py",
-    "size": 1957,
-    "modified_at": "2026-07-26T11:29:40.256667",
-    "sha256": "3feb9d3b50b1d6a576d5250e1d17ad470f812a116fe691350b28754671252b4c",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\main.py": {
-    "rel_path": "dist\\applets\\neural-strike\\main.py",
-    "size": 1320,
-    "modified_at": "2026-07-26T11:29:40.268609",
-    "sha256": "3b7c1a111ef9e4403890185fdd63b2b5482a7c96f0099797cf1ba72b33a2df8f",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\README.md": {
-    "rel_path": "dist\\applets\\neural-strike\\README.md",
-    "size": 5401,
-    "modified_at": "2026-07-26T11:29:40.253313",
-    "sha256": "312094a0c4681ad2f8d61c920538ed851acc424a0ad33bd7c28531ef9e729841",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\requirements.txt": {
-    "rel_path": "dist\\applets\\neural-strike\\requirements.txt",
-    "size": 53,
-    "modified_at": "2026-07-26T11:29:40.269307",
-    "sha256": "4b9f2145016b2ab051c0f3f9b66559f5e96901400aa8bfdc22c2f63593e34bff",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\run.bat": {
-    "rel_path": "dist\\applets\\neural-strike\\run.bat",
-    "size": 211,
-    "modified_at": "2026-07-26T11:29:40.26981",
-    "sha256": "cf4cec397d47018db8075cd2ced452f3a44607495f2e83719027b91ab5d8299e",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\assets\\theme.qss": {
-    "rel_path": "dist\\applets\\neural-strike\\assets\\theme.qss",
-    "size": 6168,
-    "modified_at": "2026-07-26T11:29:40.255317",
-    "sha256": "81dd4f9e8fbb2510f4f88edd71fda554c7af0d8566861ba9a1b724f9c22daa0e",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\data\\database.py": {
-    "rel_path": "dist\\applets\\neural-strike\\data\\database.py",
-    "size": 7705,
-    "modified_at": "2026-07-26T11:29:40.259825",
-    "sha256": "103289d35f2f9135cd53651835607268112599fa0b7770863301aa802253d8cb",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\data\\exported_features.json": {
-    "rel_path": "dist\\applets\\neural-strike\\data\\exported_features.json",
-    "size": 1099615,
-    "modified_at": "2026-07-26T11:29:40.265814",
-    "sha256": "b3eeaa879ce2c8e11e6dcf62850b0f133b173de3f19b8a4723ce0cb9867a5edc",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\data\\neural_strike.db": {
-    "rel_path": "dist\\applets\\neural-strike\\data\\neural_strike.db",
-    "size": 45056,
-    "modified_at": "2026-07-26T11:29:40.266316",
-    "sha256": "cc03f23a16ac63e189dabddeb5a027c88c83083787f1f2bad66c03551a9a879b",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\data\\neuronpedia_client.py": {
-    "rel_path": "dist\\applets\\neural-strike\\data\\neuronpedia_client.py",
-    "size": 3150,
-    "modified_at": "2026-07-26T11:29:40.267828",
-    "sha256": "8fa3e80969d44ff1d46d03abaaa980a27b38d932724c5de3065abd2e5d5f1de0",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\data\\__init__.py": {
-    "rel_path": "dist\\applets\\neural-strike\\data\\__init__.py",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.257821",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\ui\\effects.py": {
-    "rel_path": "dist\\applets\\neural-strike\\ui\\effects.py",
-    "size": 5157,
-    "modified_at": "2026-07-26T11:29:40.272547",
-    "sha256": "88154a457ba06b79298b8272ea841ef602ad8946adc24d27db1fd85491fc45bd",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\ui\\feature_inspector.py": {
-    "rel_path": "dist\\applets\\neural-strike\\ui\\feature_inspector.py",
-    "size": 7758,
-    "modified_at": "2026-07-26T11:29:40.27355",
-    "sha256": "f4208f6434af89554a7d7141f9f246f54eb0ef45529fb378d0d6d6adcbaac976",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\ui\\main_window.py": {
-    "rel_path": "dist\\applets\\neural-strike\\ui\\main_window.py",
-    "size": 16173,
-    "modified_at": "2026-07-26T11:29:40.274307",
-    "sha256": "6019b36502eddb293a2fd4e49ef0e63e238ffec2ad15193a993d2ef38b539cc3",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\ui\\token_scanner.py": {
-    "rel_path": "dist\\applets\\neural-strike\\ui\\token_scanner.py",
-    "size": 6126,
-    "modified_at": "2026-07-26T11:29:40.275309",
-    "sha256": "ec1920df55cd946b53b7014bfed55bf92f24b06dcb982bda23d1f78022a6e82e",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\ui\\umap_viewport.py": {
-    "rel_path": "dist\\applets\\neural-strike\\ui\\umap_viewport.py",
-    "size": 10444,
-    "modified_at": "2026-07-26T11:29:40.276309",
-    "sha256": "35cdc97bcb4ca62c4bc646544a1339090903e7ed57ad91ed38eaa69ebe0eab25",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\neural-strike\\ui\\__init__.py": {
-    "rel_path": "dist\\applets\\neural-strike\\ui\\__init__.py",
-    "size": 0,
-    "modified_at": "2026-07-26T11:29:40.271319",
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "source": "local",
-    "status": "synced"
-  },
   "dist\\applets\\poopy-tui\\.gitignore": {
     "rel_path": "dist\\applets\\poopy-tui\\.gitignore",
-    "size": 46,
-    "modified_at": "2026-07-26T06:50:46.288945",
-    "sha256": "5e7e62d702a15ebdf4486842bea60ff5bd95d01b2b072a71fb42a02e49178977",
+    "size": 68,
+    "modified_at": "2026-07-31T02:48:55.597871",
+    "sha256": "423845de5d8b37d2136966ef603ea7125ea3edbbb7b14faaef0db3b2458be4b4",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\poopy-tui\\auth.py": {
     "rel_path": "dist\\applets\\poopy-tui\\auth.py",
-    "size": 8605,
-    "modified_at": "2026-07-28T04:58:44.932243",
-    "sha256": "0ebf2d5f0f3a60aed911fb3f4fa9f1576839b8bd07fb1b98586c3d77d99155d4",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\poopy-tui\\bot.py": {
-    "rel_path": "dist\\applets\\poopy-tui\\bot.py",
-    "size": 8456,
-    "modified_at": "2026-07-28T05:01:00.705534",
-    "sha256": "7db7818bca1c7165af1c39766d8ff72b0c2dec83a2e420d02210b248d0f9f23e",
+    "size": 9428,
+    "modified_at": "2026-07-31T11:02:50.101448",
+    "sha256": "26c96a874e1e5acc48f9361de44e7235560b1561bbd66f170ff1fdf7fb65708f",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\poopy-tui\\client.py": {
     "rel_path": "dist\\applets\\poopy-tui\\client.py",
-    "size": 11241,
-    "modified_at": "2026-07-28T04:58:47.174701",
-    "sha256": "464c968f49cbfc20bccfb0a47bd74a1f2ed63bd3d3f61379c9c9a5429213949f",
+    "size": 11421,
+    "modified_at": "2026-08-01T16:52:45.556857",
+    "sha256": "b5edd0ab1b1dbbc53c54aa957083028f6ee1f8c70db9a7764e8ff7b7677da2ba",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\poopy-tui\\config.py": {
     "rel_path": "dist\\applets\\poopy-tui\\config.py",
-    "size": 205,
-    "modified_at": "2026-07-28T04:58:42.179744",
-    "sha256": "b38c25b73d1040ea6cdd646dd84a4014548de7fe39311c29be3e8aefccfcd701",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\poopy-tui\\crash_runner.py": {
-    "rel_path": "dist\\applets\\poopy-tui\\crash_runner.py",
-    "size": 636,
-    "modified_at": "2026-07-26T10:18:59.456616",
-    "sha256": "0f552b07efa0f5b8fb4b7f2cfcfa161e4695581e1acc8751560b74f2a313d933",
+    "size": 1185,
+    "modified_at": "2026-08-01T16:53:20.319352",
+    "sha256": "71157fcd983a87671e01ae6c091e76cffcc282a28fb88049be4abd45435125d0",
     "source": "local",
     "status": "synced"
   },
@@ -1111,11 +991,19 @@
     "source": "local",
     "status": "synced"
   },
+  "dist\\applets\\poopy-tui\\pytest.ini": {
+    "rel_path": "dist\\applets\\poopy-tui\\pytest.ini",
+    "size": 75,
+    "modified_at": "2026-08-02T12:37:49.968473",
+    "sha256": "da9808d584f4d7bf9f89efb0e294727a7abd06903d9ae8fbc45f5dd93c59b684",
+    "source": "local",
+    "status": "synced"
+  },
   "dist\\applets\\poopy-tui\\README.md": {
     "rel_path": "dist\\applets\\poopy-tui\\README.md",
-    "size": 231,
-    "modified_at": "2026-07-26T07:08:34.865621",
-    "sha256": "5c571a482fb774fb04e45268f4e80387f07987e4f1d6d6e22a9f78a2ca9c99d4",
+    "size": 968,
+    "modified_at": "2026-07-31T02:48:57.797197",
+    "sha256": "99170ba2ee4ee21f05c37bcc98fd5271b3f694cd8fc740d358a9ebbe0034345d",
     "source": "local",
     "status": "synced"
   },
@@ -1127,51 +1015,75 @@
     "source": "local",
     "status": "synced"
   },
-  "dist\\applets\\poopy-tui\\test_client.py": {
-    "rel_path": "dist\\applets\\poopy-tui\\test_client.py",
-    "size": 1375,
-    "modified_at": "2026-07-26T08:36:21.98793",
-    "sha256": "d3b9a878e047fe6400be163d668f52ed58360da4af04206dbc73b689f76e98af",
-    "source": "local",
-    "status": "synced"
-  },
-  "dist\\applets\\poopy-tui\\test_token.txt": {
-    "rel_path": "dist\\applets\\poopy-tui\\test_token.txt",
-    "size": 72,
-    "modified_at": "2026-07-26T08:33:09.899839",
-    "sha256": "1e7e53306c2d027bfc3658138796efb1ec3ee8077ac21dfd5b6ac421ae3d440a",
+  "dist\\applets\\poopy-tui\\test_navigation.py": {
+    "rel_path": "dist\\applets\\poopy-tui\\test_navigation.py",
+    "size": 13723,
+    "modified_at": "2026-08-02T13:18:09.358544",
+    "sha256": "b0fc8be5409b11666791fc391e0ef24664fbb0c2f3ebc6fbfb1f60d1b535c0a9",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\poopy-tui\\tui.py": {
     "rel_path": "dist\\applets\\poopy-tui\\tui.py",
-    "size": 48392,
-    "modified_at": "2026-07-28T04:59:20.920579",
-    "sha256": "0cf765a93fc19a09f912690811403632d206285f0a9a8552a3c3331f0e4186ed",
+    "size": 70033,
+    "modified_at": "2026-08-02T18:50:20.502792",
+    "sha256": "2a1877a0bdea6ab00574237c5b2efd68a4bc4fad916bdda0dfeffc65a29b107c",
     "source": "local",
     "status": "synced"
   },
   "dist\\applets\\poopy-tui\\voice.py": {
     "rel_path": "dist\\applets\\poopy-tui\\voice.py",
-    "size": 6626,
-    "modified_at": "2026-07-28T04:58:49.948378",
-    "sha256": "35329dee98215df2471a0741e27ea8a05ed76a1f7050f4ed00f9665dfb616a38",
+    "size": 6606,
+    "modified_at": "2026-08-01T16:53:04.867603",
+    "sha256": "ce16632ed2c5232ae127e4b6b7576c3810f4a60c41fa1db0fcc988729c49bae7",
     "source": "local",
     "status": "synced"
   },
-  "dist\\applets\\poopy-tui\\logs\\discord_2026-07-26.jsonl": {
-    "rel_path": "dist\\applets\\poopy-tui\\logs\\discord_2026-07-26.jsonl",
-    "size": 2024,
-    "modified_at": "2026-07-26T06:54:30.195905",
-    "sha256": "0b784ff902b8242a71a44d9344927e5d777ddb163754df655affcd93717694cb",
+  "dist\\applets\\poopy-tui\\.pytest_cache\\.gitignore": {
+    "rel_path": "dist\\applets\\poopy-tui\\.pytest_cache\\.gitignore",
+    "size": 37,
+    "modified_at": "2026-08-02T12:38:23.690505",
+    "sha256": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\poopy-tui\\.pytest_cache\\CACHEDIR.TAG": {
+    "rel_path": "dist\\applets\\poopy-tui\\.pytest_cache\\CACHEDIR.TAG",
+    "size": 191,
+    "modified_at": "2026-08-02T12:38:23.690505",
+    "sha256": "37dc88ef9a0abeddbe81053a6dd8fdfb13afb613045ea1eb4a5c815a74a3bde4",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\poopy-tui\\.pytest_cache\\README.md": {
+    "rel_path": "dist\\applets\\poopy-tui\\.pytest_cache\\README.md",
+    "size": 302,
+    "modified_at": "2026-08-02T12:38:23.689506",
+    "sha256": "73fd6fccdd802c419a6b2d983d6c3173b7da97558ac4b589edec2dfe443db9ad",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\poopy-tui\\.pytest_cache\\v\\cache\\lastfailed": {
+    "rel_path": "dist\\applets\\poopy-tui\\.pytest_cache\\v\\cache\\lastfailed",
+    "size": 67,
+    "modified_at": "2026-08-02T13:18:30.402256",
+    "sha256": "a715d278e5467b63a1c063bfed48b06597dcb67865768b7fa03613125f88e13b",
+    "source": "local",
+    "status": "synced"
+  },
+  "dist\\applets\\poopy-tui\\.pytest_cache\\v\\cache\\nodeids": {
+    "rel_path": "dist\\applets\\poopy-tui\\.pytest_cache\\v\\cache\\nodeids",
+    "size": 1259,
+    "modified_at": "2026-08-02T18:51:14.948426",
+    "sha256": "d01fe1200b60064414bca64160ca03b9e6202f1be19dc346492188d821d4b759",
     "source": "local",
     "status": "synced"
   },
   "dist\\models\\Modelfile": {
     "rel_path": "dist\\models\\Modelfile",
-    "size": 4390,
-    "modified_at": "2026-07-28T05:51:29.063246",
-    "sha256": "55d11e092365a00eb909bfafe74105eca1e9c601d7d4e81c316b90bfe86330cb",
+    "size": 3003,
+    "modified_at": "2026-07-31T01:31:16.254839",
+    "sha256": "0ddfdc244622d639676795511275d9fae571ff0ff2609e9245cd64403f473e56",
     "source": "local",
     "status": "synced"
   },
@@ -1185,16 +1097,16 @@
   },
   "engine\\build.rs": {
     "rel_path": "engine\\build.rs",
-    "size": 1295,
-    "modified_at": "2026-07-30T06:38:50.237244",
-    "sha256": "c245f10560851cea4736335c5271481dc31a4fa74484acb883f29bd080ab2a2d",
+    "size": 2721,
+    "modified_at": "2026-08-02T13:07:53.891262",
+    "sha256": "36cb2fd7101e284f43697ef8b381bb7301b94145a5304259dedd764999e475f6",
     "source": "local",
     "status": "synced"
   },
   "engine\\Cargo.lock": {
     "rel_path": "engine\\Cargo.lock",
     "size": 68481,
-    "modified_at": "2026-07-30T06:40:53.26602",
+    "modified_at": "2026-08-01T06:07:19.052417",
     "sha256": "305f4f63c36673657b7db12358826d04bbb970dae24545fb78dddb56cc3865a6",
     "source": "local",
     "status": "synced"
@@ -1202,7 +1114,7 @@
   "engine\\Cargo.toml": {
     "rel_path": "engine\\Cargo.toml",
     "size": 563,
-    "modified_at": "2026-07-30T06:39:32.758145",
+    "modified_at": "2026-08-01T06:07:11.433009",
     "sha256": "b8243e648bcd4a538bc74f3a2c9183cfa9ca7f5874bc0906123c6ceabe91edea",
     "source": "local",
     "status": "synced"
@@ -1215,43 +1127,11 @@
     "source": "local",
     "status": "synced"
   },
-  "engine\\pixel_art_generator.py": {
-    "rel_path": "engine\\pixel_art_generator.py",
-    "size": 12055,
-    "modified_at": "2026-07-26T11:29:40.333004",
-    "sha256": "b3f979d7a92304c1ea90dcba7ccf150be610f3e88e16dd62dc0c67fc922e34c3",
-    "source": "local",
-    "status": "synced"
-  },
   "engine\\README.md": {
     "rel_path": "engine\\README.md",
-    "size": 6936,
-    "modified_at": "2026-07-26T11:29:40.329993",
-    "sha256": "9362862a7c9a7354063b67afecca18ece42d30c89e81f4752e1e10c4d6f5a178",
-    "source": "local",
-    "status": "synced"
-  },
-  "engine\\run.bat": {
-    "rel_path": "engine\\run.bat",
-    "size": 279,
-    "modified_at": "2026-07-26T11:29:40.333004",
-    "sha256": "b8210f98fe8ea6fa14b22bcf27c6e6c3f9574064a38a897c0115dcb7a20ad97b",
-    "source": "local",
-    "status": "synced"
-  },
-  "engine\\run.ps1": {
-    "rel_path": "engine\\run.ps1",
-    "size": 272,
-    "modified_at": "2026-07-28T06:22:55.665381",
-    "sha256": "1fdd06639b09e541771b0849d0b4bd04a8d83702737580bf7378a3fef86061ad",
-    "source": "local",
-    "status": "synced"
-  },
-  "engine\\run_ayesha.bat": {
-    "rel_path": "engine\\run_ayesha.bat",
-    "size": 65,
-    "modified_at": "2026-07-26T11:29:40.333004",
-    "sha256": "148ce28b30157b41a2691f69fd9d7d2f09fdf0a94bebb70db5f1b6573f1d01d4",
+    "size": 9734,
+    "modified_at": "2026-08-01T19:03:47.333855",
+    "sha256": "bf4908f3b415e354a6c01158c71ce30c8fe64b7af7e33234541d578565019939",
     "source": "local",
     "status": "synced"
   },
@@ -1263,131 +1143,163 @@
     "source": "local",
     "status": "synced"
   },
+  "engine\\src\\agent.rs": {
+    "rel_path": "engine\\src\\agent.rs",
+    "size": 4516,
+    "modified_at": "2026-08-01T16:42:41.959185",
+    "sha256": "719470ab4909d0b782986ee2d4349792eadf86c11732f7a3ec449af297270b1d",
+    "source": "local",
+    "status": "synced"
+  },
   "engine\\src\\applet_manager.rs": {
     "rel_path": "engine\\src\\applet_manager.rs",
-    "size": 7021,
-    "modified_at": "2026-07-29T15:38:46.013974",
-    "sha256": "1cb1a895c83b8b1cc943b82526a529c99f3ce4b9c12ede7bddfa601b223d7fdf",
+    "size": 11931,
+    "modified_at": "2026-08-02T18:34:26.545660",
+    "sha256": "f3c5ace26d99f6528f9d9927cf2cc63d586aab3353591b1e143e259535417522",
+    "source": "local",
+    "status": "synced"
+  },
+  "engine\\src\\applet_runner.rs": {
+    "rel_path": "engine\\src\\applet_runner.rs",
+    "size": 8419,
+    "modified_at": "2026-08-01T17:31:59.476659",
+    "sha256": "f5f2156df8d609bb5a211863155dac83cbdaf48891045f05efe213a01849e502",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\ayesha.ico": {
     "rel_path": "engine\\src\\ayesha.ico",
     "size": 165537,
-    "modified_at": "2026-07-30T06:47:25.61744",
+    "modified_at": "2026-07-30T06:47:25.617440",
     "sha256": "8c784727073d5c1714d44ef281100765c8e4aac4663aee720291557a0b1d4379",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\cloud.rs": {
     "rel_path": "engine\\src\\cloud.rs",
-    "size": 14051,
-    "modified_at": "2026-07-28T05:29:06.705278",
-    "sha256": "4869ec8327130923347889d8d5ca0bc6a4a71bc7129e76b5cbf29642d5d959fb",
+    "size": 21445,
+    "modified_at": "2026-08-02T18:35:39.591366",
+    "sha256": "a8e53579a9586d79a7c33ca5db402788d56694fa86d02c1fbbe0f20c99cc4d1a",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\coding_agent.rs": {
     "rel_path": "engine\\src\\coding_agent.rs",
-    "size": 14855,
-    "modified_at": "2026-07-26T14:10:59.256441",
-    "sha256": "895a1b16b1a82c4429f59db1a3dcb0a3ed6cd3fe538c27ff9b2ea618cd6d3290",
+    "size": 14688,
+    "modified_at": "2026-07-31T12:06:30.231535",
+    "sha256": "c218a0ccf8add91df9e589dd5a44bbe05b271592bd7bb59519d38c56903ff178",
+    "source": "local",
+    "status": "synced"
+  },
+  "engine\\src\\completion.rs": {
+    "rel_path": "engine\\src\\completion.rs",
+    "size": 6186,
+    "modified_at": "2026-07-31T09:29:31.565538",
+    "sha256": "c248088e0a00e52dca26d4472427b24a5520dc80329b653e97789bdba4f510ed",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\main.rs": {
     "rel_path": "engine\\src\\main.rs",
-    "size": 28777,
-    "modified_at": "2026-07-29T16:01:04.841621",
-    "sha256": "61ae8f2353001e054ddd172c219791e7b34670dab2ab0da1c7a15c19697fa669",
-    "source": "local",
-    "status": "synced"
-  },
-  "engine\\src\\main.txt": {
-    "rel_path": "engine\\src\\main.txt",
-    "size": 179,
-    "modified_at": "2026-07-26T11:29:40.338511",
-    "sha256": "8c5d33f26ff9981e8616ec69336926d61b999702b8fbbc7e3a6cd64b0f657518",
+    "size": 81773,
+    "modified_at": "2026-08-02T18:36:22.278794",
+    "sha256": "e26e613a4d3bcfd4a82e0af9e238e58dac0411eeb3c6fc2e5fce42346a84db28",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\memory.rs": {
     "rel_path": "engine\\src\\memory.rs",
-    "size": 3822,
-    "modified_at": "2026-07-26T11:29:40.33951",
-    "sha256": "de276f9a22f0669c214412fda6c1c9ac05475f610277be3b11cd8e1944f15bb4",
+    "size": 3904,
+    "modified_at": "2026-07-31T08:02:19.475312",
+    "sha256": "3801eb892dbf838bb3715107e2430ef48bd4f82d6c949996384eaf3c651666c0",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\model_registry.rs": {
     "rel_path": "engine\\src\\model_registry.rs",
-    "size": 11374,
-    "modified_at": "2026-07-28T05:56:36.359736",
-    "sha256": "c02944ebf03a5f84c6e5f7df03ee7a7764d4795515dd4f8c1f533f4e19cdd628",
+    "size": 11168,
+    "modified_at": "2026-07-31T11:19:34.786104",
+    "sha256": "491ae4a9c2f58aba5a7529247942bddb963e99bf8a74466aa3298347970235a8",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\ollama.rs": {
     "rel_path": "engine\\src\\ollama.rs",
-    "size": 28920,
-    "modified_at": "2026-07-29T16:17:31.477441",
-    "sha256": "96c2830a3433ab55fe079a6d838f3bd265517a82f7bddbd387ee2f7df0740ded",
+    "size": 38770,
+    "modified_at": "2026-08-02T18:35:39.994822",
+    "sha256": "49e44d158a32db7be282374e3a45254004becf3ea6a3e6d144bb70e6dfbc99f2",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\prompt_refinement.rs": {
     "rel_path": "engine\\src\\prompt_refinement.rs",
-    "size": 5605,
-    "modified_at": "2026-07-26T11:29:40.351026",
-    "sha256": "1741a0a4582b8289d70f48863be956366f07f7b53c9cb7be11af37cdf7bd4216",
+    "size": 5687,
+    "modified_at": "2026-07-31T08:03:46.065085",
+    "sha256": "a08c52e472a2b157353a22e39812a5dc8d8232f8e35e4597af9684c565319f7e",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\resources.rc": {
     "rel_path": "engine\\src\\resources.rc",
-    "size": 20,
-    "modified_at": "2026-07-30T06:28:40.949838",
-    "sha256": "44c02c98cd8a38499be3042e912d89eb2c9866bac963a3df69850f4c8fbf98bb",
+    "size": 769,
+    "modified_at": "2026-08-02T13:07:50.342495",
+    "sha256": "c51da0b88f833d909acec16265052339d14f74e53d61c2860c3575b21719dbe2",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\sandbox.rs": {
     "rel_path": "engine\\src\\sandbox.rs",
-    "size": 2047,
-    "modified_at": "2026-07-26T14:10:14.296874",
-    "sha256": "f833d235151cfabc75cd5c38e5a2fa3985da56b91653f72d7034223266cbbcb5",
+    "size": 6411,
+    "modified_at": "2026-07-31T19:08:09.254643",
+    "sha256": "70cb87f3641db55b30dcc4510e4ac6034fbc568228d18e3a249d4339841944b6",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\self_analysis.rs": {
     "rel_path": "engine\\src\\self_analysis.rs",
-    "size": 5715,
-    "modified_at": "2026-07-26T11:29:40.353557",
-    "sha256": "e2ea0c4b2a0b93452548389d10ecfa8f0c5700087633a48c013a6da34eb8e904",
+    "size": 5811,
+    "modified_at": "2026-07-31T08:03:14.186342",
+    "sha256": "c74be911a83c91946bde7e43399e3678b470093dd884cd801fc5b0335bca20f8",
+    "source": "local",
+    "status": "synced"
+  },
+  "engine\\src\\theme.rs": {
+    "rel_path": "engine\\src\\theme.rs",
+    "size": 10083,
+    "modified_at": "2026-08-02T18:36:47.644630",
+    "sha256": "867acf2ded71589123a4b87f3aa00f8dc0512953e5e87dfec040b0a6537624ed",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\tools.rs": {
     "rel_path": "engine\\src\\tools.rs",
-    "size": 20966,
-    "modified_at": "2026-07-26T14:10:59.256441",
-    "sha256": "b0c785fe1a4fd44fbc1ce737f01ea2a95afa333612e0e6e5f0fd338b3dcc6cb8",
+    "size": 53478,
+    "modified_at": "2026-08-01T17:36:49.665483",
+    "sha256": "68e441f8087002efadba16befe8eff7c568f389806daac9c1fcdf4a8b50c9cb1",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\tool_evolution.rs": {
     "rel_path": "engine\\src\\tool_evolution.rs",
-    "size": 4972,
-    "modified_at": "2026-07-26T11:29:40.354561",
-    "sha256": "43c51223bf941a7c29fab3969b10ec43f49c019c25cc2c707044e5df63813389",
+    "size": 4990,
+    "modified_at": "2026-07-31T01:34:47.454962",
+    "sha256": "a57f3f003bc3387865ea6a6ca674aab101a2ce0725cd65c3cf65b1cf2a1a4be2",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\ui.rs": {
     "rel_path": "engine\\src\\ui.rs",
-    "size": 12822,
-    "modified_at": "2026-07-29T15:40:20.654759",
-    "sha256": "6a779ad1f02c6a9ec8126a01a7ec6ebff09d978b09c15843e3ccae32d7cf874d",
+    "size": 18976,
+    "modified_at": "2026-08-02T18:36:30.720771",
+    "sha256": "aad36d8b5873d3910deb01f2ed03e3ef4b99aee54f709b2888a88ae83f774fe9",
+    "source": "local",
+    "status": "synced"
+  },
+  "engine\\src\\util.rs": {
+    "rel_path": "engine\\src\\util.rs",
+    "size": 1237,
+    "modified_at": "2026-07-31T04:19:32.869239",
+    "sha256": "8ed8b2f4aa3750c61e435ea09fe7d54180452b411d3bc4cb10fab1e07ad3a74c",
     "source": "local",
     "status": "synced"
   },
@@ -1409,33 +1321,33 @@
   },
   "engine\\src\\pixel_striker\\object.rs": {
     "rel_path": "engine\\src\\pixel_striker\\object.rs",
-    "size": 382,
-    "modified_at": "2026-07-26T11:29:40.346519",
-    "sha256": "c922b1bb579a3b7326d8099899e0e3a85620f222b4a748e237d5461208578b4e",
+    "size": 424,
+    "modified_at": "2026-07-31T08:07:09.793665",
+    "sha256": "b038f4ea141d22d3d5600518c4e8662d61ec6bfc1e6812e351bcb13f38229d58",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\pixel_striker\\palette.rs": {
     "rel_path": "engine\\src\\pixel_striker\\palette.rs",
-    "size": 2243,
-    "modified_at": "2026-07-26T11:29:40.347519",
-    "sha256": "9a41e5a9ef99e06b26badb4326f46a6bf8a62ed96b3340f345a449fe3fee15c0",
+    "size": 2345,
+    "modified_at": "2026-07-31T09:29:11.249309",
+    "sha256": "09cb508675b3f8ca36fe5048ca559d07e40a030116668cf80a893bb9064cfcff",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\pixel_striker\\renderer.rs": {
     "rel_path": "engine\\src\\pixel_striker\\renderer.rs",
-    "size": 8943,
-    "modified_at": "2026-07-26T11:29:40.349519",
-    "sha256": "d1db91ec2f7a9b03ffa2c166b74552e43d36fb8e8e9e84ac9d947ed59df9c5f7",
+    "size": 8964,
+    "modified_at": "2026-07-31T08:05:44.009696",
+    "sha256": "a96a6c4476540a0b8feb08827ba16df2372c3c50a87c0dbe1979ec90fcdf6c2d",
     "source": "local",
     "status": "synced"
   },
   "engine\\src\\pixel_striker\\tileset.rs": {
     "rel_path": "engine\\src\\pixel_striker\\tileset.rs",
-    "size": 305,
-    "modified_at": "2026-07-26T11:29:40.349519",
-    "sha256": "f9e05ff128e6466d06db6146fb2501844ebb8929fdc2b19d71c16b02d76ed97d",
+    "size": 347,
+    "modified_at": "2026-07-31T08:07:17.835886",
+    "sha256": "2d5ae454305e9923fce07bb25252c0c138a77fec3eca1e59fcc99df63c844075",
     "source": "local",
     "status": "synced"
   },
@@ -1482,7 +1394,7 @@
   "git_middleware\\router.py": {
     "rel_path": "git_middleware\\router.py",
     "size": 2432,
-    "modified_at": "2026-07-26T11:29:40.36557",
+    "modified_at": "2026-07-26T11:29:40.365570",
     "sha256": "b2d18680aad10bae1fcb30d6feb82645619ae3b650560b77ba438db84e300fbf",
     "source": "local",
     "status": "synced"
@@ -1513,9 +1425,9 @@
   },
   "models\\Modelfile": {
     "rel_path": "models\\Modelfile",
-    "size": 4390,
-    "modified_at": "2026-07-28T05:51:29.063246",
-    "sha256": "55d11e092365a00eb909bfafe74105eca1e9c601d7d4e81c316b90bfe86330cb",
+    "size": 3003,
+    "modified_at": "2026-07-31T01:31:16.254839",
+    "sha256": "0ddfdc244622d639676795511275d9fae571ff0ff2609e9245cd64403f473e56",
     "source": "local",
     "status": "synced"
   },
@@ -1527,11 +1439,19 @@
     "source": "local",
     "status": "synced"
   },
+  "scripts\\automation_harness.py": {
+    "rel_path": "scripts\\automation_harness.py",
+    "size": 23432,
+    "modified_at": "2026-08-02T17:06:38.410929",
+    "sha256": "88b90b0b009efc55439706762e8d2b2dc0f40f9dab284ee64972a0d7b7db54e9",
+    "source": "local",
+    "status": "synced"
+  },
   "scripts\\build-exe.ps1": {
     "rel_path": "scripts\\build-exe.ps1",
-    "size": 3455,
-    "modified_at": "2026-07-30T06:37:30.546847",
-    "sha256": "d4008beb8174a7469b3092539905babc00176bf2e4583cb72d535f4da725c812",
+    "size": 4533,
+    "modified_at": "2026-08-02T17:06:07.535284",
+    "sha256": "27f0cfeb149bf7fa4b09bea71229d4000eb0a2ea5b24aa751f6323648f9fee96",
     "source": "local",
     "status": "synced"
   },
@@ -1554,16 +1474,24 @@
   "scripts\\space-app.py": {
     "rel_path": "scripts\\space-app.py",
     "size": 8852,
-    "modified_at": "2026-07-26T11:29:40.37902",
+    "modified_at": "2026-07-26T11:29:40.379020",
     "sha256": "cb6c4c73aebc2e4d5d63d09fd2757015de9ceb08049bbd6c1405fa3be078d862",
     "source": "local",
     "status": "synced"
   },
   "scripts\\sync-all.ps1": {
     "rel_path": "scripts\\sync-all.ps1",
-    "size": 2747,
-    "modified_at": "2026-07-26T11:29:40.379852",
-    "sha256": "4f857f64306e1d28ad92fa1a5e502184918c843556565ab6a6a7e5ad6643294b",
+    "size": 3529,
+    "modified_at": "2026-07-30T07:14:57.785923",
+    "sha256": "f6f51e27a88de16775906b8cca9baab4757a6695c9dfc6bd5d159ef148fd884c",
+    "source": "local",
+    "status": "synced"
+  },
+  "scripts\\theme-from-image.py": {
+    "rel_path": "scripts\\theme-from-image.py",
+    "size": 11673,
+    "modified_at": "2026-08-02T18:39:47.904725",
+    "sha256": "bc6e94b6073a1c6ad1f381e84572782faa074b881f13dce50af3b513a781ebad",
     "source": "local",
     "status": "synced"
   },
@@ -1618,7 +1546,7 @@
   "tri_mind_sync\\local_sync.py": {
     "rel_path": "tri_mind_sync\\local_sync.py",
     "size": 5612,
-    "modified_at": "2026-07-26T11:29:40.38813",
+    "modified_at": "2026-07-26T11:29:40.388130",
     "sha256": "169001449dde3ef0b2f58b22f898ae8fcb8f10fdad81d48f741f5bd77ffa243c",
     "source": "local",
     "status": "synced"
@@ -1644,6 +1572,182 @@
     "size": 232,
     "modified_at": "2026-07-26T11:29:40.381359",
     "sha256": "73520db6d5d761ad0393a39038be5797519d2c9ccdb442397abdba16ace95923",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-model\\.gitattributes": {
+    "rel_path": "_hf-model\\.gitattributes",
+    "size": 138,
+    "modified_at": "2026-07-30T07:03:53.415597",
+    "sha256": "4a98216883e97297b452dae0039bb148b4c803148b39b13277bc2103aca9ce96",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-model\\app.py": {
+    "rel_path": "_hf-model\\app.py",
+    "size": 8852,
+    "modified_at": "2026-07-26T11:29:40.379020",
+    "sha256": "cb6c4c73aebc2e4d5d63d09fd2757015de9ceb08049bbd6c1405fa3be078d862",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-model\\ayesha.json": {
+    "rel_path": "_hf-model\\ayesha.json",
+    "size": 2815,
+    "modified_at": "2026-07-31T02:11:18.430595",
+    "sha256": "279aab89628219a251e2b68ec0e64b3847073ad79fe33ddf9b3fbc65b82c3104",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-model\\Modelfile": {
+    "rel_path": "_hf-model\\Modelfile",
+    "size": 3003,
+    "modified_at": "2026-07-31T01:31:16.254839",
+    "sha256": "0ddfdc244622d639676795511275d9fae571ff0ff2609e9245cd64403f473e56",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-model\\README.md": {
+    "rel_path": "_hf-model\\README.md",
+    "size": 1793,
+    "modified_at": "2026-07-30T07:03:53.417603",
+    "sha256": "f8f7924c1e1b7ac4162eae7ecfa52f7d07bdd08bba5003735a17e061eba61e33",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\.gitattributes": {
+    "rel_path": "_hf-space\\.gitattributes",
+    "size": 1554,
+    "modified_at": "2026-07-30T06:58:35.848207",
+    "sha256": "88023d0a029a0c409b30c03b689c68605b559f5cefe06376e4a26b38ed795269",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\.gitignore": {
+    "rel_path": "_hf-space\\.gitignore",
+    "size": 114,
+    "modified_at": "2026-07-30T06:58:35.849207",
+    "sha256": "5c574486c61bf37241cab9a5150b3451d5676d99a90436791832dca60c0d9799",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\app.py": {
+    "rel_path": "_hf-space\\app.py",
+    "size": 8852,
+    "modified_at": "2026-07-26T11:29:40.379020",
+    "sha256": "cb6c4c73aebc2e4d5d63d09fd2757015de9ceb08049bbd6c1405fa3be078d862",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\ayesha_hive_client.py": {
+    "rel_path": "_hf-space\\ayesha_hive_client.py",
+    "size": 8846,
+    "modified_at": "2026-07-26T11:29:40.315138",
+    "sha256": "84eb265391cdfed32c35dd371aeaed80f7d55ac496a729732909428ca8df51d0",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\ayesha_mobile_api.py": {
+    "rel_path": "_hf-space\\ayesha_mobile_api.py",
+    "size": 13570,
+    "modified_at": "2026-07-31T01:32:21.043063",
+    "sha256": "9af63155905a6dccc89d92ae683ebda1e5bf7b7db32f13e130d056df39c7fe3b",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\ayesha_sync.py": {
+    "rel_path": "_hf-space\\ayesha_sync.py",
+    "size": 11171,
+    "modified_at": "2026-07-26T11:29:40.316293",
+    "sha256": "b6cbf36734980c4c430d5fa068995ba9bafc4006de117b70da4ca269f24256d3",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\buildozer.spec": {
+    "rel_path": "_hf-space\\buildozer.spec",
+    "size": 2527,
+    "modified_at": "2026-07-30T06:58:35.854712",
+    "sha256": "878fbb68d33471e40b48999a88a2821bc6ce4bbc6c4d5fbc498d298beb1742cc",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\manifest.json": {
+    "rel_path": "_hf-space\\manifest.json",
+    "size": 123,
+    "modified_at": "2026-07-30T06:58:35.854712",
+    "sha256": "cc6c94d5995caa5cc2bdd93319bb4b04840138900d4afa773debe43472cfa6d6",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\mobile_app.py": {
+    "rel_path": "_hf-space\\mobile_app.py",
+    "size": 2326,
+    "modified_at": "2026-07-30T06:58:35.854712",
+    "sha256": "631d0b0ef63840a696dd70c33386f5a6c271e802b5a9cd2bd275f9d49542d510",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\mobile_app_hive_integrated.py": {
+    "rel_path": "_hf-space\\mobile_app_hive_integrated.py",
+    "size": 15459,
+    "modified_at": "2026-07-30T06:58:35.855716",
+    "sha256": "d2facf4966004155f5e21076e4c3bfe0416ecbe9b2b016446088d2e3f022c8fa",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\Modelfile": {
+    "rel_path": "_hf-space\\Modelfile",
+    "size": 3003,
+    "modified_at": "2026-07-31T01:31:16.254839",
+    "sha256": "0ddfdc244622d639676795511275d9fae571ff0ff2609e9245cd64403f473e56",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\README.md": {
+    "rel_path": "_hf-space\\README.md",
+    "size": 26512,
+    "modified_at": "2026-07-30T06:58:35.850207",
+    "sha256": "8b35bd340d01808ea56eb3b2cd5095456cc0a97c80ac26b767017addd9ee88a2",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\requirements.txt": {
+    "rel_path": "_hf-space\\requirements.txt",
+    "size": 15,
+    "modified_at": "2026-07-30T06:58:35.855716",
+    "sha256": "9c3be81c970c6e7727b90ed5bf0db0330f0cd47ab62847499b6fd62dcb58b25a",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\setup.py": {
+    "rel_path": "_hf-space\\setup.py",
+    "size": 2131,
+    "modified_at": "2026-07-30T06:58:35.855716",
+    "sha256": "a5cc8b99fd06411990f93890f2adaa9ac9defac12b226ad15d6396c0e50c45be",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\status.txt": {
+    "rel_path": "_hf-space\\status.txt",
+    "size": 62,
+    "modified_at": "2026-07-30T06:58:35.855716",
+    "sha256": "2044a00e8598c67ccf703fa6eb4445f1d44c379179a232ad81aba7d38b52b7d9",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\tri_node_mind.py": {
+    "rel_path": "_hf-space\\tri_node_mind.py",
+    "size": 15050,
+    "modified_at": "2026-07-26T11:29:40.323993",
+    "sha256": "520f31ef613b8cac39be1f01f871ad30477318eec96053f9c426e93a480bf76c",
+    "source": "local",
+    "status": "synced"
+  },
+  "_hf-space\\.github\\workflows\\build-apk.yml": {
+    "rel_path": "_hf-space\\.github\\workflows\\build-apk.yml",
+    "size": 1585,
+    "modified_at": "2026-07-30T06:58:35.849207",
+    "sha256": "4f52efbea8bc9d1abebd05d249c0800e859f7a89ee5303c03fe229eb8c4804fd",
     "source": "local",
     "status": "synced"
   }

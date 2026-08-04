@@ -1,4 +1,3 @@
-use colored::Colorize;
 use reqwest::Client;
 use serde_json::{json, Value};
 use anyhow::Result;
@@ -7,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::ollama::{ChatMessage, StreamResult, ToolCall, ToolFunction, ChatResponse, ChatResponseMessage};
+use crate::theme::{self, Role};
 
 #[derive(Debug)]
 pub struct CloudClient {
@@ -260,7 +260,7 @@ fn get_api_key(provider: &str) -> Option<String> {
                                                 }
 
                                                 if in_think {
-                                                    print!("{}", c.bright_black());
+                                                    print!("{}", theme::paint(Role::Dim, &c.to_string()));
                                                 } else {
                                                     print!("{}", c);
                                                 }

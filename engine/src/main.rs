@@ -15,9 +15,10 @@ mod applet_manager;
 mod applet_runner;
 mod agent;
 mod completion;
+mod theme;
 
 use std::io::Write;
-use colored::*;
+use theme::Role;
 use ollama::{OllamaClient, ChatMessage, StreamResult};
 use cloud::CloudClient;
 use tools::{ToolExecutor, ToolContext};
@@ -297,8 +298,8 @@ fn graceful_shutdown(
     manager.stop_all();
     let _ = crossterm::terminal::disable_raw_mode();
     println!();
-    println!("  {} {}", "●".bright_green(), "ayesha-os shutting down".bright_cyan());
-    println!("  {} {}", "◆".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
+    println!("  {} {}", theme::paint(Role::Success, "●"), theme::paint(Role::Accent, "ayesha-os shutting down"));
+    println!("  {} {}", theme::paint(Role::Accent, "◆"), theme::paint(Role::Dim, format!("saved {}", memory.summary())));
     println!();
 }
 
@@ -311,6 +312,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     winapi::init_console();
+    theme::apply_no_color();
+    theme::load_from_config(None);
 
     let session_start = std::time::Instant::now();
     let sandbox = Sandbox::default_workspace();
@@ -353,12 +356,16 @@ async fn main() -> anyhow::Result<()> {
         serde_json::json!({})
     };
 
+    // Reload theme with any persisted selection from config.json
+    let active_theme = config.get("theme").and_then(|v| v.as_str()).map(|s| s.to_string());
+    theme::load_from_config(active_theme.as_deref());
+
     let user_name = match config.get("user_name").and_then(|v| v.as_str()) {
         Some(n) if !n.is_empty() => n.to_string(),
         _ => {
             print!("\n  {} {}",
-                "◆".bright_cyan(),
-                "what should i call you, senpai?".bright_green());
+                theme::paint(Role::Accent, "◆"),
+                theme::paint(Role::Primary, "what should i call you, senpai?"));
             std::io::stdout().flush()?;
             let mut name = String::new();
             std::io::stdin().read_line(&mut name)?;
@@ -369,9 +376,9 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::write(&config_path, content);
             }
             println!("  {} {} {}",
-                "✔".bright_green(),
-                format!("okay, {}!", name).bright_cyan(),
-                "remember that one, desu~".bright_black());
+                theme::bold(Role::Success, "✔"),
+                theme::paint(Role::Accent, format!("okay, {}!", name)),
+                theme::paint(Role::Dim, "remember that one, desu~"));
             name
         }
     };
@@ -820,6 +827,33 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
+            _ if lower.starts_with("theme ") || lower == "theme" => {
+                let arg = input.get(6..).unwrap_or("").trim();
+                if arg.is_empty() {
+                    let current = theme::get().name.clone();
+                    println!("\n  {}", theme::bold(Role::Accent, format!("themes  (current: {})", current)));
+                    for name in theme::names() {
+                        let is_active = name == current;
+                        println!("  {} {}",
+                            theme::paint(if is_active { Role::Primary } else { Role::Dim },
+                                if is_active { "▶" } else { " " }),
+                            theme::paint(Role::Text, theme::render_swatch(name)));
+                    }
+                    println!();
+                } else {
+                    match theme::switch(arg) {
+                        Ok(t) => {
+                            config["theme"] = serde_json::json!(t.name);
+                            if let Ok(content) = serde_json::to_string_pretty(&config) {
+                                let _ = std::fs::write(&config_path, content);
+                            }
+                            ui::show_system(&format!("theme switched to {}", t.name));
+                        }
+                        Err(e) => ui::show_error(&e),
+                    }
+                }
+                continue;
+            }
             "stats" => {
                 match executor.execute("get_tool_stats", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
@@ -927,9 +961,9 @@ async fn main() -> anyhow::Result<()> {
             }
             "system" => {
                 if !messages.is_empty() {
-                    println!("\n\x1b[1;33mSystem Prompt:\x1b[0m");
+                    println!("\n{}", theme::bold(Role::Warning, "System Prompt:"));
                     for line in messages[0].content.lines() {
-                        println!("  {}", line.bright_black());
+                        println!("  {}", theme::paint(Role::Dim, line));
                     }
                 } else {
                     ui::show_system("no system prompt loaded");
@@ -992,7 +1026,7 @@ async fn main() -> anyhow::Result<()> {
                     let key = RandomState::new().build_hasher().finish();
                     jokes[key as usize % jokes.len()]
                 };
-                println!("\n  {}", joke.bright_yellow());
+                println!("\n  {}", theme::paint(Role::Secondary, joke));
                 continue;
             }
             "time" => {
@@ -1019,7 +1053,7 @@ async fn main() -> anyhow::Result<()> {
             _ if lower == "config" || lower.starts_with("config ") => {
                 let key = input.get(7..).unwrap_or("").trim();
                 if key.is_empty() {
-                    println!("\n\x1b[1;33mConfiguration:\x1b[0m");
+                    println!("\n{}", theme::bold(Role::Warning, "Configuration:"));
                     println!("  user_name: {}", config.get("user_name").and_then(|v| v.as_str()).unwrap_or("(not set)"));
                     println!("  tool_model: {}", tool_model_name);
                     println!("  chat_model: {}", current_model);
@@ -1036,7 +1070,7 @@ async fn main() -> anyhow::Result<()> {
                         ui::show_system(&format!("set {} = {}", k, v));
                     } else {
                         let val = config.get(key).map(|v| v.to_string()).unwrap_or("(not found)".to_string());
-                        println!("  {} = {}", key.bright_cyan(), val.bright_white());
+                        println!("  {} = {}", theme::paint(Role::Accent, key), theme::paint(Role::Text, val));
                     }
                 }
                 continue;
