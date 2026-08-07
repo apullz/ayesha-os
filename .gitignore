@@ -62,3 +62,6 @@ logs/
 
 # Engine output capture (selftest / banner dumps)
 test-output.txt
+
+# poopy-tui lives in a separate private repo; never track its contents here
+applets/poopy-tui/

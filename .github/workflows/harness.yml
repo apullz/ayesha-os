@@ -1,43 +1,42 @@
 name: Ayesha-OS Automation Harness
- 
+
 on:
   schedule:
     # Runs every 10 minutes automatically
     - cron: '*/10 * * * *'
   workflow_dispatch: # Allows you to trigger it manually from GitHub anytime
- 
+
+concurrency:
+  group: harness-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   run-harness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
- 
+        uses: actions/checkout@v7
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
- 
+
       - name: Run automation harness once
         run: |
           python3 scripts/automation_harness.py --once
- 
-      - name: Debug git state
-        run: |
-          echo "Current branch: $(git branch --show-current)"
-          echo "Remote URLs:"
-          git remote -v
-          echo "Status:"
-          git status
-          echo "Diff:"
-          git diff --stat
+
       - name: Commit and push changes if any automation tasks modified files
         run: |
           git config --global user.name "ayesha-bot"
           git config --global user.email "bot@ayesha.os"
           git add -A
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore(harness): automated task execution update [skip ci]" && git push origin HEAD)
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(harness): automated task execution update [skip ci]"
+            git push origin HEAD
+          fi
