@@ -16,6 +16,66 @@ use crate::applet_manager::AppletManager;
 const MAX_READ_SIZE: usize = 256 * 1024;
 const MAX_DOWNLOAD_SIZE: usize = 100 * 1024 * 1024; // 100 MB safety cap for network tools
 
+#[cfg(test)]
+mod glob_tests {
+    use super::*;
+
+    fn sm(seg: &str, pat: &str) -> bool {
+        fn rec(s: &[char], p: &[char]) -> bool {
+            match (p.first(), s.first()) {
+                (None, _) => s.is_empty(),
+                (Some('*'), _) => rec(s, &p[1..]) || (!s.is_empty() && rec(&s[1..], p)),
+                (Some('?'), Some(_)) => rec(&s[1..], &p[1..]),
+                (Some(pc), Some(sc)) if pc == sc => rec(&s[1..], &p[1..]),
+                _ => false,
+            }
+        }
+        rec(&seg.chars().collect::<Vec<_>>(), &pat.chars().collect::<Vec<_>>())
+    }
+
+    fn m(segs: &[&str], pats: &[&str]) -> bool {
+        match_glob_segments(segs, pats, &sm)
+    }
+
+    #[test]
+    fn double_star_matches_zero_or_more_segments() {
+        assert!(m(&["a.rs"], &["**", "*.rs"]));
+        assert!(m(&["src", "a.rs"], &["**", "*.rs"]));
+        assert!(m(&["src", "deep", "a.rs"], &["src", "**", "a.rs"]));
+        assert!(m(&["a.rs"], &["src", "**", "a.rs"]).eq(&false)); // no src at all
+        assert!(m(&["src", "deep", "lib.rs"], &["src", "**", "lib.rs"]));
+    }
+
+    #[test]
+    fn single_star_never_crosses_segments() {
+        assert!(sm("main.rs", "*.rs"));
+        assert!(sm("foo", "f?o"));
+        assert!(!sm("fooo", "f?o"));
+        assert!(m(&["src", "main.rs"], &["src", "*.rs"]));
+        // single * cannot reach files two levels deep (parts.len() mismatch)
+        assert!(!m(&["src", "deep", "main.rs"], &["src", "*.rs"]));
+        // but ** can
+        assert!(m(&["src", "deep", "main.rs"], &["**", "*.rs"]));
+    }
+}
+
+/// Match path segments against a glob pattern that may contain `**`.
+/// `**` matches zero or more segments; every other segment uses `seg_match`.
+fn match_glob_segments(segments: &[&str], parts: &[&str], seg_match: &dyn Fn(&str, &str) -> bool) -> bool {
+    fn rec(segs: &[&str], pats: &[&str], seg_match: &dyn Fn(&str, &str) -> bool) -> bool {
+        match (pats.first(), segs.first()) {
+            (None, _) => segs.is_empty(),
+            (Some(p), _) if *p == "**" => {
+                rec(segs, &pats[1..], seg_match)
+                    || (!segs.is_empty() && rec(&segs[1..], pats, seg_match))
+            }
+            (Some(p), Some(s)) => seg_match(s, p) && rec(&segs[1..], &pats[1..], seg_match),
+            _ => false,
+        }
+    }
+    rec(segments, parts, seg_match)
+}
+
 pub struct ToolContext<'a> {
     pub memory: &'a mut MemoryStore,
     pub prompt_history: &'a mut PromptHistory,
@@ -45,6 +105,12 @@ impl ToolExecutor {
             "read_file" => self.read_file(args).await,
             "write_file" => self.write_file(args).await,
             "list_dir" => self.list_dir(args).await,
+            "grep" => self.grep(args).await,
+            "glob" => self.glob(args).await,
+
+            // Skills
+            "list_skills" => self.list_skills(ctx.project_root),
+            "read_skill" => self.read_skill(args, ctx.project_root),
 
             // Network
             "fetch_url" => self.fetch_url(args).await,
@@ -430,6 +496,311 @@ impl ToolExecutor {
     }
 
     // ═══════════════════════════════════════════
+    //  Search tools
+    // ═══════════════════════════════════════════
+
+    /// Recursively search files for lines containing a pattern (substring match,
+    /// case-insensitive by default). Reports matches as `path:line: text`.
+    /// Skipped: the project's .git, node_modules, target, .venv directories,
+    /// binary files (null byte check), and anything over 512KB.
+    async fn grep(&self, args: &Value) -> Result<String> {
+        let pattern = args["pattern"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("missing 'pattern' argument"))?
+            .to_string();
+        if pattern.is_empty() {
+            bail!("'pattern' must not be empty");
+        }
+
+        let root_arg = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+        self.sandbox.check_sensitive(root_arg)?;
+        let root = self.sandbox.resolve(root_arg)?;
+        self.sandbox.check_sensitive_resolved(&root)?;
+        if !root.is_dir() {
+            bail!("path is not a directory: {}", root.display());
+        }
+
+        let ignore_case = args.get("ignore_case").and_then(|v| v.as_bool()).unwrap_or(true);
+        let include = args.get("include").and_then(|v| v.as_str()).map(|s| s.to_lowercase());
+        let pattern_lower = pattern.to_lowercase();
+
+        const MAX_MATCHES: usize = 200;
+        const MAX_LINE_CHARS: usize = 300;
+        const MAX_FILE_SIZE: u64 = 512 * 1024;
+        const SKIP_DIRS: &[&str] = &[".git", "node_modules", "target", ".venv", "dist", "build"];
+
+        let mut results: Vec<String> = Vec::new();
+        let mut scanned = 0usize;
+        let mut files_searched = 0usize;
+        let mut dir_stack: Vec<std::path::PathBuf> = vec![root.clone()];
+
+        while let Some(dir) = dir_stack.pop() {
+            let entries = match fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                if results.len() >= MAX_MATCHES {
+                    break;
+                }
+                let path = entry.path();
+                let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or_else(|_| entry.metadata().map(|m| m.is_dir()).unwrap_or(false));
+                let is_file = entry.file_type().map(|t| t.is_file()).unwrap_or_else(|_| entry.metadata().map(|m| m.is_file()).unwrap_or(false));
+                if is_dir {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if !SKIP_DIRS.contains(&name) {
+                            dir_stack.push(path);
+                        }
+                    }
+                    continue;
+                }
+                if !is_file {
+                    continue;
+                }
+
+                if let Some(inc) = &include {
+                    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+                    if !name.contains(inc) {
+                        continue;
+                    }
+                }
+
+                let Ok(meta) = path.metadata() else { continue };
+                if meta.len() > MAX_FILE_SIZE {
+                    continue;
+                }
+
+                let Ok(content) = fs::read(&path) else { continue };
+                if content.contains(&0) {
+                    continue; // binary
+                }
+                let content = String::from_utf8_lossy(&content);
+                files_searched += 1;
+
+                for (i, line) in content.lines().enumerate() {
+                    let line_matches = if ignore_case {
+                        line.to_lowercase().contains(&pattern_lower)
+                    } else {
+                        line.contains(&pattern)
+                    };
+                    if line_matches {
+                        let line = if line.chars().count() > MAX_LINE_CHARS {
+                            let mut s: String = line.chars().take(MAX_LINE_CHARS).collect();
+                            s.push_str("...");
+                            s
+                        } else {
+                            line.to_string()
+                        };
+                        results.push(format!(
+                            "{}:{}: {}",
+                            path.display(),
+                            i + 1,
+                            line
+                        ));
+                    }
+                    scanned += 1;
+                    if results.len() >= MAX_MATCHES {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if results.is_empty() {
+            Ok(format!(
+                "no matches for '{}' in {} ({} files scanned)",
+                pattern,
+                root.display(),
+                files_searched
+            ))
+        } else {
+            let mut out = format!(
+                "{} match{} for '{}' in {} ({} files scanned):\n",
+                results.len(),
+                if results.len() == 1 { "" } else { "es" },
+                pattern,
+                root.display(),
+                files_searched
+            );
+            out.push_str(&results.join("\n"));
+            if scanned > results.len() {
+                out.push_str(&format!(
+                    "\n[{} lines scanned total]",
+                    scanned
+                ));
+            }
+            Ok(out)
+        }
+    }
+
+    /// Find files by glob pattern, recursively from a root path.
+    /// Supports `**` (any depth), `*` (within a path segment), and `?` (single char).
+    /// Example patterns: `**/*.rs`, `src/**/test_*.py`, `*.json`.
+    async fn glob(&self, args: &Value) -> Result<String> {
+        let pattern = args["pattern"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("missing 'pattern' argument"))?
+            .to_string();
+        if pattern.is_empty() {
+            bail!("'pattern' must not be empty");
+        }
+
+        let root_arg = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+        self.sandbox.check_sensitive(root_arg)?;
+        let root = self.sandbox.resolve(root_arg)?;
+        self.sandbox.check_sensitive_resolved(&root)?;
+        if !root.is_dir() {
+            bail!("path is not a directory: {}", root.display());
+        }
+
+        const MAX_RESULTS: usize = 500;
+        const SKIP_DIRS: &[&str] = &[".git", "node_modules", "target", ".venv", "dist", "build"];
+
+        // Normalize pattern separators to the platform separator.
+        let norm_pattern = pattern.replace('/', std::path::MAIN_SEPARATOR_STR);
+
+        // Match a single path segment (no separator crossing).
+        fn segment_match(seg: &str, pat: &str) -> bool {
+            fn rec(s: &[char], p: &[char]) -> bool {
+                match (p.first(), s.first()) {
+                    (None, _) => s.is_empty(),
+                    (Some('*'), _) => {
+                        rec(s, &p[1..]) || (!s.is_empty() && rec(&s[1..], p))
+                    }
+                    (Some('?'), Some(_)) => rec(&s[1..], &p[1..]),
+                    (Some(pc), Some(sc)) if pc == sc => rec(&s[1..], &p[1..]),
+                    _ => false,
+                }
+            }
+            rec(&seg.chars().collect::<Vec<_>>(), &pat.chars().collect::<Vec<_>>())
+        }
+
+        // Split the pattern into segments (double-star aware).
+        let mut parts: Vec<String> = Vec::new();
+        for part in norm_pattern.split(std::path::MAIN_SEPARATOR) {
+            if !part.is_empty() {
+                parts.push(part.to_string());
+            }
+        }
+        let double_star = parts.contains(&"**".to_string());
+
+        let mut matches: Vec<std::path::PathBuf> = Vec::new();
+        let mut dir_stack: Vec<std::path::PathBuf> = vec![root.clone()];
+
+        while let Some(dir) = dir_stack.pop() {
+            let entries = match fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                if matches.len() >= MAX_RESULTS {
+                    break;
+                }
+                let path = entry.path();
+                let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or_else(|_| entry.metadata().map(|m| m.is_dir()).unwrap_or(false));
+
+                // Compute the relative path from root using the platform separator.
+                let rel = match path.strip_prefix(&root) {
+                    Ok(r) => r.to_string_lossy().replace('/', std::path::MAIN_SEPARATOR_STR),
+                    Err(_) => continue,
+                };
+                let rel_segs: Vec<&str> = rel.split(std::path::MAIN_SEPARATOR).filter(|s| !s.is_empty()).collect();
+
+                // Does rel match the pattern? `**` matches zero or more segments.
+                let matched = if double_star {
+                    let pat_segs: Vec<&str> = parts.iter().map(|s| s.as_str()).collect();
+                    match_glob_segments(&rel_segs, &pat_segs, &segment_match)
+                } else {
+                    rel_segs.len() == parts.len()
+                        && rel_segs.iter().zip(parts.iter()).all(|(s, p)| segment_match(s, p))
+                };
+
+                if matched {
+                    matches.push(path.clone());
+                }
+
+                if is_dir {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if !SKIP_DIRS.contains(&name) {
+                            dir_stack.push(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        matches.sort();
+        matches.dedup();
+
+        if matches.is_empty() {
+            Ok(format!(
+                "no files match '{}' under {}",
+                pattern,
+                root.display()
+            ))
+        } else {
+            let mut out = format!(
+                "{} file{} match '{}':\n",
+                matches.len(),
+                if matches.len() == 1 { "" } else { "s" },
+                pattern
+            );
+            for m in &matches {
+                out.push_str(&format!("  {}\n", m.display()));
+            }
+            Ok(out)
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    //  Skills tools
+    // ═══════════════════════════════════════════
+
+    fn list_skills(&self, project_root: &Path) -> Result<String> {
+        let skills = crate::skills::discover(project_root);
+        if skills.is_empty() {
+            Ok(format!(
+                "no skills found (look for markdown files in '{}/skills')",
+                project_root.display()
+            ))
+        } else {
+            let mut out = String::from("available skills:\n");
+            for skill in skills {
+                out.push_str(&format!(
+                    "  {} — {}\n",
+                    skill.name,
+                    skill.description
+                ));
+            }
+            Ok(out)
+        }
+    }
+
+    fn read_skill(&self, args: &Value, project_root: &Path) -> Result<String> {
+        let name = args["name"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("missing 'name' argument"))?
+            .to_string();
+        let skills = crate::skills::discover(project_root);
+        let skill = skills
+            .iter()
+            .find(|s| s.name.eq_ignore_ascii_case(&name))
+            .ok_or_else(|| {
+                let known: Vec<String> = skills.iter().map(|s| s.name.clone()).collect();
+                anyhow::anyhow!(
+                    "skill '{}' not found. available: {}",
+                    name,
+                    if known.is_empty() {
+                        "(none)".to_string()
+                    } else {
+                        known.join(", ")
+                    }
+                )
+            })?;
+        Ok(format!("(loaded from {})\n\n{}", skill.path.display(), skill.content))
+    }
+
+    // ═══════════════════════════════════════════
     //  Generation tools
     // ═══════════════════════════════════════════
 
@@ -507,9 +878,9 @@ impl ToolExecutor {
                 let ox = col * tile_w;
                 let oy = row * tile_h;
                 let v = (col * 17 + row * 31) % 30;
-                let r = (base.0[0] as i32 + v as i32 - 15).clamp(0, 255) as u8;
-                let g = (base.0[1] as i32 + v as i32 - 15).clamp(0, 255) as u8;
-                let b = (base.0[2] as i32 + v as i32 - 15).clamp(0, 255) as u8;
+                let r = (base.0[0] + v as i32 - 15).clamp(0, 255) as u8;
+                let g = (base.0[1] + v as i32 - 15).clamp(0, 255) as u8;
+                let b = (base.0[2] + v as i32 - 15).clamp(0, 255) as u8;
                 for dy in 0..tile_h {
                     for dx in 0..tile_w {
                         img.put_pixel(ox + dx, oy + dy, image::Rgba([r, g, b, 255]));
@@ -1051,6 +1422,165 @@ mod tests {
 
         assert!(result.contains("a.txt"));
         assert!(result.contains("b.txt"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_grep_finds_matches() {
+        let dir = std::env::temp_dir().join("ayesha_test_grep");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("main.rs"), "fn main() {\n    println!(\"hello world\");\n}\n").unwrap();
+        std::fs::write(dir.join("notes.txt"), "nothing interesting here").unwrap();
+
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+        let result = executor.grep(&json!({
+            "pattern": "println",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+
+        assert!(result.contains("main.rs:2"), "expected path:line in result, got: {}", result);
+        assert!(result.contains("println!"));
+        assert!(!result.contains("notes.txt"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_grep_case_sensitive_and_include() {
+        let dir = std::env::temp_dir().join("ayesha_test_grep2");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("a.rs"), "fn Foo() {}\nfn bar() {}\n").unwrap();
+        std::fs::write(dir.join("a.md"), "fn Foo() {}\n").unwrap();
+
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+
+        // Case-insensitive default finds both
+        let ci = executor.grep(&json!({
+            "pattern": "foo",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+        assert!(ci.contains("a.rs:1"));
+
+        // Case-sensitive misses uppercase
+        let cs = executor.grep(&json!({
+            "pattern": "foo",
+            "path": dir.to_string_lossy(),
+            "ignore_case": false
+        })).await.unwrap();
+        assert!(!cs.contains("a.rs:1"), "case-sensitive search matched lowercase: {}", cs);
+
+        // include filter narrows to .md
+        let inc = executor.grep(&json!({
+            "pattern": "Foo",
+            "path": dir.to_string_lossy(),
+            "include": ".md"
+        })).await.unwrap();
+        assert!(inc.contains("a.md:1"));
+        assert!(!inc.contains("a.rs"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_grep_no_matches() {
+        let dir = std::env::temp_dir().join("ayesha_test_grep3");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("a.txt"), "hello").unwrap();
+
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+        let result = executor.grep(&json!({
+            "pattern": "zzzz",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+        assert!(result.contains("no matches"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_glob_finds_nested_files() {
+        let dir = std::env::temp_dir().join("ayesha_test_glob");
+        let _ = std::fs::create_dir_all(dir.join("src").join("deep"));
+        std::fs::write(dir.join("src").join("main.rs"), "").unwrap();
+        std::fs::write(dir.join("src").join("deep").join("lib.rs"), "").unwrap();
+        std::fs::write(dir.join("src").join("deep").join("mod.rs"), "").unwrap();
+        std::fs::write(dir.join("Cargo.toml"), "").unwrap();
+
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+
+        // ** matches any depth
+        let all = executor.glob(&json!({
+            "pattern": "**/*.rs",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+        assert!(all.contains("main.rs"));
+        assert!(all.contains("deep\\lib.rs") || all.contains("deep/lib.rs"));
+        assert!(!all.contains("Cargo.toml"));
+
+        // single-segment pattern only matches top level
+        let top = executor.glob(&json!({
+            "pattern": "*.rs",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+        assert!(!top.contains("deep"), "single-* crossed directories: {}", top);
+
+        // ? matches single char
+        let q = executor.glob(&json!({
+            "pattern": "src/deep/mo?.rs",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+        assert!(q.contains("mod.rs"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_glob_no_match() {
+        let dir = std::env::temp_dir().join("ayesha_test_glob2");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+        let result = executor.glob(&json!({
+            "pattern": "**/*.xyz",
+            "path": dir.to_string_lossy()
+        })).await.unwrap();
+        assert!(result.contains("no files match"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_list_skills_empty_when_no_dir() {
+        let dir = std::env::temp_dir().join("ayesha_test_skills_empty");
+        let _ = std::fs::create_dir_all(&dir);
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+        let result = executor.list_skills(&dir).unwrap();
+        assert!(result.contains("no skills found"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_list_and_read_skill() {
+        let dir = std::env::temp_dir().join("ayesha_test_skills");
+        let _ = std::fs::create_dir_all(dir.join("skills"));
+        std::fs::write(
+            dir.join("skills").join("demo.md"),
+            "---\nname: demo\ndescription: a demo skill\n---\n# demo\nfollow these steps",
+        ).unwrap();
+
+        let executor = ToolExecutor::new(Sandbox::new(&dir));
+
+        let listed = executor.list_skills(&dir).unwrap();
+        assert!(listed.contains("demo"));
+        assert!(listed.contains("a demo skill"));
+
+        let loaded = executor.read_skill(&json!({"name": "demo"}), &dir).unwrap();
+        assert!(loaded.contains("follow these steps"));
+        assert!(loaded.contains("demo.md"), "loaded content should mention source file: {}", loaded);
+
+        let missing = executor.read_skill(&json!({"name": "nope"}), &dir);
+        assert!(missing.is_err());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

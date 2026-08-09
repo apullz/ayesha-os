@@ -13,6 +13,7 @@ pub struct ToolUsageRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct PromptHistory {
     pub records: Vec<ToolUsageRecord>,
     pub current_system_prompt: String,
@@ -28,16 +29,6 @@ pub struct PromptRefinement {
     pub timestamp: String,
 }
 
-impl Default for PromptHistory {
-    fn default() -> Self {
-        Self {
-            records: Vec::new(),
-            current_system_prompt: String::new(),
-            prompt_version: 0,
-            refinements: Vec::new(),
-        }
-    }
-}
 
 impl PromptHistory {
     fn store_path() -> PathBuf {

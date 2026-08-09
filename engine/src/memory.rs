@@ -15,21 +15,13 @@ pub struct Memory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct MemoryStore {
     pub memories: Vec<Memory>,
     pub user_preferences: std::collections::HashMap<String, String>,
     pub learned_facts: Vec<String>,
 }
 
-impl Default for MemoryStore {
-    fn default() -> Self {
-        Self {
-            memories: Vec::new(),
-            user_preferences: std::collections::HashMap::new(),
-            learned_facts: Vec::new(),
-        }
-    }
-}
 
 impl MemoryStore {
     fn store_path() -> PathBuf {

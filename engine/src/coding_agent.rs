@@ -52,6 +52,8 @@ impl CodingAgent {
             "write" => self.write_file(args).await,
             "edit" => self.edit_file(args).await,
             "list" => self.list_dir(args).await,
+            "grep" => self.grep_files(args).await,
+            "glob" => self.glob_files(args).await,
             "analyze" => self.analyze_code(args).await,
             "modify" => self.modify_code(args).await,
             "suggest" => self.suggest_improvements(args).await,
@@ -235,6 +237,160 @@ impl CodingAgent {
             "path": path,
             "entries": entries
         }).to_string())
+    }
+
+    /// Recursive text search across the codebase (substring, case-insensitive).
+    async fn grep_files(&self, args: &Value) -> Result<String> {
+        let pattern = args.get("pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'pattern' argument"))?;
+        let root_arg = args.get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+        let include = args.get("include").and_then(|v| v.as_str()).map(|s| s.to_lowercase());
+
+        let full_root = self.project_root.join(root_arg);
+        if !full_root.is_dir() {
+            return Err(anyhow::anyhow!("Path is not a directory: {}", root_arg));
+        }
+
+        const MAX_MATCHES: usize = 100;
+        const SKIP_DIRS: &[&str] = &[".git", "node_modules", "target", ".venv", "dist", "build"];
+
+        let pattern_lower = pattern.to_lowercase();
+        let mut results: Vec<String> = Vec::new();
+        let mut dir_stack: Vec<std::path::PathBuf> = vec![full_root.clone()];
+
+        while let Some(dir) = dir_stack.pop() {
+            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            for entry in entries.flatten() {
+                if results.len() >= MAX_MATCHES {
+                    break;
+                }
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if !SKIP_DIRS.contains(&name) {
+                            dir_stack.push(path);
+                        }
+                    }
+                    continue;
+                }
+                if let Some(inc) = &include {
+                    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+                    if !name.contains(inc) {
+                        continue;
+                    }
+                }
+                let Ok(content) = fs::read_to_string(&path) else { continue };
+                for (i, line) in content.lines().enumerate() {
+                    if line.to_lowercase().contains(&pattern_lower) {
+                        let rel = path.strip_prefix(&self.project_root).map(|p| p.display().to_string()).unwrap_or_else(|_| path.display().to_string());
+                        results.push(format!("{}:{}: {}", rel, i + 1, line));
+                    }
+                    if results.len() >= MAX_MATCHES {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if results.is_empty() {
+            Ok(format!("no matches for '{}' under {}", pattern, root_arg))
+        } else {
+            Ok(format!("{} match(es) for '{}':\n{}", results.len(), pattern, results.join("\n")))
+        }
+    }
+
+    /// Find files by glob pattern relative to the project root.
+    async fn glob_files(&self, args: &Value) -> Result<String> {
+        let pattern = args.get("pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'pattern' argument"))?;
+        let root_arg = args.get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+
+        let full_root = self.project_root.join(root_arg);
+        if !full_root.is_dir() {
+            return Err(anyhow::anyhow!("Path is not a directory: {}", root_arg));
+        }
+
+        let norm_pattern = pattern.replace('/', std::path::MAIN_SEPARATOR_STR);
+        let parts: Vec<String> = norm_pattern
+            .split(std::path::MAIN_SEPARATOR)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect();
+        let double_star = parts.iter().any(|p| p == "**");
+
+        fn seg_match(seg: &str, pat: &str) -> bool {
+            fn rec(s: &[char], p: &[char]) -> bool {
+                match (p.first(), s.first()) {
+                    (None, _) => s.is_empty(),
+                    (Some('*'), _) => rec(s, &p[1..]) || (!s.is_empty() && rec(&s[1..], p)),
+                    (Some('?'), Some(_)) => rec(&s[1..], &p[1..]),
+                    (Some(pc), Some(sc)) if pc == sc => rec(&s[1..], &p[1..]),
+                    _ => false,
+                }
+            }
+            rec(&seg.chars().collect::<Vec<_>>(), &pat.chars().collect::<Vec<_>>())
+        }
+        fn segs_match(segs: &[&str], pats: &[&str], sm: &dyn Fn(&str, &str) -> bool) -> bool {
+            fn rec(segs: &[&str], pats: &[&str], sm: &dyn Fn(&str, &str) -> bool) -> bool {
+                match (pats.first(), segs.first()) {
+                    (None, _) => segs.is_empty(),
+                    (Some(p), _) if *p == "**" => rec(segs, &pats[1..], sm) || (!segs.is_empty() && rec(&segs[1..], pats, sm)),
+                    (Some(p), Some(s)) => sm(s, p) && rec(&segs[1..], &pats[1..], sm),
+                    _ => false,
+                }
+            }
+            rec(segs, pats, sm)
+        }
+
+        const MAX_RESULTS: usize = 500;
+        const SKIP_DIRS: &[&str] = &[".git", "node_modules", "target", ".venv", "dist", "build"];
+
+        let mut found: Vec<String> = Vec::new();
+        let mut dir_stack: Vec<std::path::PathBuf> = vec![full_root.clone()];
+
+        while let Some(dir) = dir_stack.pop() {
+            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            for entry in entries.flatten() {
+                if found.len() >= MAX_RESULTS {
+                    break;
+                }
+                let path = entry.path();
+                let rel = path.strip_prefix(&full_root).map(|r| r.to_string_lossy().replace('/', std::path::MAIN_SEPARATOR_STR)).unwrap_or_default();
+                let rel_segs: Vec<&str> = rel.split(std::path::MAIN_SEPARATOR).filter(|s| !s.is_empty()).collect();
+                let pat_segs: Vec<&str> = parts.iter().map(|s| s.as_str()).collect();
+                let matched = if double_star {
+                    segs_match(&rel_segs, &pat_segs, &seg_match)
+                } else {
+                    rel_segs.len() == pat_segs.len()
+                        && rel_segs.iter().zip(pat_segs.iter()).all(|(s, p)| seg_match(s, p))
+                };
+                if matched {
+                    found.push(path.display().to_string());
+                }
+                if path.is_dir() {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if !SKIP_DIRS.contains(&name) {
+                            dir_stack.push(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        found.sort();
+        found.dedup();
+
+        if found.is_empty() {
+            Ok(format!("no files match '{}' under {}", pattern, root_arg))
+        } else {
+            Ok(format!("{} file(s) match '{}':\n{}", found.len(), pattern, found.join("\n")))
+        }
     }
 
     /// Analyze code for issues, patterns, or suggestions

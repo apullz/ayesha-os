@@ -134,26 +134,15 @@ output ONLY the JSON, no explanation."#,
     }
 
     pub fn generate_tool_code(template: &ToolTemplate) -> String {
-        let params: Vec<String> = template.parameters.iter().map(|p| {
-            format!("    let {} = args[\"{}\"]\n        .as_{}()\n        .ok_or_else(|| anyhow::anyhow!(\"missing '{}' argument\"))?;",
-                p.name, p.name,
-                if p.param_type == "string" { "str" }
-                else if p.param_type == "integer" { "i64" }
-                else { "bool" },
-                p.name)
-        }).collect();
-
-        format!(
-            r#"async fn {}(&self, args: &Value) -> Result<String> {{
-    // TODO: implement - {}
-    {}
-
-    Ok(format!("{} executed successfully"))
-}}"#,
-            template.name,
-            template.description,
-            params.join("\n\n"),
-            template.name,
-        )
+         format!(
+             r#"async fn {}(&self, args: &Value) -> Result<String> {{
+     // Auto-generated implementation for {}. Replace with actual logic.
+     Ok(format!("{} executed: {{:?}}", {}, args))
+ }}"#,
+             template.name,
+             template.description,
+             template.name,
+             template.name
+         )
     }
 }

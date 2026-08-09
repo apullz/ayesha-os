@@ -12,7 +12,10 @@ impl Sandbox {
     }
 
     pub fn default_workspace() -> Self {
-        Self::new("C:\\")
+        Self::new(
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("C:\\"))
+        )
     }
 
     fn expand_env_vars(path: &str) -> String {

@@ -14,15 +14,19 @@
 
   engine/          [✔]  Agentic coding assistant + jarvis chatbot.
                          CLI persona host with streaming,
-                         model routing, tool-calling (22 tools
-                         incl. fetch_url / download_image for
+                         model routing, tool-calling (26 tools
+                         incl. grep / glob search, skills,
+                         fetch_url / download_image for
                          image & file downloads),
-                         cloud support (openrouter/opencode),
+                         cloud support (openrouter/opencode,
+                         incl. xiaomi/mimo-v2.5 + big-pickle),
+                         skills/ folder with markdown guides
+                         (list_skills + read_skill tools),
                          pixel striker sprite engine,
                          self-improvement loop, command palette,
-                         retro cyberpunk UI, applet manager,
+                         opencode-style compact UI,
                          autocomplete (Tab cycling for commands
-                         and applets), 69 unit tests, zero warnings.
+                         and applets), 85 unit tests, zero warnings.
                          └ 25 slash commands:
                             help, clear, models, auto, sync, apps,
                             run, stop, model, toolmodel, pull, route,
@@ -107,6 +111,8 @@
                 meta-llama/llama-3.3-70b-instruct:free
                 deepseek/deepseek-r1:free
                 qwen/qwen-2.5-coder-32b-instruct:free
+                xiaomi/mimo-v2.5            (1M ctx, tools, vision)
+                xiaomi/mimo-v2.5-pro        (1M ctx, agentic, thinking)
   opencode:     opencode/big-pickle
 
   ── D E P L O Y M E N T ──

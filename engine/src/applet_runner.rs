@@ -31,21 +31,18 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                     // Global hotkeys (Ctrl+M, Ctrl+P, Ctrl+C)
                     match (key.code, key.modifiers) {
                         (KeyCode::Char('m'), KeyModifiers::CONTROL) => {
-                            if key.kind == KeyEventKind::Press {
-                                if steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
-                            }
+                            if key.kind == KeyEventKind::Press
+                                && steer_tx.send("\0ctrl-m".to_string()).is_err() { break; }
                             continue;
                         }
                         (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
-                            if key.kind == KeyEventKind::Press {
-                                if steer_tx.send("\0ctrl-p".to_string()).is_err() { break; }
-                            }
+                            if key.kind == KeyEventKind::Press
+                                && steer_tx.send("\0ctrl-p".to_string()).is_err() { break; }
                             continue;
                         }
                         (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                            if key.kind == KeyEventKind::Press {
-                                if steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
-                            }
+                            if key.kind == KeyEventKind::Press
+                                && steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
                             continue;
                         }
                         _ => {}
@@ -79,11 +76,10 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                                     let _ = steer_tx.send("\0menu-backspace".to_string());
                                 }
                             }
-                            KeyCode::Char(c) if c as u8 >= 32 => {
-                                if key.kind == KeyEventKind::Press {
+                            KeyCode::Char(c) if c as u8 >= 32
+                                && key.kind == KeyEventKind::Press => {
                                     let _ = steer_tx.send(format!("\0menu-char:{}", c));
                                 }
-                            }
                             _ => {}
                         }
                         continue;
@@ -92,14 +88,12 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                     // Normal mode key handling
                     match (key.code, key.modifiers) {
                         (KeyCode::Up, KeyModifiers::SHIFT) => {
-                            if key.kind == KeyEventKind::Press {
-                                if steer_tx.send("\0shift-up".to_string()).is_err() { break; }
-                            }
+                            if key.kind == KeyEventKind::Press
+                                && steer_tx.send("\0shift-up".to_string()).is_err() { break; }
                         }
                         (KeyCode::Down, KeyModifiers::SHIFT) => {
-                            if key.kind == KeyEventKind::Press {
-                                if steer_tx.send("\0shift-down".to_string()).is_err() { break; }
-                            }
+                            if key.kind == KeyEventKind::Press
+                                && steer_tx.send("\0shift-down".to_string()).is_err() { break; }
                         }
                         (KeyCode::Tab, _) => {
                             if key.kind != KeyEventKind::Press { continue; }
@@ -144,14 +138,13 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                             print!("{}", c);
                             let _ = std::io::stdout().flush();
                         }
-                        (KeyCode::Backspace, _) => {
-                            if !input_buf.is_empty() {
+                        (KeyCode::Backspace, _)
+                            if !input_buf.is_empty() => {
                                 input_buf.pop();
                                 completer.reset();
                                 print!("\x08 \x08");
                                 let _ = std::io::stdout().flush();
                             }
-                        }
                         _ => {}
                     }
                 }

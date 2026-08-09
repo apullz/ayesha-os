@@ -26,18 +26,29 @@ pub fn needs_tools(msg: &str) -> bool {
     let lower = msg.to_lowercase();
     let hints = [
         "read", "write", "edit", "create", "open", "show", "list", "delete",
-        "move", "copy", "search", "find", "grep", "look", "run", "execute",
+        "move", "copy", "search", "find", "grep", "glob", "pattern", "look",
+        "run", "execute",
         "build", "compile", "test", "deploy", "launch", "stop", "start",
         "check", "install", "update", "sync", "push", "pull", "commit",
         "git", "cargo", "npm", "pip", "python", "rust", "code", "file",
         "directory", "folder", "path", "src", "engine", "core", "applet",
         "how many", "show me", "tell me about", "what's in", "what's the",
         "analyze", "refactor", "fix", "bug", "error", "issue", "problem",
-        "http", "https", ".com", ".org", ".rs", ".py", ".ts", ".js",
+        "skill", "http", "https", ".com", ".org", ".rs", ".py", ".ts", ".js",
         "page", "switch", "applet",
         "download", "fetch", "url", "image", "picture", "photo", "wallpaper",
         "anime", "dragonball", "pokemon", "ghibli", "manga",
         "desktop", "documents", "to my",
+        // web / creative action verbs
+        "make a", "make me", "website", "site", "html", "css", "javascript",
+        "generate", "design", "draw", "paint", "sprite", "pixel",
+        // file / data operations
+        "put it", "save it", "give me", "send me", "help me with",
+        "i want", "i need", "i'd like",
+        // common tool-adjacent nouns
+        "script", "program", "app", "tool", "project", "repo",
+        "terminal", "console", "shell", "powershell", "cmd",
+        "ollama", "model", "ollama model",
     ];
     hints.iter().any(|h| lower.contains(h))
 }
@@ -95,6 +106,20 @@ mod tests {
     }
 
     #[test]
+    fn needs_tools_detects_web_creative() {
+        assert!(needs_tools("can you make a website"));
+        assert!(needs_tools("make me a web page"));
+        assert!(needs_tools("create an html file"));
+        assert!(needs_tools("generate a sprite"));
+        assert!(needs_tools("design a logo"));
+        assert!(needs_tools("draw a pixel cat"));
+        assert!(needs_tools("build me a tool"));
+        assert!(needs_tools("i want a script"));
+        assert!(needs_tools("help me with my project"));
+        assert!(needs_tools("give me a css file"));
+    }
+
+    #[test]
     fn needs_tools_skips_chitchat() {
         assert!(!needs_tools("hi"));
         assert!(!needs_tools("hello"));
@@ -107,8 +132,6 @@ mod tests {
         // Common words that must NOT trigger the ~2s tool-model round-trip
         assert!(!needs_tools("i'm home"));
         assert!(!needs_tools("what's new"));
-        assert!(!needs_tools("make me a sandwich"));
-        assert!(!needs_tools("save the date"));
         assert!(!needs_tools("that's a nice piece of art"));
         assert!(!needs_tools("the root of this is simple"));
     }

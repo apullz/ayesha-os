@@ -1,6 +1,6 @@
 {
   "name": "ayesha-os",
-  "version": "4.2.0",
+  "version": "4.5.0",
   "personality": {
     "name": "ayesha",
     "age": 33,
@@ -36,7 +36,9 @@
         "nvidia/nemotron-3-super:free": ["general", "coding", "agentic", "tools", "1M_context"],
         "meta-llama/llama-3.3-70b-instruct:free": ["general", "coding", "reasoning"],
         "deepseek/deepseek-r1:free": ["thinking", "math", "coding"],
-        "qwen/qwen-2.5-coder-32b-instruct:free": ["coding", "tools"]
+        "qwen/qwen-2.5-coder-32b-instruct:free": ["coding", "tools"],
+        "xiaomi/mimo-v2.5": ["general", "coding", "tools", "vision", "1M_context"],
+        "xiaomi/mimo-v2.5-pro": ["general", "coding", "agentic", "thinking", "1M_context"]
       }
     },
     "opencode_zen": {
@@ -44,6 +46,23 @@
       "free_models": {
         "opencode/big-pickle": ["coding", "reasoning", "stealth_moe", "200k_context"]
       }
+    }
+  },
+  "theme": {
+    "name": "monokai++",
+    "palette": {
+      "background": "#221F22",
+      "surface": "#19181A",
+      "text": "#FCFCFA",
+      "primary": "#FF6188",
+      "accent": "#FF6188",
+      "secondary": "#78DCE8",
+      "success": "#A9DC76",
+      "warning": "#FFD866",
+      "error": "#FF5F5F",
+      "dim": "#6C696E",
+      "border": "#454147",
+      "code_bg": "#2D2A2E"
     }
   },
   "projects": {

@@ -32,6 +32,37 @@ try {
   // Silence env load errors
 }
 
+// ── theme (driven by ayesha.json → theme.palette, truecolor ANSI) ───────
+const _defaultPal: Record<string, string> = {
+  primary: "#E75E9D", accent: "#D782A7", secondary: "#4C5D79",
+  text: "#E8E6F0", dim: "#6A6478", success: "#62C884", error: "#E5536A",
+};
+const _palette: Record<string, string> = { ..._defaultPal };
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "ayesha.json"), "utf-8"));
+  const pal = cfg?.theme?.palette || {};
+  for (const k of Object.keys(_defaultPal)) {
+    if (typeof pal[k] === "string") _palette[k] = pal[k];
+  }
+} catch (e) {
+  // keep default palette
+}
+const _rgbStr = (hex: string) => {
+  const h = hex.replace("#", "");
+  return `${parseInt(h.slice(0, 2), 16)};${parseInt(h.slice(2, 4), 16)};${parseInt(h.slice(4, 6), 16)}`;
+};
+const _fg = (hex: string, bold = false) => `\x1b[${bold ? "1;" : ""}38;2;${_rgbStr(hex)}m`;
+const RST = "\x1b[0m";
+// role codes: Y=primary(was yellow), C=accent(was cyan), G=success(green),
+// R=error(red), M=secondary(magenta/blue), D=dim, W=text(white)
+const Y = _fg(_palette.primary), YB = _fg(_palette.primary, true);
+const C = _fg(_palette.accent), CB = _fg(_palette.accent, true);
+const G = _fg(_palette.success), GB = _fg(_palette.success, true);
+const R = _fg(_palette.error);
+const M = _fg(_palette.secondary), MB = _fg(_palette.secondary, true);
+const D = _fg(_palette.dim);
+const W = _fg(_palette.text), WB = _fg(_palette.text, true);
+
 // Utility to get a node from a path array
 export function getNodeFromPath(root: PlantNode, pathSegments: string[]): PlantNode | null {
   let current = root;
@@ -85,9 +116,9 @@ function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = 
   let result = "";
   if (node.rank !== "clade" || node.name !== "Plantae") {
     const marker = isLast ? "└── " : "├── ";
-    result += `${indent}${marker}\x1b[33m${node.name}\x1b[0m \x1b[36m(${node.rank})\x1b[0m${node.commonName ? ` - ${node.commonName}` : ""}\n`;
+    result += `${indent}${marker}${Y}${node.name}${RST} ${C}(${node.rank})${RST}${node.commonName ? ` - ${node.commonName}` : ""}\n`;
   } else {
-    result += `\x1b[32m${node.name} (${node.commonName})\x1b[0m\n`;
+    result += `${G}${node.name} (${node.commonName})${RST}\n`;
   }
 
   if (node.children && depth < maxDepth) {
@@ -100,7 +131,7 @@ function buildAsciiTree(node: PlantNode, indent: string = "", isLast: boolean = 
   } else if (node.children && depth >= maxDepth) {
     const childCount = Object.keys(node.children).length;
     const marker = isLast ? "└── " : "├── ";
-    result += `${indent}${marker}\x1b[90m... (${childCount} more children, use tree --depth ${maxDepth + 1} to expand)\x1b[0m\n`;
+    result += `${indent}${marker}${D}... (${childCount} more children, use tree --depth ${maxDepth + 1} to expand)${RST}\n`;
   }
   return result;
 }
@@ -120,13 +151,13 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
   const currentNode = getNodeFromPath(floraData, pathSegments);
   if (!currentNode) {
     pathSegments = [];
-    return { output: "\x1b[31mError: Current path is invalid. Reset to root.\x1b[0m" };
+    return { output: R + "Error: Current path is invalid. Reset to root." + RST };
   }
 
   switch (command) {
     case "exit":
     case "quit":
-      return { output: "\x1b[32mFair thee well, Scholar. May the wind be always at your back.\x1b[0m", shouldExit: true };
+      return { output: G + "Fair thee well, Scholar. May the wind be always at your back." + RST, shouldExit: true };
 
     case "clear":
       // Standard ANSI code to clear screen and reset cursor
@@ -135,25 +166,25 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
     case "help":
       return {
         output: `
-\x1b[1;32mAvailable Commands:\x1b[0m
-  \x1b[33mls\x1b[0m                 List taxonomic divisions, families, or species in the current folder
-  \x1b[33mcd [taxon]\x1b[0m          Change active taxonomic directory (e.g. \x1b[36mcd angiosperms\x1b[0m, \x1b[36mcd ..\x1b[0m)
-  \x1b[33mpwd\x1b[0m                Print current absolute taxonomic path
-  \x1b[33mcat [species.md]\x1b[0m    Inspect detailed botanical report & folklore of a species
-  \x1b[33mtree [--depth=N]\x1b[0m    Render ASCII taxonomic branching diagram (default depth: 3)
-  \x1b[33mevolution\x1b[0m          Draw vertical geologic timeline and milestones of current lineage
-  \x1b[33msearch [query]\x1b[0m     Search full database for any plant, family, or Gaelic term
-  \x1b[33mask [question]\x1b[0m      Query the Caledonian Botanist AI on folklore, uses, or biology
-  \x1b[33mclear\x1b[0m              Clear terminal screen
-  \x1b[33mhistory\x1b[0m            Show conversation history with the Sage
-  \x1b[33mexit\x1b[0m / \x1b[33mquit\x1b[0m          Exit the application
+${YB}Available Commands:${RST}
+  ${Y}ls${RST}                 List taxonomic divisions, families, or species in the current folder
+  ${Y}cd [taxon]${RST}          Change active taxonomic directory (e.g. ${C}cd angiosperms${RST}, ${C}cd ..${RST})
+  ${Y}pwd${RST}                Print current absolute taxonomic path
+  ${Y}cat [species.md]${RST}    Inspect detailed botanical report & folklore of a species
+  ${Y}tree [--depth=N]${RST}    Render ASCII taxonomic branching diagram (default depth: 3)
+  ${Y}evolution${RST}          Draw vertical geologic timeline and milestones of current lineage
+  ${Y}search [query]${RST}     Search full database for any plant, family, or Gaelic term
+  ${Y}ask [question]${RST}      Query the Caledonian Botanist AI on folklore, uses, or biology
+  ${Y}clear${RST}              Clear terminal screen
+  ${Y}history${RST}            Show conversation history with the Sage
+  ${Y}exit${RST} / ${Y}quit${RST}          Exit the application
 
-\x1b[1;36mTaxonomic Ranks of Earth:\x1b[0m
-  \x1b[35mclade\x1b[0m     -> Deep evolutionary branches (e.g. Bryophytes, Gymnosperms)
-  \x1b[35mclass\x1b[0m     -> Major botanical classes (e.g. Bryophyta, Conifers)
-  \x1b[35mfamily\x1b[0m    -> Related plant groupings (ending in -aceae, e.g. Ericaceae)
-  \x1b[35mgenus\x1b[0m     -> General plant genus (e.g. Calluna, Pinus)
-  \x1b[35mspecies\x1b[0m   -> Individual plant files (e.g. vulgaris, sylvestris)
+${CB}Taxonomic Ranks of Earth:${RST}
+  ${M}clade${RST}     -> Deep evolutionary branches (e.g. Bryophytes, Gymnosperms)
+  ${M}class${RST}     -> Major botanical classes (e.g. Bryophyta, Conifers)
+  ${M}family${RST}    -> Related plant groupings (ending in -aceae, e.g. Ericaceae)
+  ${M}genus${RST}     -> General plant genus (e.g. Calluna, Pinus)
+  ${M}species${RST}   -> Individual plant files (e.g. vulgaris, sylvestris)
 `
       };
 
@@ -162,31 +193,31 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
 
     case "history": {
       if (chatHistory.length === 0) {
-        return { output: "\x1b[90mNo conversation history yet.\x1b[0m" };
+        return { output: D + "No conversation history yet." + RST };
       }
-      let out = "\x1b[1;33mConversation History:\x1b[0m\n";
+      let out = YB + "Conversation History:" + RST + "\n";
       for (const msg of chatHistory) {
-        const role = msg.role === "user" ? "\x1b[36mYou\x1b[0m" : "\x1b[33mSage\x1b[0m";
+        const role = msg.role === "user" ? C + "You" + RST : Y + "Sage" + RST;
         out += `  ${role}: ${msg.content.slice(0, 120)}${msg.content.length > 120 ? "..." : ""}\n`;
       }
-      out += `\x1b[90m(${chatHistory.length} messages, use 'ask /reset' to clear)\x1b[0m`;
+      out += D + `(${chatHistory.length} messages, use 'ask /reset' to clear)` + RST;
       return { output: out };
     }
 
     case "ls": {
       if (!currentNode.children || Object.keys(currentNode.children).length === 0) {
-        return { output: `This is a terminal species file. Type \x1b[33mcat ${currentNode.name.split(" ")[1] || currentNode.name}.md\x1b[0m to read details, or \x1b[33mcd ..\x1b[0m to go up.` };
+        return { output: `This is a terminal species file. Type ${Y}cat ${currentNode.name.split(" ")[1] || currentNode.name}.md${RST} to read details, or ${Y}cd ..${RST} to go up.` };
       }
 
       const keys = Object.keys(currentNode.children);
-      let listOutput = "\x1b[1;37mTaxon elements in current clade:\x1b[0m\n\n";
+      let listOutput = WB + "Taxon elements in current clade:" + RST + "\n\n";
       keys.forEach(key => {
         const child = currentNode.children![key];
         if (child.rank === "species") {
-          listOutput += `  \x1b[32m📄 ${key}.md\x1b[0m   (${child.commonName || "Native Species"})\n`;
+          listOutput += `  ${G}📄 ${key}.md${RST}   (${child.commonName || "Native Species"})\n`;
         } else {
-          const rankColor = child.rank === "clade" ? "\x1b[36m" : child.rank === "class" ? "\x1b[35m" : child.rank === "family" ? "\x1b[34m" : "\x1b[33m";
-          listOutput += `  ${rankColor}📁 ${key}/\x1b[0m   [${child.rank}] - ${child.commonName || ""}\n`;
+          const rankColor = child.rank === "clade" ? C : child.rank === "class" ? M : child.rank === "family" ? M : Y;
+          listOutput += `  ${rankColor}📁 ${key}/${RST}   [${child.rank}] - ${child.commonName || ""}\n`;
         }
       });
       return { output: listOutput };
@@ -196,7 +227,7 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
       const targetDir = args[0] || "";
       const resolved = resolvePath(floraData, pathSegments, targetDir);
       if (resolved === null) {
-        return { output: `\x1b[31mcd: no such taxonomic folder: ${targetDir}\x1b[0m` };
+        return { output: R + `cd: no such taxonomic folder: ${targetDir}` + RST };
       } else {
         pathSegments = resolved;
         return { output: "" };
@@ -206,7 +237,7 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
     case "cat": {
       let filename = args[0] || "";
       if (!filename) {
-        return { output: "\x1b[31mcat: missing species file argument. Example: cat vulgaris.md\x1b[0m" };
+        return { output: R + "cat: missing species file argument. Example: cat vulgaris.md" + RST };
       }
       if (filename.endsWith(".md")) {
         filename = filename.slice(0, -3);
@@ -227,28 +258,28 @@ async function handleCommand(inputLine: string): Promise<{ output: string; shoul
       if (foundSpecies && foundSpecies.rank === "species") {
         return {
           output: `
-\x1b[1;33m${foundSpecies.name.toUpperCase()}\x1b[0m
-\x1b[36mCommon Name:\x1b[0m   ${foundSpecies.commonName || "Unknown"}
-\x1b[36mGaelic Name:\x1b[0m   ${foundSpecies.gaelicName || "None recorded"}
-\x1b[36mConservation:\x1b[0m  ${foundSpecies.status || "Unspecified"}
-\x1b[36mOrigin Era:\x1b[0m    ${foundSpecies.geologicalEra || "Prehistoric"}
-\x1b[36mEvolutionary:\x1b[0m   ${foundSpecies.evolutionaryMilestone || ""}
+${YB}${foundSpecies.name.toUpperCase()}${RST}
+${C}Common Name:${RST}   ${foundSpecies.commonName || "Unknown"}
+${C}Gaelic Name:${RST}   ${foundSpecies.gaelicName || "None recorded"}
+${C}Conservation:${RST}  ${foundSpecies.status || "Unspecified"}
+${C}Origin Era:${RST}    ${foundSpecies.geologicalEra || "Prehistoric"}
+${C}Evolutionary:${RST}   ${foundSpecies.evolutionaryMilestone || ""}
 
-\x1b[1;32m=== BOTANICAL DESCRIPTION ===\x1b[0m
+${GB}=== BOTANICAL DESCRIPTION ===${RST}
 ${foundSpecies.description}
 
-\x1b[1;32m=== HIGHLAND HABITAT ===\x1b[0m
+${GB}=== HIGHLAND HABITAT ===${RST}
 ${foundSpecies.habitat || "Widespread"}
 
-\x1b[1;32m=== TRADITIONAL LORE & FOLKLORE ===\x1b[0m
+${GB}=== TRADITIONAL LORE & FOLKLORE ===${RST}
 ${foundSpecies.lore || "None"}
 
-\x1b[1;33m=== ASCII REPRESENTATION ===\x1b[0m
+${YB}=== ASCII REPRESENTATION ===${RST}
 ${foundSpecies.asciiArt || ""}
 `
         };
       } else {
-        return { output: `\x1b[31mcat: file not found or is a folder: ${args[0]}. (Tip: Use 'ls' to find .md species files)\x1b[0m` };
+        return { output: R + `cat: file not found or is a folder: ${args[0]}. (Tip: Use 'ls' to find .md species files)` + RST };
       }
     }
 
@@ -259,12 +290,12 @@ ${foundSpecies.asciiArt || ""}
         const val = depthFlag.includes("=") ? depthFlag.split("=")[1] : args[args.indexOf(depthFlag) + 1];
         maxDepth = Math.max(1, parseInt(val) || 3);
       }
-      return { output: `\x1b[1;32mPhylogeny Tree starting from ${currentNode.name} (depth ${maxDepth}):\x1b[0m\n\n` + buildAsciiTree(currentNode, "", true, maxDepth) };
+      return { output: GB + `Phylogeny Tree starting from ${currentNode.name} (depth ${maxDepth}):` + RST + "\n\n" + buildAsciiTree(currentNode, "", true, maxDepth) };
     }
 
     case "evolution":
     case "lineage": {
-      let timeline = "\x1b[1;33m=== EVOLUTIONARY DEEP HISTORY OF CURRENT TAXON ===\x1b[0m\n\n";
+      let timeline = YB + "=== EVOLUTIONARY DEEP HISTORY OF CURRENT TAXON ===" + RST + "\n\n";
       let tempSegments: string[] = [];
       let lineageNodes: PlantNode[] = [floraData];
 
@@ -276,11 +307,11 @@ ${foundSpecies.asciiArt || ""}
 
       lineageNodes.forEach((node, idx) => {
         const isCurrent = idx === lineageNodes.length - 1;
-        const arrow = isCurrent ? " ● \x1b[1;32m[ACTIVE]\x1b[0m " : " │   ";
-        timeline += `\x1b[1;36m${node.geologicalEra || "Deep Time"}\x1b[0m\n`;
-        timeline += `${arrow}\x1b[33m${node.name}\x1b[0m (${node.rank})\n`;
+        const arrow = isCurrent ? " ● " + GB + "[ACTIVE]" + RST + " " : " │   ";
+        timeline += `${CB}${node.geologicalEra || "Deep Time"}${RST}\n`;
+        timeline += `${arrow}${Y}${node.name}${RST} (${node.rank})\n`;
         if (node.evolutionaryMilestone) {
-          timeline += ` │   \x1b[37m→ Landmark: ${node.evolutionaryMilestone}\x1b[0m\n`;
+          timeline += ` │   ${W}→ Landmark: ${node.evolutionaryMilestone}${RST}\n`;
         }
         if (!isCurrent) {
           timeline += ` │\n`;
@@ -293,7 +324,7 @@ ${foundSpecies.asciiArt || ""}
     case "locate": {
       const query = args.join(" ").trim().toLowerCase();
       if (!query) {
-        return { output: "\x1b[31msearch: missing search term. Example: search heather\x1b[0m" };
+        return { output: R + "search: missing search term. Example: search heather" + RST };
       }
 
       let results: { name: string; rank: string; path: string; gaelic?: string; common?: string }[] = [];
@@ -327,13 +358,13 @@ ${foundSpecies.asciiArt || ""}
       recursiveSearch(floraData, []);
 
       if (results.length === 0) {
-        return { output: `No taxonomic matches found for: \x1b[31m"${query}"\x1b[0m` };
+        return { output: `No taxonomic matches found for: ${R}"${query}"${RST}` };
       } else {
-        let searchOutput = `Found \x1b[1;32m${results.length}\x1b[0m phylogenetic branches or species:\n\n`;
+        let searchOutput = `Found ${GB}${results.length}${RST} phylogenetic branches or species:\n\n`;
         results.forEach(r => {
-          searchOutput += `  \x1b[1;33m${r.name}\x1b[0m [${r.rank}] ${r.common ? `(${r.common})` : ""}\n`;
+          searchOutput += `  ${YB}${r.name}${RST} [${r.rank}] ${r.common ? `(${r.common})` : ""}\n`;
           if (r.gaelic) searchOutput += `    Gaelic: ${r.gaelic}\n`;
-          searchOutput += `    Path:   \x1b[1;36mcd ${r.path}\x1b[0m\n\n`;
+          searchOutput += `    Path:   ${CB}cd ${r.path}${RST}\n\n`;
         });
         return { output: searchOutput };
       }
@@ -342,15 +373,15 @@ ${foundSpecies.asciiArt || ""}
     case "ask": {
       const question = args.join(" ").trim();
       if (!question) {
-        return { output: "\x1b[31mask: What would you like to ask? Use 'ask /reset' to clear history.\x1b[0m" };
+        return { output: R + "ask: What would you like to ask? Use 'ask /reset' to clear history." + RST };
       }
 
       if (question === "/reset") {
         chatHistory.length = 0;
-        return { output: "\x1b[33mConversation history cleared.\x1b[0m" };
+        return { output: Y + "Conversation history cleared." + RST };
       }
 
-      console.log("\x1b[33mThe Caledonian Botanist Sage is cogitating...\x1b[0m");
+      console.log(Y + "The Caledonian Botanist Sage is cogitating..." + RST);
 
       try {
         const system = `You are the legendary Caledonian Botanist AI, a wise and friendly Scottish naturalist, phytologist, and clan historian.
@@ -402,14 +433,14 @@ Terminal Formatting Instructions:
         chatHistory.push({ role: "assistant", content: text });
         if (chatHistory.length > 50) chatHistory.splice(0, chatHistory.length - 50);
 
-        return { output: `\n\x1b[1;33mTHE CALEDONIAN BOTANIST SAGE COGITATES:\x1b[0m\n\n${text}\n` };
+        return { output: `\n${YB}THE CALEDONIAN BOTANIST SAGE COGITATES:${RST}\n\n${text}\n` };
       } catch (err: any) {
-        return { output: `\x1b[31mError connecting to Caledonian Botanist AI: ${err?.message || err}\x1b[0m` };
+        return { output: R + `Error connecting to Caledonian Botanist AI: ${err?.message || err}` + RST };
       }
     }
 
     default:
-      return { output: `\x1b[31mbash: command not found: ${command}. (Type 'help' to see list of valid commands)\x1b[0m` };
+      return { output: R + `bash: command not found: ${command}. (Type 'help' to see list of valid commands)` + RST };
   }
 }
 
@@ -426,13 +457,13 @@ async function runShell() {
 
   // Clear screen and print Caledonian Botanical Terminal welcome banner
   console.log("\x1b[2J\x1b[H");
-  console.log("\x1b[1;33m=================================================================\x1b[0m");
-  console.log("\x1b[1;32m          🌲  CALEDONIAN PHYLOGENETIC TERMINAL v1.2  🌲          \x1b[0m");
-  console.log("\x1b[1;33m=================================================================\x1b[0m");
+  console.log(YB + "=================================================================" + RST);
+  console.log(GB + "          🌲  CALEDONIAN PHYLOGENETIC TERMINAL v1.2  🌲          " + RST);
+  console.log(YB + "=================================================================" + RST);
   console.log("Welcome, Scholar. Traverse the deep branches of Scottish Flora.");
-  console.log("Type \x1b[36mhelp\x1b[0m to list commands, \x1b[36mls\x1b[0m to view clades, or \x1b[36mexit\x1b[0m to quit.");
-  console.log("Inquire of the \x1b[1;33mCaledonian Botanist AI\x1b[0m using: \x1b[33mask [question]\x1b[0m");
-  console.log("\x1b[1;33m-----------------------------------------------------------------\x1b[0m\n");
+  console.log("Type " + C + "help" + RST + " to list commands, " + C + "ls" + RST + " to view clades, or " + C + "exit" + RST + " to quit.");
+  console.log("Inquire of the " + YB + "Caledonian Botanist AI" + RST + " using: " + Y + "ask [question]" + RST);
+  console.log(YB + "-----------------------------------------------------------------" + RST + "\n");
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -441,7 +472,7 @@ async function runShell() {
 
   const prompt = () => {
     const currentPathStr = "/" + pathSegments.join("/");
-    rl.question(`\x1b[1;32mguest@caledonia\x1b[0m:\x1b[1;34m${currentPathStr}\x1b[0m$ `, async (line) => {
+    rl.question(GB + "guest@caledonia" + RST + ":" + MB + currentPathStr + RST + "$ ", async (line) => {
       const { output, shouldExit } = await handleCommand(line);
       if (output) {
         console.log(output);

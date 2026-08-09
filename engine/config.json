@@ -1,5 +1,6 @@
 {
   "dithering": true,
+  "lowercase_enforce": true,
   "palette": {
     "circuit": "#00ff00",
     "hair": "#ff00ff",

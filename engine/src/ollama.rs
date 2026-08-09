@@ -1,9 +1,9 @@
-use colored::Colorize;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use anyhow::Result;
 use std::time::Duration;
+use crate::theme::{self, Role};
 
 const OLLAMA_BASE: &str = "http://localhost:11434";
 
@@ -114,12 +114,18 @@ pub struct OllamaClient {
 /// No I/O — feed it trimmed lines, it accumulates content + tool calls and
 /// tracks think-block state. Unit-testable and shared by the visible and
 /// collect streaming paths so they can never drift apart.
+///
+/// Content deltas are passed through the format enforcer (lowercase + emoji
+/// strip, code-fence aware) so the ayesha format rules hold even when the
+/// model slips — the same defense-in-depth the opencode lowercase-proxy
+/// provided at the API layer.
 pub struct StreamParser {
     pub content: String,
     pub tool_calls: Vec<ToolCall>,
     pub done: bool,
     in_think: bool,
     recent: String,
+    formatter: crate::format::LowercaseStreamer,
 }
 
 #[derive(Debug)]
@@ -142,6 +148,7 @@ impl StreamParser {
             done: false,
             in_think: false,
             recent: String::new(),
+            formatter: crate::format::LowercaseStreamer::new(),
         }
     }
 
@@ -164,8 +171,9 @@ impl StreamParser {
         // Accumulate content deltas
         if let Some(c) = json["message"]["content"].as_str() {
             if !c.is_empty() {
-                self.content.push_str(c);
-                self.recent.push_str(c);
+                let enforced = self.formatter.feed(c);
+                self.content.push_str(&enforced);
+                self.recent.push_str(&enforced);
                 let n = self.recent.chars().count();
                 if n > Self::RECENT_MAX {
                     let skip = n - Self::RECENT_MAX;
@@ -187,7 +195,7 @@ impl StreamParser {
                 {
                     self.in_think = false;
                 }
-                return StreamLine::Content(c.to_string(), was_in_think || just_entered);
+                return StreamLine::Content(enforced.to_string(), was_in_think || just_entered);
             }
         }
 
@@ -208,8 +216,21 @@ impl StreamParser {
         StreamLine::Skip
     }
 
-    pub fn finish(self) -> StreamResult {
+    pub fn finish(mut self) -> StreamResult {
+        let tail = self.formatter.finish();
+        if !tail.is_empty() {
+            self.content.push_str(&tail);
+        }
         StreamResult { content: self.content, tool_calls: self.tool_calls, steering: None }
+    }
+
+    /// Flush any held-back enforcer tail into content (for early-exit paths
+    /// like steering that return `content` directly instead of `finish`).
+    pub fn flush_tail(&mut self) {
+        let tail = self.formatter.finish();
+        if !tail.is_empty() {
+            self.content.push_str(&tail);
+        }
     }
 }
 
@@ -309,6 +330,7 @@ impl OllamaClient {
 
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
+                parser.flush_tail();
                 return Ok(StreamResult {
                     content: parser.content,
                     tool_calls: parser.tool_calls,
@@ -353,6 +375,7 @@ impl OllamaClient {
 
         let mut parser = StreamParser::new();
         let mut buf = String::new();
+        let mut code = crate::render::CodeStream::new();
 
         while let Some(chunk) = resp.chunk().await? {
             buf.push_str(&String::from_utf8_lossy(&chunk));
@@ -364,13 +387,14 @@ impl OllamaClient {
                 match parser.feed_line(&line) {
                     StreamLine::Content(text, thinking) => {
                         if thinking {
-                            print!("{}", text.bright_black());
+                            print!("{}", theme::paint(Role::Dim, &text));
                         } else {
-                            print!("{}", text);
+                            print!("{}", code.feed(&text));
                         }
                         std::io::stdout().flush().ok();
                     }
                     StreamLine::Done => {
+                        print!("{}", code.finish());
                         if !parser.content.is_empty() {
                             println!();
                         }
@@ -382,6 +406,8 @@ impl OllamaClient {
 
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
+                parser.flush_tail();
+                print!("{}", code.finish());
                 println!();
                 return Ok(StreamResult {
                     content: parser.content,
@@ -391,6 +417,7 @@ impl OllamaClient {
             }
         }
 
+        print!("{}", code.finish());
         println!();
         Ok(parser.finish())
     }
@@ -499,6 +526,64 @@ always stay in character. be helpful but keep your personality. now go be cute a
                             "path": { "type": "string", "description": "Absolute path to the directory to list. Use the literal absolute path, not environment variables." }
                         },
                         "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "grep",
+                    "description": "Recursively search files under a directory for lines containing a pattern (substring match, case-insensitive by default). Returns matches as path:line: text. Use this to find code, error strings, or configuration values across a codebase.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": { "type": "string", "description": "The text to search for. Plain substring, not a regex." },
+                            "path": { "type": "string", "description": "Directory to search recursively. Defaults to the current directory." },
+                            "ignore_case": { "type": "boolean", "description": "Case-insensitive search. Defaults to true." },
+                            "include": { "type": "string", "description": "Only search files whose name contains this substring (e.g. '.rs', 'Cargo', 'config')." }
+                        },
+                        "required": ["pattern"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "glob",
+                    "description": "Find files matching a glob pattern, recursively from a root path. Supports ** (any depth), * (within a path segment), and ? (single char). Example patterns: **/*.rs, src/**/test_*.py, *.json. Use this to locate files by name or extension.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": { "type": "string", "description": "Glob pattern, e.g. '**/*.rs' or 'src/**/README*'." },
+                            "path": { "type": "string", "description": "Directory to search recursively. Defaults to the current directory." }
+                        },
+                        "required": ["pattern"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "list_skills",
+                    "description": "List available skills. Skills are markdown guides in the skills/ folder that the model can load and follow when a task matches. Call this first to see what skills exist.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "read_skill",
+                    "description": "Read the full instructions of a skill by name (use list_skills to see available names). Follow the skill's steps exactly for the task it covers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string", "description": "The skill name, e.g. 'code-review'." }
+                        },
+                        "required": ["name"]
                     }
                 }
             }),
@@ -800,6 +885,86 @@ always stay in character. be helpful but keep your personality. now go be cute a
                             "name": { "type": "string", "description": "Applet name for status/launch/stop (e.g. flora-cli, desktop-cat)" }
                         },
                         "required": ["action"]
+                    }
+                }
+            }),
+        ]
+    }
+
+    /// Core tool definitions for the tool model (qwen2.5:7b).
+    /// qwen can only handle ~5 tools reliably; this is the essential subset.
+    pub fn tool_definitions_core() -> Vec<Value> {
+        vec![
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "read_file",
+                    "description": "Read the contents of a file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string", "description": "Absolute path to the file." }
+                        },
+                        "required": ["path"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "write_file",
+                    "description": "Write content to a file.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string", "description": "Absolute path to the file." },
+                            "content": { "type": "string", "description": "The content to write." }
+                        },
+                        "required": ["path", "content"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "generate_html",
+                    "description": "Generate a standalone HTML file with embedded CSS and JS.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string", "description": "Output path for the HTML file." },
+                            "content": { "type": "string", "description": "Full HTML content to write." }
+                        },
+                        "required": ["path", "content"]
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "list_dir",
+                    "description": "List files and directories in a folder.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string", "description": "Absolute path to the directory." }
+                        },
+                        "required": []
+                    }
+                }
+            }),
+            json!({
+                "type": "function",
+                "function": {
+                    "name": "grep",
+                    "description": "Search files for text patterns.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": { "type": "string", "description": "Text to search for." },
+                            "path": { "type": "string", "description": "Directory to search." }
+                        },
+                        "required": ["pattern"]
                     }
                 }
             }),

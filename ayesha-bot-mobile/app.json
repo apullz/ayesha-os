@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Ayesha Bot",
+    "slug": "ayesha-bot-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/ayesha-bot.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F7EAF2",
+      "image": "./assets/splash-icon.png"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.apullz.ayesha-bot"
+    },
+    "android": {
+      "package": "com.apullz.ayeshabot",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7EAF2",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}

@@ -54,7 +54,7 @@ impl CharacterSprite {
             "walk_left" | "walk_right" => {
                 leg_offset = ((frame as i32) % 2) * 2 - 1;
                 arm_offset = -leg_offset;
-                bob = if frame % 2 == 0 { 1 } else { 0 };
+                bob = if frame.is_multiple_of(2) { 1 } else { 0 };
             }
             "hacking_active" => {
                 arm_offset = (frame as i32).saturating_sub(1);
@@ -72,10 +72,10 @@ impl CharacterSprite {
 
         // HAIR (top)
         for dx in 0u32..8 {
-            put_pixel(img, ox + (1 + dx) * s, add_offset(oy + 1 * s, bob), hair_s);
+            put_pixel(img, ox + (1 + dx) * s, add_offset(oy + s, bob), hair_s);
             put_pixel(img, ox + (1 + dx) * s, add_offset(oy + 2 * s, bob), hair);
         }
-        put_pixel(img, ox + 3 * s, add_offset(oy + 1 * s, bob), hair_h);
+        put_pixel(img, ox + 3 * s, add_offset(oy + s, bob), hair_h);
 
         // HEAD / SKIN
         for dy in 0u32..4 {

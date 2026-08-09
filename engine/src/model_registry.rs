@@ -59,15 +59,12 @@ impl ModelRegistry {
     }
 
     pub async fn detect(&mut self) {
-        match Self::detect_from_ollama().await {
-            Ok(additional) => {
-                for m in additional {
-                    if !self.models.iter().any(|e| e.name == m.name) {
-                        self.models.push(m);
-                    }
+        if let Ok(additional) = Self::detect_from_ollama().await {
+            for m in additional {
+                if !self.models.iter().any(|e| e.name == m.name) {
+                    self.models.push(m);
                 }
             }
-            Err(_) => {}
         }
         // Add cloud models
         self.detect_cloud_models();
@@ -124,6 +121,28 @@ impl ModelRegistry {
                     Capability::Tools,
                 ],
                 context_length: 32_768,
+                backend: Backend::Cloud { provider: "openrouter".into() },
+            },
+            ModelProfile {
+                name: "xiaomi/mimo-v2.5".into(),
+                capabilities: vec![
+                    Capability::General,
+                    Capability::Coding,
+                    Capability::Tools,
+                    Capability::Vision,
+                ],
+                context_length: 1_000_000,
+                backend: Backend::Cloud { provider: "openrouter".into() },
+            },
+            ModelProfile {
+                name: "xiaomi/mimo-v2.5-pro".into(),
+                capabilities: vec![
+                    Capability::General,
+                    Capability::Coding,
+                    Capability::Agentic,
+                    Capability::Thinking,
+                ],
+                context_length: 1_000_000,
                 backend: Backend::Cloud { provider: "openrouter".into() },
             },
             ModelProfile {

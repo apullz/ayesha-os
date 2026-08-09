@@ -1,9 +1,11 @@
 mod ollama;
 mod cloud;
 mod tools;
+mod skills;
 mod sandbox;
 mod ui;
 mod util;
+mod format;
 mod pixel_striker;
 mod memory;
 mod self_analysis;
@@ -15,9 +17,13 @@ mod applet_manager;
 mod applet_runner;
 mod agent;
 mod completion;
+mod theme;
+mod syntax;
+mod render;
+mod session;
 
 use std::io::Write;
-use colored::*;
+use theme::Role;
 use ollama::{OllamaClient, ChatMessage, StreamResult};
 use cloud::CloudClient;
 use tools::{ToolExecutor, ToolContext};
@@ -28,12 +34,22 @@ use self_analysis::SelfAnalyzer;
 use tool_evolution::ToolEvolver;
 use model_registry::ModelRegistry;
 use applet_manager::AppletManager;
-use serde_json;
+
 
 /// Active backend — either local Ollama or cloud (OpenRouter/OpenCode)
 enum ActiveBackend {
     Ollama(OllamaClient),
     Cloud(CloudClient),
+}
+
+/// Build the system prompt for a user, appending the skills hint if any
+/// skills are installed in the project's skills/ folder.
+fn build_system_prompt(user_name: &str, project_root: &std::path::Path) -> String {
+    let mut prompt = OllamaClient::system_prompt(user_name);
+    if let Some(hint) = skills::system_prompt_hint(project_root) {
+        prompt.push_str(&hint);
+    }
+    prompt
 }
 
 /// Heuristic: does this user message likely need tool calls?
@@ -193,7 +209,7 @@ mod winapi {
             let console = GetConsoleWindow();
             if !console.is_null() {
                 let module = GetModuleHandleW(std::ptr::null());
-                let icon = LoadIconW(module, 1 as *const u16);
+                let icon = LoadIconW(module, std::ptr::dangling::<u16>());
                 if !icon.is_null() {
                     SendMessageW(console, 0x0080, 0, icon as isize);
                     SendMessageW(console, 0x0080, 1, icon as isize);
@@ -217,6 +233,62 @@ mod winapi {
 #[cfg(not(windows))]
 mod winapi {
     pub fn init_console() {}
+}
+
+/// Read the tri-mind sync configuration (repo, branch, auto_push) from
+/// tri_mind_sync.json at the project root. Falls back to the github defaults.
+fn sync_config(root: &std::path::Path) -> (String, String, bool) {
+    let path = root.join("tri_mind_sync.json");
+    if let Ok(s) = std::fs::read_to_string(&path) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+            let g = v.get("github");
+            let repo = g.and_then(|g| g.get("repo")).and_then(|r| r.as_str())
+                .unwrap_or("apullz/ayesha-os").to_string();
+            let branch = g.and_then(|g| g.get("branch")).and_then(|b| b.as_str())
+                .unwrap_or("master").to_string();
+            let auto_push = g.and_then(|g| g.get("auto_push")).and_then(|b| b.as_bool())
+                .unwrap_or(true);
+            return (repo, branch, auto_push);
+        }
+    }
+    ("apullz/ayesha-os".to_string(), "master".to_string(), true)
+}
+
+/// Print a status summary from .tri_mind_state/engine_state.json (per-node
+/// connectivity + last-sync times). Silently no-ops if state doesn't exist.
+fn show_sync_state(root: &std::path::Path) {
+    let path = root.join(".tri_mind_state").join("engine_state.json");
+    let s = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => {
+            ui::show_system("no engine_state.json yet — run /sync once to generate it");
+            return;
+        }
+    };
+    let v: serde_json::Value = match serde_json::from_str(&s) {
+        Ok(v) => v,
+        Err(_) => {
+            ui::show_system("engine_state.json exists but is unreadable");
+            return;
+        }
+    };
+
+    let last_full = v.get("last_full_sync").and_then(|x| x.as_str()).unwrap_or("unknown");
+    println!();
+    println!("  {} {}", theme::paint(Role::Accent, "tri-mind engine state:"),
+        theme::paint(Role::Dim, format!("last full sync: {last_full}")));
+    if let Some(nodes) = v.get("nodes").and_then(|n| n.as_object()) {
+        for (name, node) in nodes {
+            let connected = node.get("connected").and_then(|c| c.as_bool()).unwrap_or(false);
+            let last = node.get("last_sync").and_then(|x| x.as_str()).unwrap_or("unknown");
+            let dot = if connected { theme::paint(Role::Success, "●") } else { theme::paint(Role::Error, "○") };
+            let status = if connected { "connected" } else { "disconnected" };
+            println!("  {} {}  {}  {}", dot, theme::paint(Role::Text, name),
+                theme::paint(if connected { Role::Success } else { Role::Error }, status),
+                theme::paint(Role::Dim, format!("last sync: {last}")));
+        }
+    }
+    println!();
 }
 
 /// Match natural-language applet phrases like "launch flora cli", "open
@@ -281,6 +353,7 @@ fn graceful_shutdown(
     memory: &mut MemoryStore,
     prompt_history: &mut PromptHistory,
     manager: &mut AppletManager,
+    project_root: &std::path::Path,
 ) {
     // Auto-parse memory markers from ayesha's last response
     if let Some(last) = messages.last() {
@@ -294,11 +367,16 @@ fn graceful_shutdown(
 
     let _ = memory.save();
     let _ = prompt_history.save();
+    if messages.len() > 1 {
+        if let Ok(path) = session::save_session(project_root, session::DEFAULT_SESSION, messages) {
+            println!("  {} {}", theme::paint(Role::Dim, "◆"), theme::paint(Role::Dim, format!("session saved → {}", path.display())));
+        }
+    }
     manager.stop_all();
     let _ = crossterm::terminal::disable_raw_mode();
     println!();
-    println!("  {} {}", "●".bright_green(), "ayesha-os shutting down".bright_cyan());
-    println!("  {} {}", "◆".bright_cyan(), format!("saved {}", memory.summary()).bright_black());
+    println!("  {} {}", theme::paint(Role::Success, "●"), theme::paint(Role::Accent, "ayesha-os shutting down"));
+    println!("  {} {}", theme::paint(Role::Accent, "◆"), theme::paint(Role::Dim, format!("saved {}", memory.summary())));
     println!();
 }
 
@@ -310,7 +388,14 @@ async fn main() -> anyhow::Result<()> {
         return selftest().await;
     }
 
+    // --headless "message": run one agent turn non-interactively, exit 0 if tools executed
+    if let Some(headless_msg) = std::env::args().skip_while(|a| a != "--headless").nth(1) {
+        return run_headless(&headless_msg).await;
+    }
+
     winapi::init_console();
+    theme::apply_no_color();
+    theme::load_from_config(None);
 
     let session_start = std::time::Instant::now();
     let sandbox = Sandbox::default_workspace();
@@ -328,6 +413,7 @@ async fn main() -> anyhow::Result<()> {
     let tool_ollama = OllamaClient::new("ayesha");
     let evolver = ToolEvolver::new(vec![
         "read_file".into(), "write_file".into(), "list_dir".into(),
+        "grep".into(), "glob".into(), "list_skills".into(), "read_skill".into(),
         "generate_html".into(), "generate_sprite".into(), "generate_tileset".into(),
         "generate_object".into(), "render_sprite".into(), "read_clipboard".into(),
         "remember".into(), "list_memories".into(), "search_memories".into(),
@@ -353,12 +439,22 @@ async fn main() -> anyhow::Result<()> {
         serde_json::json!({})
     };
 
+    // Reload theme with any persisted selection from config.json
+    let active_theme = config.get("theme").and_then(|v| v.as_str()).map(|s| s.to_string());
+    theme::load_from_config(active_theme.as_deref());
+
+    // Output enforcement (lowercase + emoji strip, code-fence aware).
+    // Default ON — mirrors the opencode lowercase-proxy. Disable with
+    // "lowercase_enforce": false in config.json if you need raw output.
+    let enforce = config.get("lowercase_enforce").and_then(|v| v.as_bool()).unwrap_or(true);
+    format::set_enabled(enforce);
+
     let user_name = match config.get("user_name").and_then(|v| v.as_str()) {
         Some(n) if !n.is_empty() => n.to_string(),
         _ => {
             print!("\n  {} {}",
-                "◆".bright_cyan(),
-                "what should i call you, senpai?".bright_green());
+                theme::paint(Role::Accent, "◆"),
+                theme::paint(Role::Primary, "what should i call you, senpai?"));
             std::io::stdout().flush()?;
             let mut name = String::new();
             std::io::stdin().read_line(&mut name)?;
@@ -369,9 +465,9 @@ async fn main() -> anyhow::Result<()> {
                 let _ = std::fs::write(&config_path, content);
             }
             println!("  {} {} {}",
-                "✔".bright_green(),
-                format!("okay, {}!", name).bright_cyan(),
-                "remember that one, desu~".bright_black());
+                theme::bold(Role::Success, "✔"),
+                theme::paint(Role::Accent, format!("okay, {}!", name)),
+                theme::paint(Role::Dim, "remember that one, desu~"));
             name
         }
     };
@@ -389,7 +485,8 @@ async fn main() -> anyhow::Result<()> {
         "model", "toolmodel", "pull", "route", "name", "exit",
         "stats", "history", "compact", "save", "load", "system", "export", "ping", "reset",
         "joke", "time", "uptime", "config",
-        "memory", "analyze", "evolve", "refine",
+        "memory", "skills", "analyze", "evolve", "refine",
+        "sessions", "resume", "newsession",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
         completion_candidates.push(name);
@@ -404,32 +501,65 @@ async fn main() -> anyhow::Result<()> {
     let mut messages: Vec<ChatMessage> = vec![
         ChatMessage {
             role: "system".to_string(),
-            content: OllamaClient::system_prompt(&user_name),
+            content: build_system_prompt(&user_name, &project_root),
             tool_calls: None,
             tool_call_id: None,
         },
     ];
 
-    let tools = OllamaClient::tool_definitions();
+    // Resume last session? (config: "resume_prompt": false to disable the prompt)
+    if config.get("resume_prompt").and_then(|v| v.as_bool()).unwrap_or(true)
+        && session::session_exists(&project_root, session::DEFAULT_SESSION)
+    {
+        print!("  {} {} ",
+            theme::bold(Role::Primary, "⟲"),
+            theme::paint(Role::Text, "resume last session? (y/n)"));
+        std::io::stdout().flush()?;
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        let answer = answer.trim().to_lowercase();
+        if answer == "y" || answer == "yes" {
+            match session::load_session(&project_root, session::DEFAULT_SESSION) {
+                Ok(saved) => {
+                    let n = saved.len().saturating_sub(1);
+                    messages.extend(saved.into_iter().skip(1));
+                    ui::show_system(&format!("resumed last session ({} messages)", n));
+                }
+                Err(e) => ui::show_error(&format!("failed to resume session: {}", e)),
+            }
+        }
+    }
+
+    let tools = OllamaClient::tool_definitions_core();
     let mut current_model = "ayesha:latest".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
     // Warm up ollama — preload both models into memory so first user interaction is fast.
-    {
+    // Runs off the boot path: the prompt appears instantly while models preload in the
+    // background. Set "boot_warmup": false in config.json to disable entirely.
+    if config.get("boot_warmup").and_then(|v| v.as_bool()).unwrap_or(true) {
         let tool_model = tool_model_name.clone();
-        let (_, warmup_rx) = std::sync::mpsc::channel::<String>();
-        let _ = tokio::join!(
-            async {
-                let client = OllamaClient::new("ayesha");
-                let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
-                let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
-            },
-            async {
-                let client = OllamaClient::new(&tool_model);
-                let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
-                let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
-            }
-        );
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build warmup runtime");
+            rt.block_on(async move {
+                let (_, warmup_rx) = std::sync::mpsc::channel::<String>();
+                let _ = tokio::join!(
+                    async {
+                        let client = OllamaClient::new("ayesha");
+                        let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
+                        let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
+                    },
+                    async {
+                        let client = OllamaClient::new(&tool_model);
+                        let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
+                        let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
+                    }
+                );
+            });
+        });
     }
 
     // Holds steering input that needs to be processed as the next user message
@@ -480,7 +610,7 @@ async fn main() -> anyhow::Result<()> {
         // Ctrl+C → exit (graceful: save memory, stop applets, release raw mode)
         if input == "\0ctrl-c" {
             menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
-            graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
+            graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
             break;
         }
         // Ctrl+M / Ctrl+P → open interactive applet menu
@@ -515,13 +645,11 @@ async fn main() -> anyhow::Result<()> {
                 match menu_input.as_str() {
                     "\0ctrl-c" => {
                         menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
-                        graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
+                        graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
                         return Ok(());
                     }
                     "\0menu-up" => {
-                        if menu_idx > 0 {
-                            menu_idx -= 1;
-                        }
+                        menu_idx = menu_idx.saturating_sub(1);
                         let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
                         let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
                         let _ = write!(std::io::stdout(), "{}", rendered);
@@ -552,10 +680,10 @@ async fn main() -> anyhow::Result<()> {
                         break;
                     }
                     "\0menu-enter" => {
-                        let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().cloned().filter(|(n, d, _, _)| {
+                        let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().filter(|&(n, d, _, _)| {
                             if menu_filter.is_empty() { true }
                             else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
-                        }).collect();
+                        }).cloned().collect();
                         if let Some((name, _desc, _running, _foreground)) = filtered.get(menu_idx) {
                             selected = Some(name.clone());
                         }
@@ -565,10 +693,10 @@ async fn main() -> anyhow::Result<()> {
                         let c = &s["\0menu-char:".len()..];
                         if menu_filter.is_empty() && c == "x" {
                             // Stop action
-                            let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().cloned().filter(|(n, d, _, _)| {
+                            let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().filter(|&(n, d, _, _)| {
                                 if menu_filter.is_empty() { true }
                                 else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
-                            }).collect();
+                            }).cloned().collect();
                             if let Some((name, _, running, _)) = filtered.get(menu_idx) {
                                 if *running {
                                     match manager.stop(name) {
@@ -654,7 +782,7 @@ async fn main() -> anyhow::Result<()> {
         // ── meta-commands ──
         match lower.as_str() {
             "exit" | "quit" | "q" => {
-                graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager);
+                graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
                 break;
             }
             "help" | "h" | "?" => {
@@ -670,7 +798,7 @@ async fn main() -> anyhow::Result<()> {
                 messages = vec![
                     ChatMessage {
                         role: "system".to_string(),
-                        content: OllamaClient::system_prompt(&user_name),
+                        content: build_system_prompt(&user_name, &project_root),
                         tool_calls: None,
                         tool_call_id: None,
                     },
@@ -691,29 +819,40 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             }
             "sync" => {
-                ui::show_system("initiating tri-mind sync & pushing directly to github...");
+                let (repo, branch, auto_push) = sync_config(&project_root);
+                ui::show_system(&format!("initiating tri-mind sync → {repo} ({branch})"));
                 let _ = std::process::Command::new("python")
                     .args(["-m", "tri_mind_sync.cli", "sync"])
                     .output();
 
-                let _ = std::process::Command::new("git")
-                    .args(["add", "."])
-                    .status();
-                let _ = std::process::Command::new("git")
-                    .args(["commit", "-m", "ayesha-os: auto sync update"])
-                    .status();
-                let push_status = std::process::Command::new("git")
-                    .args(["push", "origin", "master"])
-                    .status();
+                if auto_push {
+                    let _ = std::process::Command::new("git")
+                        .args(["add", "."])
+                        .status();
+                    let _ = std::process::Command::new("git")
+                        .args(["commit", "-m", "ayesha-os: auto sync update"])
+                        .status();
+                    let push_status = std::process::Command::new("git")
+                        .args(["push", "origin", &branch])
+                        .status();
 
-                match push_status {
-                    Ok(s) if s.success() => {
-                        ui::show_system("successfully pushed updates to https://github.com/apullz/ayesha-os! (๑>◡<๑)");
+                    match push_status {
+                        Ok(s) if s.success() => {
+                            ui::show_system(&format!("successfully pushed updates to https://github.com/{repo} ({branch}) (๑>◡<๑)"));
+                        }
+                        _ => {
+                            ui::show_error("git push failed (check authentication / branch).");
+                        }
                     }
-                    _ => {
-                        ui::show_error("git push executed (check authentication if remote unchanged).");
-                    }
+                } else {
+                    ui::show_system("auto_push disabled in tri_mind_sync.json — skipped git push");
                 }
+
+                show_sync_state(&project_root);
+                continue;
+            }
+            _ if lower == "sync status" || lower.starts_with("sync status ") => {
+                show_sync_state(&project_root);
                 continue;
             }
             "apps" | "applets" => {
@@ -814,9 +953,36 @@ async fn main() -> anyhow::Result<()> {
                         let _ = std::fs::write(&config_path, content);
                     }
                     if !messages.is_empty() {
-                        messages[0].content = OllamaClient::system_prompt(&name);
+                        messages[0].content = build_system_prompt(&name, &project_root);
                     }
                     ui::show_system(&format!("okay, {} it is!", name));
+                }
+                continue;
+            }
+            _ if lower.starts_with("theme ") || lower == "theme" => {
+                let arg = input.get(6..).unwrap_or("").trim();
+                if arg.is_empty() {
+                    let current = theme::get().name.clone();
+                    println!("\n  {}", theme::bold(Role::Accent, format!("themes  (current: {})", current)));
+                    for name in theme::names() {
+                        let is_active = name == current;
+                        println!("  {} {}",
+                            theme::paint(if is_active { Role::Primary } else { Role::Dim },
+                                if is_active { "▶" } else { " " }),
+                            theme::paint(Role::Text, theme::render_swatch(name)));
+                    }
+                    println!();
+                } else {
+                    match theme::switch(arg) {
+                        Ok(t) => {
+                            config["theme"] = serde_json::json!(t.name);
+                            if let Ok(content) = serde_json::to_string_pretty(&config) {
+                                let _ = std::fs::write(&config_path, content);
+                            }
+                            ui::show_system(&format!("theme switched to {}", t.name));
+                        }
+                        Err(e) => ui::show_error(&e),
+                    }
                 }
                 continue;
             }
@@ -925,11 +1091,72 @@ async fn main() -> anyhow::Result<()> {
                 }
                 continue;
             }
+            "sessions" => {
+                let names = session::list_sessions(&project_root);
+                if names.is_empty() {
+                    ui::show_system("no saved sessions yet");
+                } else {
+                    println!("\n  {}", theme::bold(Role::Accent, "sessions:"));
+                    for name in names {
+                        let file = std::path::Path::new(&project_root)
+                            .join(session::SESSION_DIR)
+                            .join(format!("{name}.json"));
+                        let msgs = session::load_session(&project_root, &name)
+                            .map(|m| m.len().saturating_sub(1))
+                            .unwrap_or(0);
+                        let mtime = file.metadata()
+                            .and_then(|m| m.modified())
+                            .map(|t| {
+                                let d = std::time::SystemTime::now()
+                                    .duration_since(t)
+                                    .map(|x| x.as_secs())
+                                    .unwrap_or(0);
+                                format!("{}s ago", d)
+                            })
+                            .unwrap_or_else(|_| "?".to_string());
+                        let is_default = name == session::DEFAULT_SESSION;
+                        println!("  {} {}  ({} msgs, {})",
+                            theme::paint(if is_default { Role::Primary } else { Role::Dim },
+                                if is_default { "▶" } else { " " }),
+                            theme::paint(Role::Text, &name),
+                            msgs,
+                            mtime);
+                    }
+                    println!();
+                }
+                continue;
+            }
+            _ if lower == "resume" || lower.starts_with("resume ") => {
+                let name = input.get(7..).unwrap_or("").trim();
+                let name = if name.is_empty() { session::DEFAULT_SESSION } else { name };
+                match session::load_session(&project_root, name) {
+                    Ok(saved) => {
+                        let n = saved.len().saturating_sub(1);
+                        messages.clear();
+                        messages.push(ChatMessage {
+                            role: "system".to_string(),
+                            content: build_system_prompt(&user_name, &project_root),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                        messages.extend(saved.into_iter().skip(1));
+                        ui::show_system(&format!("resumed session '{}' ({} messages)", name, n));
+                    }
+                    Err(e) => ui::show_error(&format!("no session '{}': {}", name, e)),
+                }
+                continue;
+            }
+            "newsession" => {
+                let kept = messages.len();
+                messages.truncate(1);
+                ui::show_system(&format!("started a new session (dropped {} messages)", kept.saturating_sub(1)));
+                continue;
+            }
             "system" => {
                 if !messages.is_empty() {
-                    println!("\n\x1b[1;33mSystem Prompt:\x1b[0m");
+                    println!("\n{}", theme::bold(Role::Warning, "System Prompt:"));
                     for line in messages[0].content.lines() {
-                        println!("  {}", line.bright_black());
+                        println!("  {}", theme::paint(Role::Dim, line));
                     }
                 } else {
                     ui::show_system("no system prompt loaded");
@@ -992,7 +1219,7 @@ async fn main() -> anyhow::Result<()> {
                     let key = RandomState::new().build_hasher().finish();
                     jokes[key as usize % jokes.len()]
                 };
-                println!("\n  {}", joke.bright_yellow());
+                println!("\n  {}", theme::paint(Role::Secondary, joke));
                 continue;
             }
             "time" => {
@@ -1019,7 +1246,7 @@ async fn main() -> anyhow::Result<()> {
             _ if lower == "config" || lower.starts_with("config ") => {
                 let key = input.get(7..).unwrap_or("").trim();
                 if key.is_empty() {
-                    println!("\n\x1b[1;33mConfiguration:\x1b[0m");
+                    println!("\n{}", theme::bold(Role::Warning, "Configuration:"));
                     println!("  user_name: {}", config.get("user_name").and_then(|v| v.as_str()).unwrap_or("(not set)"));
                     println!("  tool_model: {}", tool_model_name);
                     println!("  chat_model: {}", current_model);
@@ -1036,13 +1263,26 @@ async fn main() -> anyhow::Result<()> {
                         ui::show_system(&format!("set {} = {}", k, v));
                     } else {
                         let val = config.get(key).map(|v| v.to_string()).unwrap_or("(not found)".to_string());
-                        println!("  {} = {}", key.bright_cyan(), val.bright_white());
+                        println!("  {} = {}", theme::paint(Role::Accent, key), theme::paint(Role::Text, val));
                     }
                 }
                 continue;
             }
             "memory" => {
                 match executor.execute("list_memories", &serde_json::json!({}), &mut ToolContext {
+                    memory: &mut memory, prompt_history: &mut prompt_history,
+                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    project_root: &project_root, applet_manager: &mut manager,
+                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
+                    menu_flag: &menu_flag,
+                }).await {
+                    Ok(r) => println!("\n{}", r),
+                    Err(e) => ui::show_error(&e.to_string()),
+                }
+                continue;
+            }
+            "skills" => {
+                match executor.execute("list_skills", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
                     project_root: &project_root, applet_manager: &mut manager,
@@ -1181,6 +1421,9 @@ async fn main() -> anyhow::Result<()> {
         // ── agent loop (dual-model: ayesha for personality, qwen for tools) ──
         let msg_count_before = messages.len();
         let mut needs_tools = might_need_tools(&user_content);
+
+        ui::show_user_msg(&user_content);
+        ui::show_turn_separator();
 
         messages.push(ChatMessage {
             role: "user".to_string(),
@@ -1338,8 +1581,32 @@ async fn main() -> anyhow::Result<()> {
         if !steer_happened && !first_had_tools && needs_tools {
             // Try qwen2.5 with tools to see if it wants to call any
             // (invisible — tool model deliberation is not shown to user)
+            // IMPORTANT: strip ayesha's system prompt ("never output tool calls")
+            // and replace with a tool-friendly instruction for the tool model.
+            let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+            let desktop = dirs::desktop_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+            let tool_friendly_prompt = format!(
+                "you are a tool-calling assistant. analyze the conversation and call the appropriate tools to fulfill the user's request. \
+                you MUST output tool calls using the function calling format. do NOT output plain text responses — only tool calls. \
+                call tools EXACTLY ONCE — do NOT call tools repeatedly in a loop. one round of tool calls is enough. \
+                always use ABSOLUTE paths. the user's home is {home}, their desktop is {desktop}. \
+                if the user says 'on my desktop', use path like {desktop}\\filename.html. \
+                if no location specified, use {home}\\filename.html."
+            );
+            let tool_messages: Vec<ChatMessage> = messages.iter().enumerate().filter_map(|(i, m)| {
+                if i == 0 && m.role == "system" {
+                    Some(ChatMessage {
+                        role: "system".to_string(),
+                        content: tool_friendly_prompt.clone(),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    })
+                } else {
+                    Some(m.clone())
+                }
+            }).collect();
             let qwen_result = tool_client
-                .chat_stream_collect(&messages, Some(&tools), &steer_rx)
+                .chat_stream_collect(&tool_messages, Some(&tools), &steer_rx)
                 .await;
 
             match qwen_result {
@@ -1355,10 +1622,11 @@ async fn main() -> anyhow::Result<()> {
                     });
 
                     let mut tool_iterations = 0;
+                    let mut wrote_file = false;
                     loop {
                         tool_iterations += 1;
-                        if tool_iterations > 8 {
-                            ui::show_error("max tool iterations (8). stopping.");
+                        if tool_iterations > 3 {
+                            ui::show_error("max tool iterations (3). stopping.");
                             // Add synthetic tool results so message history is valid
                             let last_tcs = messages.last()
                                 .and_then(|m| m.tool_calls.as_ref())
@@ -1431,6 +1699,12 @@ async fn main() -> anyhow::Result<()> {
                                 ui::show_tool_ok(name, &tool_result);
                             }
 
+                            // Check if a file-writing tool succeeded BEFORE moving tool_result
+                            let is_file_tool = name == "generate_html" || name == "write_file"
+                                || name == "generate_sprite" || name == "generate_tileset"
+                                || name == "generate_object" || name == "render_sprite";
+                            let tool_succeeded = !tool_result.starts_with("error:") && is_file_tool;
+
                             let tool_result = truncate_tool_result(&tool_result, 8192);
 
                             messages.push(ChatMessage {
@@ -1439,11 +1713,32 @@ async fn main() -> anyhow::Result<()> {
                                 tool_calls: None,
                                 tool_call_id: Some(tool_call.id.clone()),
                             });
+
+                            if tool_succeeded {
+                                wrote_file = true;
+                            }
+                        }
+
+                        // If a file was written, we're done — skip re-prompting qwen
+                        if wrote_file {
+                            break;
                         }
 
                         // Re-prompt qwen2.5 for next tool calls (invisible)
+                        let tool_messages2: Vec<ChatMessage> = messages.iter().enumerate().filter_map(|(i, m)| {
+                            if i == 0 && m.role == "system" {
+                                Some(ChatMessage {
+                                    role: "system".to_string(),
+                                    content: tool_friendly_prompt.to_string(),
+                                    tool_calls: None,
+                                    tool_call_id: None,
+                                })
+                            } else {
+                                Some(m.clone())
+                            }
+                        }).collect();
                         let next_result = tool_client
-                            .chat_stream_collect(&messages, Some(&tools), &steer_rx)
+                            .chat_stream_collect(&tool_messages2, Some(&tools), &steer_rx)
                             .await;
 
                         match next_result {
@@ -1553,9 +1848,104 @@ async fn main() -> anyhow::Result<()> {
 
         let _ = memory.save();
         let _ = prompt_history.save();
+        let _ = session::save_session(&project_root, session::DEFAULT_SESSION, &messages);
     }
 
     Ok(())
+}
+
+/// Headless single-turn agent test — sends one message through the full tool
+/// pipeline (needs_tools → tool model → execute) and prints what happened.
+/// Exit 0 if a tool was executed successfully, exit 1 otherwise.
+/// Called via `ayesha-os --headless "message"`.
+async fn run_headless(message: &str) -> anyhow::Result<()> {
+    let sandbox = Sandbox::default_workspace();
+    let executor = ToolExecutor::new(sandbox.clone());
+    let client = OllamaClient::new("ayesha");
+    let tool_client = OllamaClient::new("qwen2.5:7b");
+    let tools = OllamaClient::tool_definitions_core();
+    let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
+    let mut memory = memory::MemoryStore::load();
+    let mut prompt_history = PromptHistory::load();
+    let analyzer = SelfAnalyzer::new(std::env::current_dir().unwrap_or_default());
+    let evolver = ToolEvolver::new(vec![
+        "read_file".into(), "write_file".into(), "list_dir".into(),
+        "grep".into(), "glob".into(), "generate_html".into(),
+    ]);
+    let project_root = std::env::current_dir().unwrap_or_default();
+    let mut input_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let menu_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut manager = AppletManager::new();
+
+    // Build the tool-friendly system prompt (same as main loop)
+    let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    let desktop = dirs::desktop_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    let system_prompt = format!(
+        "you are a tool-calling assistant. analyze the conversation and call the appropriate tools to fulfill the user's request. \
+        you MUST output tool calls using the function calling format. do NOT output plain text responses — only tool calls. \
+        always use ABSOLUTE paths. the user's home is {home}, their desktop is {desktop}. \
+        if the user says 'on my desktop', use path like {desktop}\\filename.html. \
+        if no location specified, use {home}\\filename.html."
+    );
+
+    let mut messages = vec![
+        ChatMessage { role: "system".to_string(), content: system_prompt.clone(), tool_calls: None, tool_call_id: None },
+        ChatMessage { role: "user".to_string(), content: message.to_string(), tool_calls: None, tool_call_id: None },
+    ];
+
+    let mut ctx = ToolContext {
+        memory: &mut memory,
+        prompt_history: &mut prompt_history,
+        analyzer: &analyzer,
+        evolver: &evolver,
+        ollama: &client,
+        project_root: &project_root,
+        applet_manager: &mut manager,
+        steer_tx: &steer_tx,
+        steer_rx: &steer_rx,
+        input_flag: &mut input_flag,
+        menu_flag: &menu_flag,
+    };
+
+    // Step 1: try qwen directly with tools
+    let qwen_result = tool_client.chat_stream_collect(&messages, Some(&tools), &steer_rx).await;
+
+    let mut tools_executed = false;
+    match qwen_result {
+        Ok(qr) if qr.has_tool_calls() => {
+            messages.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: String::new(),
+                tool_calls: Some(qr.tool_calls.clone()),
+                tool_call_id: None,
+            });
+            for tc in &qr.tool_calls {
+                let name = tc.function.name.clone();
+                let args_str = serde_json::to_string(&tc.function.arguments).unwrap_or_default();
+                println!("  ▶ {name} {}", truncate_tool_result(&args_str, 200));
+                let result = executor.execute(&name, &tc.function.arguments, &mut ctx).await;
+                match result {
+                    Ok(r) => {
+                        println!("  ✓ {name} succeeded ({} chars)", r.len());
+                        tools_executed = true;
+                    }
+                    Err(e) => println!("  ✖ {name} error: {e}"),
+                }
+            }
+        }
+        Ok(_) => println!("  ⚠ tool model returned no tool calls"),
+        Err(e) => println!("  ✖ tool model error: {e}"),
+    }
+
+    let _ = memory.save();
+    manager.stop_all();
+    if tools_executed {
+        println!("\n  ✓ headless test passed");
+        std::process::exit(0);
+    } else {
+        println!("\n  ✖ headless test failed — no tools executed");
+        std::process::exit(1);
+    }
 }
 
 /// Headless E2E smoke test — verifies ollama is reachable, both models respond,
@@ -1622,11 +2012,28 @@ async fn selftest() -> anyhow::Result<()> {
     let tools_ok = !tools.is_empty();
     check(&format!("{} tool definitions loaded", tools.len()), tools_ok, &mut checks);
 
-    // 5. Truncate tool result
+    // 5. Qwen emits tool_calls when tools provided (regression guard)
+    let tool_msgs = vec![ChatMessage {
+        role: "user".to_string(),
+        content: "read main.rs".to_string(),
+        tool_calls: None,
+        tool_call_id: None,
+    }];
+    let qwen_tool_resp = qwen.chat_stream_collect(&tool_msgs, Some(&tools), &rx).await;
+    let qwen_tool_ok = qwen_tool_resp.as_ref().map(|r| r.has_tool_calls()).unwrap_or(false);
+    check(
+        &format!("qwen2.5 emits tool_calls{}", if let Err(e) = &qwen_tool_resp {
+            format!(" (error: {})", e)
+        } else { String::new() }),
+        qwen_tool_ok,
+        &mut checks,
+    );
+
+    // 6. Truncate tool result
     let trunc_ok = util::truncate_chars("hello world", 5) == "hello";
     check("truncate_chars works", trunc_ok, &mut checks);
 
-    // 6. StreamParser works
+    // 7. StreamParser works
     let mut parser = ollama::StreamParser::new();
     parser.feed_line(r#"{"message":{"content":"test"},"done":false}"#);
     parser.feed_line(r#"{"message":{"content":" ok"},"done":false}"#);
@@ -1634,7 +2041,7 @@ async fn selftest() -> anyhow::Result<()> {
     let parser_ok = parser.content == "test ok" && parser.done;
     check("StreamParser accumulates content", parser_ok, &mut checks);
 
-    // 7. needs_tools heuristic
+    // 8. needs_tools heuristic
     let needs_tools_ok = agent::needs_tools("read main.rs") && !agent::needs_tools("hi");
     check("needs_tools heuristic", needs_tools_ok, &mut checks);
 

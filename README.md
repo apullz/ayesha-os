@@ -1,6 +1,6 @@
 # ayesha-os
 
-a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant (like opencode) and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai.
+a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant (like opencode) and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai. **v4.5.0**: rust engine with themes, sessions, skills & streaming syntax highlighting; an expo/react-native mobile chat app; a dockerized huggingface bot space; and a CI automation harness.
 
 ```
                        _     
@@ -22,27 +22,36 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 │   mobile api)│     │   tool-calling) │     │   + openrouter)  │
 └──────┬───────┘     └────────┬────────┘     └──────────────────┘
        │                      │
-       │              ┌───────▼─────────┐
-       │              │  tri_mind_sync  │
-       │              │  (sync engine)  │
-       │              └───────┬─────────┘
+       │              ┌───────▼───────────────┐
+       │              │  tri_mind_sync +      │
+       │              │  automation harness   │
+       │              │  (sync engine + CI)   │
+       │              └───────┬───────────────┘
        │                      │
-       │              ┌───────▼─────────┐
-       │              │  applets/       │
-        │              │  ├─ desktop-cat │
-        │              │  ├─ flora-cli   │
-        │              │  └─ neural-strike│
-       │              └─────────────────┘
+       │              ┌───────▼─────────┐      ┌──────────────────────┐
+       │              │  applets/       │      │  ayesha-bot-mobile   │
+       │              │  ├─ desktop-cat │      │  (expo / react       │
+       │              │  └─ flora-cli   │      │   native chat client)│
+       │              └─────────────────┘      └─────────┬────────────┘
+       │                                                │
+       │                    ┌───────────────────────────▼─────────────┐
+       │                    │  hf space apullz/ayesha-bot             │
+       │                    │  (docker + ollama nemotron-3-nano +     │
+       │                    │   gradio, streams via SSE)              │
+       │                    └─────────────────────────────────────────┘
 ```
 
 ## projects
 
 | project | lang | description |
 |---------|------|-------------|
-| **engine/** | rust | agentic coding assistant + jarvis chatbot with tool-calling, model routing, streaming, self-improvement, pixel art generation |
-| **core/** | python | hivemind orchestrator with gradio web ui, fastapi mobile api |
+| **engine/** | rust | agentic coding assistant + jarvis chatbot with tool-calling, model routing, streaming (syntax-highlighted), themes, sessions, self-improvement, pixel art generation |
+| **core/** | python | hivemind orchestrator with gradio web ui, fastapi mobile api, tri-node mind integration |
+| **ayesha-bot-mobile/** | typescript (expo) | pastel "magical chat" mobile client that streams from the hf bot space via gradio SSE |
+| **_hf-ayesha-bot/** | docker + gradio | huggingface space that runs ollama (`nemotron-3-nano:4b`) as the `ayesha` personality and serves it behind a phone-frame chat overlay |
 | **tri_mind_sync/** | python | bidirectional sync engine (github, huggingface, local) |
 | **git_middleware/** | python | gitea webhook receiver + LLM task runner (code review, security scan) |
+| **skills/** | markdown | skill guides the engine discovers and loads at runtime (`list_skills` / `read_skill`) |
 | **models/** | modelfile | ayesha ollama personality definition |
 
 ### applets/
@@ -51,8 +60,7 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 |--------|------|-------------|
 | **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
 | **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
-| **neural-strike/** | python | mechanistic interpretability game with SAE feature visualization |
-| **poopy-tui/** | python | full-featured discord terminal client with voice, QR login, TUI |
+| **poopy-tui/** | python | full-featured discord terminal client with voice, QR login, TUI (separate private repo — not bundled) |
 
 ## quick start
 
@@ -87,7 +95,7 @@ the engine is the heart of ayesha-os — an agentic coding assistant with a full
 | backend | provider | models |
 |---------|----------|--------|
 | **local** | ollama @ `localhost:11434` | ayesha, qwen2.5-coder:14b, llama3.2-vision |
-| **cloud** | openrouter (free tier) | nvidia/nemotron-3-super:free, deepseek-r1:free, qwen-2.5-coder-32b:free |
+| **cloud** | openrouter (free tier) | nvidia/nemotron-3-super:free, meta-llama/llama-3.3-70b-instruct:free, deepseek-r1:free, qwen-2.5-coder-32b:free, xiaomi/mimo-v2.5, xiaomi/mimo-v2.5-pro |
 | **cloud** | opencode | opencode/big-pickle |
 
 ```bash
@@ -105,13 +113,17 @@ auto-routes queries to the best model based on content:
 
 ### agentic tool calling
 
-the model can autonomously call tools to complete tasks:
+the model can autonomously call tools to complete tasks (26 tools):
 
 | tool | description |
 |------|-------------|
 | `read_file` | read any file on disk (sandboxed) |
 | `write_file` | create or overwrite files |
 | `list_dir` | browse directories |
+| `grep` | recursive text search (case-insensitive substring, `path:line:` results) |
+| `glob` | find files by pattern (`**`, `*`, `?`), recursive |
+| `list_skills` | list available skills from the `skills/` folder |
+| `read_skill` | load a skill's instructions and follow them |
 | `generate_html` | generate self-contained interactive html apps |
 | `generate_sprite` | create pixel art character sprite sheets |
 | `generate_tileset` | create terrain tilesets (grass, desert, water, snow) |
@@ -130,10 +142,11 @@ the model can autonomously call tools to complete tasks:
 | `coding_agent` | multi-action coding tool (read/write/edit/analyze/modify/suggest) |
 | `fetch_url` | download any file (html/json/binary) from a URL to a local path (100 MB cap) |
 | `download_image` | download an image from a URL, validate it's really an image, auto-pick extension |
+| `manage_applet` | list / launch / stop applets from inside the engine |
 
 ### streaming + steering
 
-responses stream in real-time with retro typewriter effect. type during generation to interrupt and redirect:
+responses stream in real-time with retro typewriter effect. a `lowercase-proxy` formatter keeps output on-brand (all-lowercase outside code fences, text kaomojis preserved), and a code renderer paints fenced code blocks and inline `` `code` `` spans with syntax highlighting (keywords, strings, numbers, comments, functions, types). type during generation to interrupt and redirect:
 
 ```
 fox> write a fibonacci function
@@ -142,6 +155,33 @@ fox> write a fibonacci function
 fox> actually, make it recursive
 ```
 
+### themes
+
+six color themes — `kook`, `cyberpunk`, `sakura`, `win95`, `mono`, `monokai++` (default) — each with 12 role colors + 9 syntax-token colors:
+
+```bash
+fox> theme            # list themes
+fox> theme sakura     # switch to a theme
+```
+
+generate a theme from any image: `python scripts/theme-from-image.py --image shot.png`
+
+### sessions
+
+conversations auto-save to `sessions/default.json` and can be snapshotted and resumed:
+
+```bash
+fox> save my-idea      # save the conversation
+fox> sessions          # list auto-saved sessions
+fox> resume my-idea    # resume a saved session
+fox> newsession        # start fresh
+fox> export chat.md    # export as markdown
+```
+
+### skills
+
+drop a markdown guide in `skills/` and the engine will auto-discover it (parses YAML frontmatter for `name`/`description`), surface it via `list_skills`, and hint the model to call `read_skill` when a request matches. bundled: `code-review`, `rust-build`.
+
 ### meta-commands
 
 | command | action |
@@ -149,16 +189,34 @@ fox> actually, make it recursive
 | `help` | show help |
 | `exit` | quit (saves memory + prompt history) |
 | `clear` | clear screen |
-| `models` | list available models |
+| `reset` | wipe conversation + memory |
+| `models` | list available models (local + cloud) |
 | `model <name>` | switch model manually |
+| `toolmodel [name]` | view / switch the tool-calling model |
 | `auto` | re-enable auto-routing |
 | `route <query>` | route one query manually |
 | `pull <name>` | pull a model from ollama |
+| `theme [name]` | list / switch color theme |
 | `apps` | list registered applets |
 | `run <name>` | launch an applet |
 | `stop <name>` | stop an applet |
 | `stats` | tool usage statistics |
 | `memory` | list stored memories |
+| `skills` | list available skills |
+| `history [n]` | show last n messages |
+| `compact` | trim history to system + ~8 messages |
+| `save [path]` | save conversation to JSON |
+| `load [path]` | load a conversation from JSON |
+| `sessions` | list auto-saved sessions |
+| `resume [name]` | resume a saved session |
+| `newsession` | start a fresh conversation |
+| `system` | print the current system prompt |
+| `export [path]` | export conversation as markdown |
+| `ping` | latency test to the active model |
+| `joke` | random programmer joke |
+| `time` | current UTC time |
+| `uptime` | session uptime |
+| `config [key=value]` | view / edit config |
 | `analyze` | analyze own source code |
 | `evolve` | suggest new tools |
 | `refine` | analyze prompt history |
@@ -166,7 +224,7 @@ fox> actually, make it recursive
 | `name <you>` | set your display name |
 | `/` | open command palette |
 
-**Ctrl+M** or **Ctrl+P** opens the interactive applet menu — navigate with **↑/↓**, type to filter, **Enter** to launch, **x** to stop the selected applet, **Esc** to exit. **Shift+Up/Down** cycles through applets.
+**Tab** autocompletes slash commands and applet names (repeat to cycle, double-Tab lists all). **Ctrl+M** or **Ctrl+P** opens the interactive applet menu — navigate with **↑/↓**, type to filter, **Enter** to launch, **x** to stop the selected applet, **Esc** to exit. **Shift+Up/Down** cycles through applets.
 
 ### pixel striker (built-in sprite engine)
 
@@ -185,6 +243,7 @@ the engine learns and evolves:
 - **tool evolution** — identifies missing tools and generates definitions + implementation skeletons
 - **prompt refinement** — tracks tool success rates and suggests system prompt changes
 - **error auto-memory** — tool failures automatically stored as memories
+- **111 unit tests** — `cargo test` with zero warnings; `ayesha-os --selftest` runs a headless E2E smoke test
 
 ### sandbox security
 
@@ -213,7 +272,10 @@ REST API for mobile apps with:
 - hive status broadcasting
 - personality config read/write
 - WebSocket real-time updates
-- Android-specific endpoints
+- Android-specific endpoints (`/api/android/init`, `/api/android/session`)
+- tri-node mind integration — broadcasts fan out to all hivemind nodes
+- `/api/hive/*` — list active sisters, shared key/value config store
+- background 30s hive sync + heartbeat loop
 
 ### hivemind client
 
@@ -258,17 +320,6 @@ pixel art desktop pet cat with:
 
 interactive TypeScript terminal for exploring scottish flora phylogeny. uses ollama for natural language queries about plant taxonomy.
 
-### neural-strike
-
-mechanistic interpretability game with:
-- PyQt6 UI with CRT scanline effects
-- UMAP 2D feature visualization with pan/zoom
-- Token scanner with matrix-rain output
-- Feature inspector with auto-interpretation
-- Territory capture system with credits
-- SQLite database for caching features
-- local Neuronpedia data client (no network required)
-
 ### poopy-tui
 
 full-featured Discord terminal client built with Textual:
@@ -279,6 +330,34 @@ full-featured Discord terminal client built with Textual:
 - friends list management
 - real-time event display
 
+> poopy-tui lives in a separate private repo (it needs a Discord token) and is not bundled with the monorepo.
+
+## mobile app
+
+`ayesha-bot-mobile/` — an **expo / react-native** chat client for the ayesha bot:
+
+- pastel "magical chat" UI with 3 tabs: **Chat**, **Stars** (saved conversations), **Settings**
+- streams replies from the `apullz/ayesha-bot` hf space via gradio SSE v3 (`/gradio_api/call/respond`)
+- haptics on send, animated sparkles, on-device history via AsyncStorage (no accounts)
+- run with `npx expo start` inside `ayesha-bot-mobile/`
+
+## hf bot space
+
+`_hf-ayesha-bot/` — the dockerized **`apullz/ayesha-bot`** huggingface space that powers the mobile app:
+
+- `FROM ollama/ollama:latest` — bakes `nemotron-3-nano:4b` in as the `ayesha` personality at image build time
+- gradio `ChatInterface` on port 7860 streaming via `/api/chat`, wrapped in a custom phone-frame overlay (`overlay.html` / `theme.css` / `chat.js`)
+- deploy with the `Dockerfile` + `Modelfile` in that folder
+
+## automation harness
+
+`.github/workflows/harness.yml` runs `scripts/automation_harness.py` in CI **every 10 minutes** (plus manual dispatch). the harness:
+
+- polls `.automation/tasks/` for `*.task.json` jobs and runs them non-interactively (command / sync / test / lint)
+- writes files atomically (temp → fsync → SHA-256 → rename) with backup/restore on failure
+- lints changed files per language (`.py`, `.rs` via `cargo check`, `.ts/.tsx` via `tsc`, `.json`, `.toml`, `.ps1`, `.sh`)
+- auto-commits and pushes any results back as `chore(harness): ... [skip ci]`
+
 ## git middleware
 
 gitea webhook receiver with LLM-powered task execution:
@@ -287,9 +366,11 @@ gitea webhook receiver with LLM-powered task execution:
 |----------|-------------|
 | `POST /webhook/gitea` | receive push/PR/release webhooks |
 | `POST /task` | on-demand LLM task execution |
+| `POST /reload` | hot-reload `config.json` |
+| `GET /config` | router / model mapping summary |
 | `GET /health` | server health check |
 
-tasks: code review, auto-summary, commit analysis, security scan. uses ollama with task-specific prompt templates.
+tasks: code review, auto-summary, commit analysis, security scan. uses ollama with task-specific prompt templates. `python main.py test` runs a built-in test suite (router mapping, HMAC verification, webhook mapping).
 
 ## deployment
 
@@ -301,11 +382,25 @@ this monorepo lives at `github.com/apullz/ayesha-os`
 
 - **model**: `apullz/ayesha` — ayesha personality modelfile
 - **space**: `apullz/ayesha-hivemind` — gradio web ui
+- **space**: `apullz/ayesha-bot` — dockerized chat backend powering the mobile app
 
 ```powershell
 $env:HF_TOKEN = "hf_..."
 .\scripts\sync-all.ps1
 ```
+
+### scripts
+
+| script | purpose |
+|--------|---------|
+| `build-exe.ps1` | build `dist\ayesha-os.exe` with config, models, applets bundled |
+| `sync-all.ps1` | push github + hf model + hf space |
+| `setup-cloud.ps1` | interactive `.env` setup for openrouter + opencode cloud keys |
+| `launcher.py` | system-tray applet launcher (pystray) |
+| `automation_harness.py` | zero-touch task queue / lint / self-correct loop |
+| `import-takeout-memories.py` | distill google takeout activity into ayesha memories |
+| `theme-from-image.py` | extract a color palette from an image → `ayesha.json` theme |
+| `space-app.py` | static themed gradio demo for the hf space |
 
 ### building the standalone exe
 

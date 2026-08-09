@@ -1,4 +1,4 @@
-/// Tab completion engine — pure, testable prefix-matching + cycle state.
+//! Tab completion engine — pure, testable prefix-matching + cycle state.
 
 pub struct Completer {
     candidates: Vec<String>,
@@ -9,7 +9,7 @@ pub struct Completer {
 
 impl Completer {
     pub fn new(mut candidates: Vec<String>) -> Self {
-        candidates.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        candidates.sort_by_key(|a| a.to_lowercase());
         candidates.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
         Self {
             candidates,
@@ -22,7 +22,7 @@ impl Completer {
     /// Update the candidate list (e.g. after applet names change).
     #[allow(dead_code)]
     pub fn set_candidates(&mut self, mut candidates: Vec<String>) {
-        candidates.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        candidates.sort_by_key(|a| a.to_lowercase());
         candidates.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
         self.candidates = candidates;
         self.reset();
@@ -62,8 +62,8 @@ impl Completer {
         let idx = self.cycle_idx % self.matches.len();
         let selected = self.matches[idx].clone();
 
-        // Double-tab: show all matches
-        let show_all = self.cycle_idx > 0 && self.cycle_idx % self.matches.len() == 0;
+         // Double-tab: show all matches
+         let show_all = self.cycle_idx > 0 && self.cycle_idx.is_multiple_of(self.matches.len());
 
         (Some(selected), if show_all { self.matches.clone() } else { vec![] })
     }
@@ -77,7 +77,7 @@ impl Completer {
         for m in &matches[1..] {
             end = end.min(m.len());
             for (i, (a, b)) in first.bytes().take(end).zip(m.bytes().take(end)).enumerate() {
-                if a.to_ascii_lowercase() != b.to_ascii_lowercase() {
+                if !a.eq_ignore_ascii_case(&b) {
                     end = i;
                     break;
                 }

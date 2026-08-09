@@ -1,4 +1,3 @@
-use colored::Colorize;
 use reqwest::Client;
 use serde_json::{json, Value};
 use anyhow::Result;
@@ -7,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::ollama::{ChatMessage, StreamResult, ToolCall, ToolFunction, ChatResponse, ChatResponseMessage};
+use crate::theme::{self, Role};
 
 #[derive(Debug)]
 pub struct CloudClient {
@@ -108,6 +108,8 @@ fn get_api_key(provider: &str) -> Option<String> {
             ("meta-llama/llama-3.3-70b-instruct:free".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string()]),
             ("deepseek/deepseek-r1:free".to_string(), "openrouter".to_string(), vec!["thinking".to_string(), "coding".to_string()]),
             ("qwen/qwen-2.5-coder-32b-instruct:free".to_string(), "openrouter".to_string(), vec!["coding".to_string(), "tools".to_string()]),
+            ("xiaomi/mimo-v2.5".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string(), "tools".to_string(), "vision".to_string()]),
+            ("xiaomi/mimo-v2.5-pro".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string(), "agentic".to_string(), "thinking".to_string()]),
             ("opencode/big-pickle".to_string(), "opencode".to_string(), vec!["coding".to_string(), "reasoning".to_string()]),
         ]
     }
@@ -202,6 +204,8 @@ fn get_api_key(provider: &str) -> Option<String> {
         let mut buf = String::new();
         let mut full_content = String::new();
         let mut in_think = false;
+        let mut formatter = crate::format::LowercaseStreamer::new();
+        let mut code = crate::render::CodeStream::new();
 
         let mut recent = String::new();
         const RECENT_MAX: usize = 20;
@@ -241,8 +245,9 @@ fn get_api_key(provider: &str) -> Option<String> {
                                         // Handle content
                                         if let Some(c) = delta.get("content").and_then(|c| c.as_str()) {
                                             if !c.is_empty() {
-                                                full_content.push_str(c);
-                                                recent.push_str(c);
+                                                let enforced = formatter.feed(c);
+                                                full_content.push_str(&enforced);
+                                                recent.push_str(&enforced);
                                                 let n = recent.chars().count();
                                                 if n > RECENT_MAX {
                                                     let skip = n - RECENT_MAX;
@@ -260,9 +265,9 @@ fn get_api_key(provider: &str) -> Option<String> {
                                                 }
 
                                                 if in_think {
-                                                    print!("{}", c.bright_black());
+                                                    print!("{}", theme::paint(Role::Dim, &enforced));
                                                 } else {
-                                                    print!("{}", c);
+                                                    print!("{}", code.feed(&enforced));
                                                 }
                                                 std::io::stdout().flush().ok();
                                             }
@@ -329,6 +334,14 @@ fn get_api_key(provider: &str) -> Option<String> {
                     });
                 }
                 
+                let tail = formatter.finish();
+                if !tail.is_empty() {
+                    full_content.push_str(&tail);
+                    print!("{}", code.feed(&tail));
+                    std::io::stdout().flush().ok();
+                }
+                print!("{}", code.finish());
+
                 return Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: Some(input) });
             }
         }
@@ -351,6 +364,14 @@ fn get_api_key(provider: &str) -> Option<String> {
                 }
             });
         }
+
+        let tail = formatter.finish();
+        if !tail.is_empty() {
+            full_content.push_str(&tail);
+            print!("{}", code.feed(&tail));
+            std::io::stdout().flush().ok();
+        }
+        print!("{}", code.finish());
 
         Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })
     }
@@ -387,6 +408,7 @@ fn get_api_key(provider: &str) -> Option<String> {
 
         let mut buf = String::new();
         let mut full_content = String::new();
+        let mut formatter = crate::format::LowercaseStreamer::new();
 
         #[derive(Default)]
         struct ActiveToolCall {
@@ -417,7 +439,7 @@ fn get_api_key(provider: &str) -> Option<String> {
                             if let Some(choice) = choices.first() {
                                 if let Some(delta) = choice.get("delta") {
                                     if let Some(c) = delta.get("content").and_then(|c| c.as_str()) {
-                                        full_content.push_str(c);
+                                        full_content.push_str(&formatter.feed(c));
                                     }
                                     if let Some(tcs) = delta.get("tool_calls").and_then(|t| t.as_array()) {
                                         for tc in tcs {
@@ -469,6 +491,10 @@ fn get_api_key(provider: &str) -> Option<String> {
                         }
                     });
                 }
+                let tail = formatter.finish();
+                if !tail.is_empty() {
+                    full_content.push_str(&tail);
+                }
                 return Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: Some(input) });
             }
         }
@@ -488,6 +514,11 @@ fn get_api_key(provider: &str) -> Option<String> {
                     arguments: args_val,
                 }
             });
+        }
+
+        let tail = formatter.finish();
+        if !tail.is_empty() {
+            full_content.push_str(&tail);
         }
 
         Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })

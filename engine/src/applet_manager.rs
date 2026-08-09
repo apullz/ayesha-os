@@ -3,8 +3,8 @@ use std::io::Write;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, mpsc};
-use colored::*;
 use serde::Deserialize;
+use crate::theme::{self, Role};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppletEntry {
@@ -159,9 +159,10 @@ impl AppletManager {
             } else {
                 ""
             };
-            let full_cmd = format!("cd /d \"{}\" && {}{} {}", work_dir.display(), install_cmd, program, args_joined);
+            let full_cmd = format!("{}{} {}", install_cmd, program, args_joined);
             Command::new("cmd.exe")
                 .args(["/c", "start", "cmd.exe", "/k", &full_cmd])
+                .current_dir(&work_dir)
                 .spawn()
                 .map_err(|e| format!("failed to launch {}: {}", name, e))?
         } else {
@@ -210,9 +211,10 @@ impl AppletManager {
             } else {
                 ""
             };
-            let full_cmd = format!("cd /d \"{}\" && {}{} {}", work_dir.display(), install_cmd, program, args_joined);
+            let full_cmd = format!("{}{} {}", install_cmd, program, args_joined);
             Command::new("cmd.exe")
                 .args(["/c", &full_cmd])
+                .current_dir(&work_dir)
                 .spawn()
                 .map_err(|e| format!("failed to launch {} in this window: {}", name, e))?
         } else {
@@ -256,8 +258,8 @@ impl AppletManager {
         let _ = std::io::stdout().flush();
         println!();
         println!("  {} {}",
-            "◆".bright_green(),
-            format!("{} running in this window — exit it (or close) to return to ayesha", name).bright_cyan());
+            theme::paint(Role::Primary, "◆"),
+            theme::paint(Role::Accent, format!("{} running in this window — exit it (or close) to return to ayesha", name)));
         println!();
         let _ = std::io::stdout().flush();
 

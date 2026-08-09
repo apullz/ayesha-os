@@ -116,8 +116,9 @@ impl SelfAnalyzer {
                 });
             }
 
-            // TODO/FIXME
-            if trimmed.contains("TODO") || trimmed.contains("FIXME") {
+             // todo/fixme
+             let lower = trimmed.to_ascii_lowercase();
+             if lower.contains("todo") || lower.contains("fixme") {
                 issues.push(Issue {
                     severity: "info".to_string(),
                     line: Some(i + 1),

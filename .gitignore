@@ -57,5 +57,17 @@ _hf-space/
 *.log
 logs/
 
+# Automation harness local state (queue, reports, backups, logs)
+.automation/
+
 # Engine output capture (selftest / banner dumps)
 test-output.txt
+
+# Stale engine source backup
+*.backup
+
+# Web prototype build artifact (source lives in the HF bot space)
+ayesha-bot.zip
+
+# poopy-tui lives in a separate private repo; never track its contents here
+applets/poopy-tui/
