@@ -1,0 +1,638 @@
+{
+  ".gitignore": {
+    "rel_path": ".gitignore",
+    "size": 700,
+    "modified_at": "2026-08-04T20:34:18.035660",
+    "sha256": "2811652e99acd45d9a175f11de049bd930c21845e1282e75c049b26651a6695a"
+  },
+  ".timer-end": {
+    "rel_path": ".timer-end",
+    "size": 21,
+    "modified_at": "2026-08-04T20:34:18.036657",
+    "sha256": "9cdc87fa91883a9dcaa639837e31fee7a2ae75305e87c904cbd9014fb6a3b05c"
+  },
+  ".timer-start": {
+    "rel_path": ".timer-start",
+    "size": 21,
+    "modified_at": "2026-08-04T20:34:18.037657",
+    "sha256": "36ee46ed4acbb1bf8b14f49d28ab1f05a4f38b6c8523cfad8da4d6c1b3917927"
+  },
+  "AGENTS.md": {
+    "rel_path": "AGENTS.md",
+    "size": 3878,
+    "modified_at": "2026-08-04T20:34:18.042663",
+    "sha256": "73247b33ed5878d29022e778dfe155854fcb083eafb0bae59570f4ef7fad1d64"
+  },
+  "ayesha.bat": {
+    "rel_path": "ayesha.bat",
+    "size": 200,
+    "modified_at": "2026-08-04T20:34:18.075547",
+    "sha256": "3dc2cbce9c7e4bccd27cb63d0cd49e5772149da7351addb8745b0104076d788c"
+  },
+  "ayesha.json": {
+    "rel_path": "ayesha.json",
+    "size": 3193,
+    "modified_at": "2026-08-04T20:34:18.075547",
+    "sha256": "9a48b437d7c58b6f7fd050035f06b088efe988975fd1147a581576c2eebf8aa4"
+  },
+  "opencode.json": {
+    "rel_path": "opencode.json",
+    "size": 353,
+    "modified_at": "2026-08-04T20:34:18.106126",
+    "sha256": "be6501589e5348ea344b2b8a3051c9e54f4afc644e355428749e1b987754b2fb"
+  },
+  "progress.json": {
+    "rel_path": "progress.json",
+    "size": 1357,
+    "modified_at": "2026-08-04T20:34:18.107126",
+    "sha256": "9b7ccec07f90fdd3122fe3ee7d18933285621862ffade9279c8edc1db883a73b"
+  },
+  "README.md": {
+    "rel_path": "README.md",
+    "size": 12034,
+    "modified_at": "2026-08-04T20:34:18.043668",
+    "sha256": "a186bdb2c15666aa4fde75f48a9e23064fbede84c02fe37e9015dbdf22dc6213"
+  },
+  "STATUS.md": {
+    "rel_path": "STATUS.md",
+    "size": 5702,
+    "modified_at": "2026-08-04T20:34:18.044668",
+    "sha256": "4e642ceffca19ac84e44322aa7d1cf8f8f017ece38f3a607a34475553bd54575"
+  },
+  ".github\\workflows\\harness.yml": {
+    "rel_path": ".github\\workflows\\harness.yml",
+    "size": 1325,
+    "modified_at": "2026-08-04T20:34:18.029759",
+    "sha256": "63b2da84a4731285a9cfb4c0cfbf0f15299896eafb9b4bc2d3300393d0e69729"
+  },
+  ".tri_mind_state\\engine_state.json": {
+    "rel_path": ".tri_mind_state\\engine_state.json",
+    "size": 400,
+    "modified_at": "2026-08-04T20:34:18.040159",
+    "sha256": "6ebc3713dfda0fe3b01a4d867c0434010013d50b6b6d27d4fe46ab3551f157be"
+  },
+  ".tri_mind_state\\local_manifests.json": {
+    "rel_path": ".tri_mind_state\\local_manifests.json",
+    "size": 61752,
+    "modified_at": "2026-08-04T20:34:18.041161",
+    "sha256": "c7a1893bedfee281b964baff4d1dd56b594569139cf46b369bbd10deefde257d"
+  },
+  "applets\\desktop-cat\\cat.png": {
+    "rel_path": "applets\\desktop-cat\\cat.png",
+    "size": 1036796,
+    "modified_at": "2026-08-04T20:34:18.053191",
+    "sha256": "fe07bd6eff7fbc35172f93062ac0e5529b2a725b5a467e3ee8762593a4e4b17c"
+  },
+  "applets\\desktop-cat\\desktopcat.py": {
+    "rel_path": "applets\\desktop-cat\\desktopcat.py",
+    "size": 16449,
+    "modified_at": "2026-08-04T20:34:18.053191",
+    "sha256": "d456717ea87bce5e4278902a439d6f6614e3208f5e8b1a9148a128b9e66d7aae"
+  },
+  "applets\\desktop-cat\\e0a10184-91aa-445e-a47a-846e7665d460.png": {
+    "rel_path": "applets\\desktop-cat\\e0a10184-91aa-445e-a47a-846e7665d460.png",
+    "size": 1056108,
+    "modified_at": "2026-08-04T20:34:18.057699",
+    "sha256": "7f8f42f99ecafd33e8222535a4162d9fd621f0053975977497216ea17b7a319b"
+  },
+  "applets\\desktop-cat\\oneko.gif": {
+    "rel_path": "applets\\desktop-cat\\oneko.gif",
+    "size": 3316,
+    "modified_at": "2026-08-04T20:34:18.057699",
+    "sha256": "f4c5688eb8ee6f22b08ab8df361222307dc6fe2d5bdcfa12582cea694707e66d"
+  },
+  "applets\\desktop-cat\\oneko_sprite.png": {
+    "rel_path": "applets\\desktop-cat\\oneko_sprite.png",
+    "size": 6152,
+    "modified_at": "2026-08-04T20:34:18.058699",
+    "sha256": "4bfd5abdac138f2f1376ab6758262dfefbecfac6af71c103e4d733dbc2011e15"
+  },
+  "applets\\desktop-cat\\README.md": {
+    "rel_path": "applets\\desktop-cat\\README.md",
+    "size": 3188,
+    "modified_at": "2026-08-04T20:34:18.045669",
+    "sha256": "8208538eb4ec183d6cc6a406fe633a3cfe7b526ca50e32f8ea7d2ed2552dc597"
+  },
+  "applets\\desktop-cat\\requirements.txt": {
+    "rel_path": "applets\\desktop-cat\\requirements.txt",
+    "size": 28,
+    "modified_at": "2026-08-04T20:34:18.059698",
+    "sha256": "65aebec4b707babbc5afb90d5e80e97e61964b78d428675e69f22d2ce9aee997"
+  },
+  "applets\\desktop-cat\\run.bat": {
+    "rel_path": "applets\\desktop-cat\\run.bat",
+    "size": 48,
+    "modified_at": "2026-08-04T20:34:18.059698",
+    "sha256": "ce8ec4cd501fccd25a4c067819fab7ccb5cbe458ca7f14393fe823d71b2dad2f"
+  },
+  "applets\\desktop-cat\\run.py": {
+    "rel_path": "applets\\desktop-cat\\run.py",
+    "size": 1882,
+    "modified_at": "2026-08-04T20:34:18.060768",
+    "sha256": "d398525a9ae73e379c1cd1b267d721196b08075987a485a4d4682501c485cd79"
+  },
+  "applets\\flora-cli\\.env.example": {
+    "rel_path": "applets\\flora-cli\\.env.example",
+    "size": 169,
+    "modified_at": "2026-08-04T20:34:18.060768",
+    "sha256": "9179036bbb71d62bb9579406bec9f388a457820e72b99bae34672617d0fcd74a"
+  },
+  "applets\\flora-cli\\.gitignore": {
+    "rel_path": "applets\\flora-cli\\.gitignore",
+    "size": 81,
+    "modified_at": "2026-08-04T20:34:18.062277",
+    "sha256": "eb13e93639d4c770f0a28ba670e9f4a922bc20ff1e734bdbe916740b0ae13d74"
+  },
+  "applets\\flora-cli\\cli.ts": {
+    "rel_path": "applets\\flora-cli\\cli.ts",
+    "size": 19197,
+    "modified_at": "2026-08-04T20:34:18.063280",
+    "sha256": "99d7f191282279a54d16ad255dda31605911e8f16acd2505674715493965711e"
+  },
+  "applets\\flora-cli\\index.html": {
+    "rel_path": "applets\\flora-cli\\index.html",
+    "size": 334,
+    "modified_at": "2026-08-04T20:34:18.063280",
+    "sha256": "df8b36dc0d6fd71df0be26502389a3ecf67282fbcbbef072955640bb17b9fa99"
+  },
+  "applets\\flora-cli\\metadata.json": {
+    "rel_path": "applets\\flora-cli\\metadata.json",
+    "size": 345,
+    "modified_at": "2026-08-04T20:34:18.063280",
+    "sha256": "d1c2a40b7f166b8f200c1adecc0cb456649de2159944bd999dc1376981332298"
+  },
+  "applets\\flora-cli\\package-lock.json": {
+    "rel_path": "applets\\flora-cli\\package-lock.json",
+    "size": 137388,
+    "modified_at": "2026-08-04T20:34:18.065789",
+    "sha256": "064338b8d11f7774b4dec76b82b7f6fefb5edf8265287cffa45ac9feff650fd4"
+  },
+  "applets\\flora-cli\\package.json": {
+    "rel_path": "applets\\flora-cli\\package.json",
+    "size": 1009,
+    "modified_at": "2026-08-04T20:34:18.065789",
+    "sha256": "4782511bedee0fdc453ec1c9f1458c7049378da9594c8bb95d604d4b8fc87d2a"
+  },
+  "applets\\flora-cli\\README.md": {
+    "rel_path": "applets\\flora-cli\\README.md",
+    "size": 5052,
+    "modified_at": "2026-08-04T20:34:18.062277",
+    "sha256": "40accc278b0d5d586f27114562dbefc18d8abb47b74e7b51159f54cb14239443"
+  },
+  "applets\\flora-cli\\server.ts": {
+    "rel_path": "applets\\flora-cli\\server.ts",
+    "size": 4544,
+    "modified_at": "2026-08-04T20:34:18.066794",
+    "sha256": "8b9bc9cdc14461f3a5bafa6e49c0c6790637cd36358604f67ef38a4d8e99079e"
+  },
+  "applets\\flora-cli\\tsconfig.json": {
+    "rel_path": "applets\\flora-cli\\tsconfig.json",
+    "size": 534,
+    "modified_at": "2026-08-04T20:34:18.073539",
+    "sha256": "3c6abfb62d861145b657e37a6bbf96d1626752b6145e3bf9c218a0e66112cdd6"
+  },
+  "applets\\flora-cli\\vite.config.ts": {
+    "rel_path": "applets\\flora-cli\\vite.config.ts",
+    "size": 728,
+    "modified_at": "2026-08-04T20:34:18.074543",
+    "sha256": "4842aa03485f26bee8bc863763162bdb8942c3539f00719bfb7b63a39e9b9063"
+  },
+  "applets\\flora-cli\\src\\App.tsx": {
+    "rel_path": "applets\\flora-cli\\src\\App.tsx",
+    "size": 9867,
+    "modified_at": "2026-08-04T20:34:18.067794",
+    "sha256": "80db90dfcce20fd85081d9d23473c950d1b098d10e76a4cd352cfc98f6dffe44"
+  },
+  "applets\\flora-cli\\src\\index.css": {
+    "rel_path": "applets\\flora-cli\\src\\index.css",
+    "size": 496,
+    "modified_at": "2026-08-04T20:34:18.072035",
+    "sha256": "cf6239febb22aabe418d1663fe35cfeb1141ced72531a39637c639432a171090"
+  },
+  "applets\\flora-cli\\src\\main.tsx": {
+    "rel_path": "applets\\flora-cli\\src\\main.tsx",
+    "size": 241,
+    "modified_at": "2026-08-04T20:34:18.072035",
+    "sha256": "8b129211a1e36a01a0c294633d8463c9a661a78fe04c3f26f45ca2fdabdedff0"
+  },
+  "applets\\flora-cli\\src\\types.ts": {
+    "rel_path": "applets\\flora-cli\\src\\types.ts",
+    "size": 602,
+    "modified_at": "2026-08-04T20:34:18.072035",
+    "sha256": "c56f20d295662331b9bf7dc10b48431f29e945c1d46542176e6d4a34788ca1f3"
+  },
+  "applets\\flora-cli\\src\\components\\FieldGuide.tsx": {
+    "rel_path": "applets\\flora-cli\\src\\components\\FieldGuide.tsx",
+    "size": 17438,
+    "modified_at": "2026-08-04T20:34:18.068793",
+    "sha256": "905fc10c29e963397dbb596d1cef5a4a954af8b4d27c956ede86bde170e0dc95"
+  },
+  "applets\\flora-cli\\src\\components\\Terminal.tsx": {
+    "rel_path": "applets\\flora-cli\\src\\components\\Terminal.tsx",
+    "size": 26058,
+    "modified_at": "2026-08-04T20:34:18.069794",
+    "sha256": "8099ed4b5650b2af6f3b0731af2cb3f43f576a664e6bea6eadb196903870f00c"
+  },
+  "applets\\flora-cli\\src\\components\\VisualTree.tsx": {
+    "rel_path": "applets\\flora-cli\\src\\components\\VisualTree.tsx",
+    "size": 24970,
+    "modified_at": "2026-08-04T20:34:18.069794",
+    "sha256": "efad3582a82c338603958b9e543d16ce93693b43214fab327cdf15c8cf43e241"
+  },
+  "applets\\flora-cli\\src\\data\\floraData.ts": {
+    "rel_path": "applets\\flora-cli\\src\\data\\floraData.ts",
+    "size": 42460,
+    "modified_at": "2026-08-04T20:34:18.071041",
+    "sha256": "4af894ea2bc0fc020d82339055bd51138d76f7664a59ac4cb00a37f0ef5366da"
+  },
+  "core\\.gitattributes": {
+    "rel_path": "core\\.gitattributes",
+    "size": 1554,
+    "modified_at": "2026-08-04T20:34:18.076547",
+    "sha256": "88023d0a029a0c409b30c03b689c68605b559f5cefe06376e4a26b38ed795269"
+  },
+  "core\\.gitignore": {
+    "rel_path": "core\\.gitignore",
+    "size": 114,
+    "modified_at": "2026-08-04T20:34:18.077547",
+    "sha256": "5c574486c61bf37241cab9a5150b3451d5676d99a90436791832dca60c0d9799"
+  },
+  "core\\app.py": {
+    "rel_path": "core\\app.py",
+    "size": 24681,
+    "modified_at": "2026-08-04T20:34:18.078547",
+    "sha256": "589a499c48245c51a8ce46bf349db1d65e1c14628b7a256c37c162f0eb063964"
+  },
+  "core\\ayesha_hive_client.py": {
+    "rel_path": "core\\ayesha_hive_client.py",
+    "size": 9101,
+    "modified_at": "2026-08-04T20:34:18.078547",
+    "sha256": "54a7b76974156f25a0e5ea9478f612cb27cb0f51010e80151146b53cfb61128b"
+  },
+  "core\\ayesha_mobile_api.py": {
+    "rel_path": "core\\ayesha_mobile_api.py",
+    "size": 13570,
+    "modified_at": "2026-08-04T20:34:18.079547",
+    "sha256": "9af63155905a6dccc89d92ae683ebda1e5bf7b7db32f13e130d056df39c7fe3b"
+  },
+  "core\\mobile_app_hive_integrated.py": {
+    "rel_path": "core\\mobile_app_hive_integrated.py",
+    "size": 15459,
+    "modified_at": "2026-08-04T20:34:18.079547",
+    "sha256": "d2facf4966004155f5e21076e4c3bfe0416ecbe9b2b016446088d2e3f022c8fa"
+  },
+  "core\\README.md": {
+    "rel_path": "core\\README.md",
+    "size": 3597,
+    "modified_at": "2026-08-04T20:34:18.077547",
+    "sha256": "e81a00c6374935e35edf57e37568113c9093c22ee16bbd46b2a417eb6e9c86af"
+  },
+  "core\\requirements.txt": {
+    "rel_path": "core\\requirements.txt",
+    "size": 85,
+    "modified_at": "2026-08-04T20:34:18.080937",
+    "sha256": "d1a6af1984ba57a0c319616ed542a4c9667ab4bdedff77e915da0169a1066cc1"
+  },
+  "engine\\.gitignore": {
+    "rel_path": "engine\\.gitignore",
+    "size": 9,
+    "modified_at": "2026-08-04T20:34:18.082441",
+    "sha256": "f61c42065f048ea8fa74560cdb2ce376ca780b0904950df8b77d7a1156185c7f"
+  },
+  "engine\\Cargo.lock": {
+    "rel_path": "engine\\Cargo.lock",
+    "size": 71187,
+    "modified_at": "2026-08-04T20:34:18.082441",
+    "sha256": "881bd3c984cd797874ff1201490b873c2565440884374bd236ddf3309b23fab0"
+  },
+  "engine\\Cargo.toml": {
+    "rel_path": "engine\\Cargo.toml",
+    "size": 563,
+    "modified_at": "2026-08-04T20:34:18.083448",
+    "sha256": "b8243e648bcd4a538bc74f3a2c9183cfa9ca7f5874bc0906123c6ceabe91edea"
+  },
+  "engine\\config.json": {
+    "rel_path": "engine\\config.json",
+    "size": 435,
+    "modified_at": "2026-08-04T20:34:18.084446",
+    "sha256": "f606103f967aff70f54fe43f099bce58b2d691ff7b4700dcfd53401109ea3c4d"
+  },
+  "engine\\README.md": {
+    "rel_path": "engine\\README.md",
+    "size": 9973,
+    "modified_at": "2026-08-04T20:34:18.084446",
+    "sha256": "467f6dc4cdc8d1f844e56986678e0ceddfecdfc1e2b81454fc7da0df0de2194f"
+  },
+  "engine\\.cargo\\config.toml": {
+    "rel_path": "engine\\.cargo\\config.toml",
+    "size": 44,
+    "modified_at": "2026-08-04T20:34:18.080937",
+    "sha256": "1f7fbefe3a9eaf0d0aa4b5a3e48fc03e655ac95b395178a3b9b4b4ec39a20544"
+  },
+  "engine\\src\\agent.rs": {
+    "rel_path": "engine\\src\\agent.rs",
+    "size": 4638,
+    "modified_at": "2026-08-04T20:34:18.085450",
+    "sha256": "9d8139bb5584d84094b4bddb61b3a07c4993a4b0c04aa7c808729b488f3377b2"
+  },
+  "engine\\src\\applet_manager.rs": {
+    "rel_path": "engine\\src\\applet_manager.rs",
+    "size": 11877,
+    "modified_at": "2026-08-04T20:34:18.085450",
+    "sha256": "516ac25e9f5cc6fa54c787004cc7ae712d7c5c2d19cc4e7a848520cfe62483fa"
+  },
+  "engine\\src\\applet_runner.rs": {
+    "rel_path": "engine\\src\\applet_runner.rs",
+    "size": 8596,
+    "modified_at": "2026-08-04T20:34:18.086450",
+    "sha256": "bee59218709eb137dd86e89bfa84e1a11d3a198fbdc25feae07243f7fb320e36"
+  },
+  "engine\\src\\ayesha.ico": {
+    "rel_path": "engine\\src\\ayesha.ico",
+    "size": 165537,
+    "modified_at": "2026-08-04T20:34:18.086450",
+    "sha256": "8c784727073d5c1714d44ef281100765c8e4aac4663aee720291557a0b1d4379"
+  },
+  "engine\\src\\cloud.rs": {
+    "rel_path": "engine\\src\\cloud.rs",
+    "size": 21908,
+    "modified_at": "2026-08-04T20:34:18.087451",
+    "sha256": "bcfea611654daef109b3432a698f41c060eec435f97e2f960ca764890a0b49c6"
+  },
+  "engine\\src\\coding_agent.rs": {
+    "rel_path": "engine\\src\\coding_agent.rs",
+    "size": 14688,
+    "modified_at": "2026-08-04T20:34:18.088450",
+    "sha256": "c218a0ccf8add91df9e589dd5a44bbe05b271592bd7bb59519d38c56903ff178"
+  },
+  "engine\\src\\completion.rs": {
+    "rel_path": "engine\\src\\completion.rs",
+    "size": 6384,
+    "modified_at": "2026-08-04T20:34:18.088450",
+    "sha256": "8da7de13dfc949b0cd5817388d889cecbf8a2e77d99f966126556f47f3b9fc00"
+  },
+  "engine\\src\\main.rs": {
+    "rel_path": "engine\\src\\main.rs",
+    "size": 79838,
+    "modified_at": "2026-08-04T20:34:18.089955",
+    "sha256": "da203e649fbe8abf67544d0702d83e9c42d1f7a796acc11fb4402a2e59f42218"
+  },
+  "engine\\src\\memory.rs": {
+    "rel_path": "engine\\src\\memory.rs",
+    "size": 3904,
+    "modified_at": "2026-08-04T20:34:18.089955",
+    "sha256": "3801eb892dbf838bb3715107e2430ef48bd4f82d6c949996384eaf3c651666c0"
+  },
+  "engine\\src\\model_registry.rs": {
+    "rel_path": "engine\\src\\model_registry.rs",
+    "size": 11168,
+    "modified_at": "2026-08-04T20:34:18.090958",
+    "sha256": "491ae4a9c2f58aba5a7529247942bddb963e99bf8a74466aa3298347970235a8"
+  },
+  "engine\\src\\ollama.rs": {
+    "rel_path": "engine\\src\\ollama.rs",
+    "size": 38739,
+    "modified_at": "2026-08-04T20:34:18.091957",
+    "sha256": "30196ec25542f08cfcc1fe030bc35a255c2b69bc7f18c9c7d7a6a10f922f01b0"
+  },
+  "engine\\src\\prompt_refinement.rs": {
+    "rel_path": "engine\\src\\prompt_refinement.rs",
+    "size": 5687,
+    "modified_at": "2026-08-04T20:34:18.096032",
+    "sha256": "a08c52e472a2b157353a22e39812a5dc8d8232f8e35e4597af9684c565319f7e"
+  },
+  "engine\\src\\sandbox.rs": {
+    "rel_path": "engine\\src\\sandbox.rs",
+    "size": 6411,
+    "modified_at": "2026-08-04T20:34:18.096426",
+    "sha256": "70cb87f3641db55b30dcc4510e4ac6034fbc568228d18e3a249d4339841944b6"
+  },
+  "engine\\src\\self_analysis.rs": {
+    "rel_path": "engine\\src\\self_analysis.rs",
+    "size": 5811,
+    "modified_at": "2026-08-04T20:34:18.096930",
+    "sha256": "c74be911a83c91946bde7e43399e3678b470093dd884cd801fc5b0335bca20f8"
+  },
+  "engine\\src\\tools.rs": {
+    "rel_path": "engine\\src\\tools.rs",
+    "size": 54763,
+    "modified_at": "2026-08-04T20:34:18.098119",
+    "sha256": "3416f79437fefe4df93aa4338d3162e925e4656af9190a1f7557cf0b9f523b45"
+  },
+  "engine\\src\\tool_evolution.rs": {
+    "rel_path": "engine\\src\\tool_evolution.rs",
+    "size": 4990,
+    "modified_at": "2026-08-04T20:34:18.097485",
+    "sha256": "a57f3f003bc3387865ea6a6ca674aab101a2ce0725cd65c3cf65b1cf2a1a4be2"
+  },
+  "engine\\src\\ui.rs": {
+    "rel_path": "engine\\src\\ui.rs",
+    "size": 18094,
+    "modified_at": "2026-08-04T20:34:18.099260",
+    "sha256": "72b783da24b778f421819c1c4c95c80ffa5a9e2d2f6b86ba35635366132e6ed3"
+  },
+  "engine\\src\\util.rs": {
+    "rel_path": "engine\\src\\util.rs",
+    "size": 1279,
+    "modified_at": "2026-08-04T20:34:18.099767",
+    "sha256": "d9b1ad73c45a9fea7d970903c2324e1cfa8b90bbc57d5f14f0043d6d30f5e7ee"
+  },
+  "engine\\src\\pixel_striker\\character.rs": {
+    "rel_path": "engine\\src\\pixel_striker\\character.rs",
+    "size": 5037,
+    "modified_at": "2026-08-04T20:34:18.092566",
+    "sha256": "dd9c50824d559b1414a5d1fa91f31750d05c11fbeae7421b9caef667beb103ca"
+  },
+  "engine\\src\\pixel_striker\\mod.rs": {
+    "rel_path": "engine\\src\\pixel_striker\\mod.rs",
+    "size": 92,
+    "modified_at": "2026-08-04T20:34:18.093085",
+    "sha256": "8f0a1b94acb794615e906535db7b9fada5004b2016272b6a64a9652a7b7daacb"
+  },
+  "engine\\src\\pixel_striker\\object.rs": {
+    "rel_path": "engine\\src\\pixel_striker\\object.rs",
+    "size": 424,
+    "modified_at": "2026-08-04T20:34:18.093645",
+    "sha256": "b038f4ea141d22d3d5600518c4e8662d61ec6bfc1e6812e351bcb13f38229d58"
+  },
+  "engine\\src\\pixel_striker\\palette.rs": {
+    "rel_path": "engine\\src\\pixel_striker\\palette.rs",
+    "size": 2345,
+    "modified_at": "2026-08-04T20:34:18.094113",
+    "sha256": "09cb508675b3f8ca36fe5048ca559d07e40a030116668cf80a893bb9064cfcff"
+  },
+  "engine\\src\\pixel_striker\\renderer.rs": {
+    "rel_path": "engine\\src\\pixel_striker\\renderer.rs",
+    "size": 8964,
+    "modified_at": "2026-08-04T20:34:18.094617",
+    "sha256": "a96a6c4476540a0b8feb08827ba16df2372c3c50a87c0dbe1979ec90fcdf6c2d"
+  },
+  "engine\\src\\pixel_striker\\tileset.rs": {
+    "rel_path": "engine\\src\\pixel_striker\\tileset.rs",
+    "size": 347,
+    "modified_at": "2026-08-04T20:34:18.095003",
+    "sha256": "2d5ae454305e9923fce07bb25252c0c138a77fec3eca1e59fcc99df63c844075"
+  },
+  "git_middleware\\auth.py": {
+    "rel_path": "git_middleware\\auth.py",
+    "size": 2142,
+    "modified_at": "2026-08-04T20:34:18.101344",
+    "sha256": "003b86ecaf3f61b4d5b018e0fe44b34df08b79e39aef2c1104f78f35bb1734ee"
+  },
+  "git_middleware\\config.json": {
+    "rel_path": "git_middleware\\config.json",
+    "size": 1446,
+    "modified_at": "2026-08-04T20:34:18.101884",
+    "sha256": "2dc9275ba0983ea95972b98bb408a7d12395d1af9bc3309350eaf48fdcb2f0cd"
+  },
+  "git_middleware\\main.py": {
+    "rel_path": "git_middleware\\main.py",
+    "size": 8370,
+    "modified_at": "2026-08-04T20:34:18.102404",
+    "sha256": "ae84f43856d658b4b740c11d06775a12fee1fe0852be9d0e9dc3e9845a29dcc8"
+  },
+  "git_middleware\\models.py": {
+    "rel_path": "git_middleware\\models.py",
+    "size": 1590,
+    "modified_at": "2026-08-04T20:34:18.102925",
+    "sha256": "06cef76d267f6681ec53f6a814ed67251139f3394d9064d50339466172a6ffa7"
+  },
+  "git_middleware\\requirements.txt": {
+    "rel_path": "git_middleware\\requirements.txt",
+    "size": 86,
+    "modified_at": "2026-08-04T20:34:18.103454",
+    "sha256": "e5c1a7460413ec4f56f1cf5f13eaa10627f281c451df642feab6e60f50fcec95"
+  },
+  "git_middleware\\router.py": {
+    "rel_path": "git_middleware\\router.py",
+    "size": 2432,
+    "modified_at": "2026-08-04T20:34:18.104123",
+    "sha256": "b2d18680aad10bae1fcb30d6feb82645619ae3b650560b77ba438db84e300fbf"
+  },
+  "git_middleware\\tasks.py": {
+    "rel_path": "git_middleware\\tasks.py",
+    "size": 5175,
+    "modified_at": "2026-08-04T20:34:18.104123",
+    "sha256": "c139992103c6748b3954664f4840863763365677c7da97b4b662dc7fd94acff7"
+  },
+  "git_middleware\\webhook.py": {
+    "rel_path": "git_middleware\\webhook.py",
+    "size": 4745,
+    "modified_at": "2026-08-04T20:34:18.104123",
+    "sha256": "b7a34fcdd4934bba0af46d8fb6c09fd3ee3992492e3dd27cf76226aab354275a"
+  },
+  "git_middleware\\__init__.py": {
+    "rel_path": "git_middleware\\__init__.py",
+    "size": 58,
+    "modified_at": "2026-08-04T20:34:18.100818",
+    "sha256": "e401ba6c73a91545045db30b7427fe6611f63fa46a74175ec5bd7a77fb92a3ea"
+  },
+  "models\\Modelfile": {
+    "rel_path": "models\\Modelfile",
+    "size": 3036,
+    "modified_at": "2026-08-04T20:34:18.105127",
+    "sha256": "cc304e283c38cdbcc9345d6918c02da807754fa7db9e4eca35fa6fe624eac286"
+  },
+  "models\\README.md": {
+    "rel_path": "models\\README.md",
+    "size": 3153,
+    "modified_at": "2026-08-04T20:34:18.106126",
+    "sha256": "27dd8c14c419acff1a82065cd057d8c15a14f9d6b03ded48bedcb110c1615b0f"
+  },
+  "scripts\\automation_harness.py": {
+    "rel_path": "scripts\\automation_harness.py",
+    "size": 24056,
+    "modified_at": "2026-08-04T20:34:18.107126",
+    "sha256": "d7275b027530f4a964b913de59fc144e043eecbfdf30d09afab6a3a5aacb4aec"
+  },
+  "scripts\\build-exe.ps1": {
+    "rel_path": "scripts\\build-exe.ps1",
+    "size": 4549,
+    "modified_at": "2026-08-04T20:34:18.108126",
+    "sha256": "eb38917380a1658d49b55fd3a290ae02e2f91a95dc3d35e6ac70e07c2ae9ee2d"
+  },
+  "scripts\\launcher.py": {
+    "rel_path": "scripts\\launcher.py",
+    "size": 2923,
+    "modified_at": "2026-08-04T20:34:18.108126",
+    "sha256": "ffc660e29880ee6aa82e6181010a8e5b1756ed572fe41e9213ca6701bea563e6"
+  },
+  "scripts\\setup-cloud.ps1": {
+    "rel_path": "scripts\\setup-cloud.ps1",
+    "size": 7287,
+    "modified_at": "2026-08-04T20:34:18.109631",
+    "sha256": "cdc72f20df59084493def7fa0e14505f9cfaa516b3ba560f44d315eaab6b50b1"
+  },
+  "scripts\\space-app.py": {
+    "rel_path": "scripts\\space-app.py",
+    "size": 8852,
+    "modified_at": "2026-08-04T20:34:18.109631",
+    "sha256": "cb6c4c73aebc2e4d5d63d09fd2757015de9ceb08049bbd6c1405fa3be078d862"
+  },
+  "scripts\\sync-all.ps1": {
+    "rel_path": "scripts\\sync-all.ps1",
+    "size": 3627,
+    "modified_at": "2026-08-04T20:34:18.110637",
+    "sha256": "343721902d44c00a0c229d9c94f1bf2a3d2d0702468674dba9fdcd4fc952844f"
+  },
+  "tri_mind_sync\\cli.py": {
+    "rel_path": "tri_mind_sync\\cli.py",
+    "size": 3997,
+    "modified_at": "2026-08-04T20:34:18.111636",
+    "sha256": "fba7588e6b44239aa478d0707be668b35794ca11196e4f82209f860a887f0918"
+  },
+  "tri_mind_sync\\config.py": {
+    "rel_path": "tri_mind_sync\\config.py",
+    "size": 3898,
+    "modified_at": "2026-08-04T20:34:18.111636",
+    "sha256": "80c853a775c9acf826e90c218585c90fee60a36f6aa83f18a6aa92b47eb6f6e1"
+  },
+  "tri_mind_sync\\conflict.py": {
+    "rel_path": "tri_mind_sync\\conflict.py",
+    "size": 4980,
+    "modified_at": "2026-08-04T20:34:18.112636",
+    "sha256": "15765aed2bb080926502ebf64fe817b76c91205376b0648da20eca801ea66bdc"
+  },
+  "tri_mind_sync\\engine.py": {
+    "rel_path": "tri_mind_sync\\engine.py",
+    "size": 7322,
+    "modified_at": "2026-08-04T20:34:18.112636",
+    "sha256": "587edc5a28a43348c85098384533cfde21def3699dc0295d8c2de50c6de32123"
+  },
+  "tri_mind_sync\\github_sync.py": {
+    "rel_path": "tri_mind_sync\\github_sync.py",
+    "size": 7383,
+    "modified_at": "2026-08-04T20:34:18.114141",
+    "sha256": "372d8bb6a653d809685190ce197fa0f625b30a5f1b6631386226dc30f0536707"
+  },
+  "tri_mind_sync\\huggingface_sync.py": {
+    "rel_path": "tri_mind_sync\\huggingface_sync.py",
+    "size": 5284,
+    "modified_at": "2026-08-04T20:34:18.114141",
+    "sha256": "6f61cd432ae1bc13e4f52a9a0d795067d5f39a76af94f9b0bf62c0c044130bc3"
+  },
+  "tri_mind_sync\\local_sync.py": {
+    "rel_path": "tri_mind_sync\\local_sync.py",
+    "size": 5612,
+    "modified_at": "2026-08-04T20:34:18.115645",
+    "sha256": "169001449dde3ef0b2f58b22f898ae8fcb8f10fdad81d48f741f5bd77ffa243c"
+  },
+  "tri_mind_sync\\models.py": {
+    "rel_path": "tri_mind_sync\\models.py",
+    "size": 3060,
+    "modified_at": "2026-08-04T20:34:18.115645",
+    "sha256": "821e797cf51df848aa70009000ed154ace2917c2384d9ebb834d44c38e5f6d43"
+  },
+  "tri_mind_sync\\requirements.txt": {
+    "rel_path": "tri_mind_sync\\requirements.txt",
+    "size": 79,
+    "modified_at": "2026-08-04T20:34:18.115645",
+    "sha256": "f79a9616367158ea46945cf0c09745a4dc84c7746420ff69c1b94c702e7c5083"
+  },
+  "tri_mind_sync\\__init__.py": {
+    "rel_path": "tri_mind_sync\\__init__.py",
+    "size": 232,
+    "modified_at": "2026-08-04T20:34:18.110637",
+    "sha256": "73520db6d5d761ad0393a39038be5797519d2c9ccdb442397abdba16ace95923"
+  }
+}

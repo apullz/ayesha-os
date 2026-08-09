@@ -31,6 +31,7 @@ const BANNER_LINES: &[&str] = &[
 ];
 
 pub fn print_banner() {
+    // keep the classic rainbow logo, then theme the info lines below it
     let colors: &[Color] = &[
         Color::BrightRed,
         Color::BrightYellow,
@@ -49,10 +50,10 @@ pub fn print_banner() {
         "◆".bright_green(),
         "ayesha-os v4.5.0".bright_cyan());
     println!("  {} {}",
-        "  system online".bright_black(),
-        "(๑蔷๑)".bright_magenta());
+        theme::paint(Role::Dim, "  system online"),
+        theme::paint(Role::Accent, "(๑蔷๑)"));
     println!("  {}",
-        "──────────────────────────────────────────────".bright_black());
+        theme::paint(Role::Dim, "──────────────────────────────────────────────"));
     println!();
 }
 
