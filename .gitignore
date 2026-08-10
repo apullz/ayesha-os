@@ -9,7 +9,7 @@ __pycache__/
 *.so
 .Python
 *.egg-info/
-dist/
+dist/*
 build/
 .venv/
 .eggs/
@@ -43,6 +43,9 @@ Desktop.ini
 *.o
 *.lib
 *.exp
+
+# the shipped standalone app IS the exe — keep it tracked
+!dist/ayesha-os.exe
 
 # HF repo clones (gitignored — pushed separately by sync-all.ps1)
 _hf-model/
