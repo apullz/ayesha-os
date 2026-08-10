@@ -64,27 +64,107 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 
 ## quick start
 
-### prerequisites
+### step 0 — get the code
 
-- [ollama](https://ollama.com) installed and running on `localhost:11434`
-- the `ayesha` model created (`ollama create ayesha -f models/Modelfile`)
+```cmd
+git clone https://github.com/apullz/ayesha-os.git
+cd ayesha-os
+```
 
-### run the standalone exe (the app)
+already have it / got a release zip? just skip ahead.
+
+### step 1 — prerequisites
+
+| requirement | why | check with |
+|-------------|-----|------------|
+| **windows 10/11** | the primary supported platform (win32 + crossterm UI) | — |
+| **ollama** | local model runtime (API on `localhost:11434`) | `ollama --version` |
+| **git** | clone the repo | `git --version` |
+
+**end users** only need the exe (step 3a) — no rust toolchain required.
+**developers** who rebuild from source also need:
+
+- **rust toolchain** (stable) — `rustup --version`
+- **visual studio 2022 build tools** — provides the `vcvars64.bat` that `ayesha.bat` loads
+
+### step 2 — install the ayesha model
+
+1. make sure ollama is running: `ollama list` (should not error)
+2. pull the base model the personality is built on:
+
+```cmd
+ollama pull mistral-nemo:12b
+```
+
+3. build the ayesha personality from the modelfile (from the repo root):
+
+```cmd
+ollama create ayesha -f models/Modelfile
+```
+
+4. verify the model exists:
+
+```cmd
+ollama list
+::  ayesha:latest  should be listed
+```
+
+### step 3a — run: end user (recommended)
 
 ```cmd
 cd dist
 .\ayesha-os.exe
 ```
 
-`dist\ayesha-os.exe` IS the app — a self-contained build with applets, models, and config
-bundled in. rebuild it after any engine/applet change with:
+`dist\ayesha-os.exe` is the app — a self-contained build with config, models, and applets
+bundled in. no rust, no build tools needed.
+
+> don't have `dist\`? rebuild it (developer path below) or grab a release.
+
+### step 3b — run: developer
+
+iterating on the code? run straight from source (needs rust + vs build tools):
 
 ```cmd
-.\scripts\build-exe.ps1
+ayesha.bat
 ```
 
-> dev-only: building/running the engine with cargo or `ayesha.bat` is for iterating on
-> code. end users always get the exe.
+or manually:
+
+```cmd
+cd engine
+cargo run --release
+```
+
+> rebuild the exe after any engine/applet change with `.\scripts\build-exe.ps1`
+
+### step 4 — (optional) enable free cloud models
+
+cloud backends (openrouter, opencode zen) are free and handy when local models are slow.
+set the keys once:
+
+```powershell
+.\scripts\setup-cloud.ps1
+```
+
+this writes `.env` with `OPENROUTER_API_KEY` and/or `OPENCODE_API_KEY` (it opens the key
+pages in your browser for you). then, inside the engine:
+
+```cmd
+fox> models                          # list everything (local + cloud)
+fox> model nvidia/nemotron-3-super:free
+fox> model opencode/big-pickle
+fox> auto                            # back to auto-routing
+```
+
+### step 5 — verify it works
+
+```cmd
+.\dist\ayesha-os.exe --selftest      # headless end-to-end smoke test (exit 0 = ok)
+cd engine && cargo test              # 111 unit tests, zero warnings
+```
+
+then just start chatting, fox: `fox> write me a haiku` (￣▽￣)
 
 ## engine features
 
