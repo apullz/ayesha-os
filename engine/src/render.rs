@@ -20,6 +20,7 @@ use crate::syntax;
 pub struct CodeStream {
     buf: String,
     in_fence: bool,
+    fence_lang: Option<String>,
 }
 
 impl CodeStream {
@@ -78,7 +79,7 @@ impl CodeStream {
 
         for &i in &line_ends {
             let line = &self.buf[consumed..i];
-            let rendered = Self::handle_line(line, &mut self.in_fence);
+            let rendered = Self::handle_line(line, &mut self.in_fence, &mut self.fence_lang);
             if !rendered.is_empty() {
                 out.push_str(&rendered);
                 out.push('\n');
@@ -92,11 +93,21 @@ impl CodeStream {
         out
     }
 
-    fn handle_line(line: &str, in_fence: &mut bool) -> String {
+    fn handle_line(line: &str, in_fence: &mut bool, fence_lang: &mut Option<String>) -> String {
         let trimmed = line.trim_start();
 
         if trimmed.starts_with("```") {
+            let opening = !*in_fence;
             *in_fence = !*in_fence;
+            if opening {
+                let lang = trimmed[3..].trim().to_string();
+                *fence_lang = if lang.is_empty() { None } else { Some(lang.clone()) };
+                if !lang.is_empty() {
+                    return paint_code_header(&lang);
+                }
+            } else {
+                *fence_lang = None;
+            }
             return String::new();
         }
 
@@ -108,14 +119,55 @@ impl CodeStream {
     }
 }
 
-/// Paint a single code line: dim gutter + syntax-highlighted text on the
-/// theme's code background.
+/// Solid code-panel width for fenced blocks (opencode-style).
+const CODE_PANEL_WIDTH: usize = 80;
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            while let Some(n) = chars.next() {
+                if n == 'm' {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn visible_len(s: &str) -> usize {
+    strip_ansi(s).chars().count()
+}
+
+/// Paint a single code line: dim gutter + syntax-highlighted text on a solid
+/// code-background panel.
 fn paint_code_line(line: &str) -> String {
-    use colored::Colorize;
-    let highlighted = syntax::highlight_line(line);
-    let bg = theme::get().color(Role::CodeBg);
+    let truncated: String = if line.chars().count() > CODE_PANEL_WIDTH {
+        let mut s: String = line.chars().take(CODE_PANEL_WIDTH - 3).collect();
+        s.push_str("...");
+        s
+    } else {
+        line.to_string()
+    };
+    let highlighted = syntax::highlight_line(&truncated);
+    let pad = CODE_PANEL_WIDTH.saturating_sub(visible_len(&highlighted));
+    let padded = format!("{highlighted}{}", " ".repeat(pad));
     let gutter = theme::paint(Role::Dim, "▐");
-    format!("  {gutter} {}", highlighted.on_color(bg))
+    format!("  {gutter} {}", theme::bg_fill(Role::CodeBg, padded))
+}
+
+/// opencode-style code block header: the language name on the panel, followed
+/// by a dim rule.
+fn paint_code_header(lang: &str) -> String {
+    let title = format!("{} ", theme::bold(Role::Secondary, lang));
+    let pad = CODE_PANEL_WIDTH.saturating_sub(lang.chars().count() + 1);
+    let dashes = theme::paint(Role::Dim, "─".repeat(pad));
+    let gutter = theme::paint(Role::Dim, "▐");
+    format!("  {gutter} {}", theme::bg_fill(Role::CodeBg, format!("{title}{dashes}")))
 }
 
 /// Tint inline `` `code` `` spans in a prose line with the inline-code token
@@ -177,6 +229,7 @@ mod tests {
 
     fn set_monokai() {
         colored::control::set_override(true);
+        std::env::set_var("COLORTERM", "truecolor");
         theme::set_active(theme::preset("monokai++").unwrap());
     }
 
@@ -200,6 +253,8 @@ mod tests {
         // fence markers hidden, code lines kept with gutter + bg
         assert!(plain.contains("fn main() {"));
         assert!(plain.contains("▐"));
+        // language header rendered on the panel
+        assert!(plain.contains("rust"));
         // syntax-colored tokens (fg + bg escape sequences present)
         assert!(out.contains("\u{1b}["));
         let distinct = out.matches("\u{1b}[").count();
@@ -211,10 +266,8 @@ mod tests {
     fn fence_split_across_chunks() {
         let mut s = CodeStream::new();
         assert_eq!(s.feed("here is code:\n```"), "here is code:\n");
-        assert_eq!(
-            strip_ansi(&s.feed("rust\nx = 1\n```\n")),
-            "  ▐ x = 1\n"
-        );
+        let plain = strip_ansi(&s.feed("rust\nx = 1\n```\n"));
+        assert!(plain.contains("  ▐ x = 1"), "missing code line: {plain:?}");
     }
 
     #[test]

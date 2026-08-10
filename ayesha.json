@@ -52,7 +52,7 @@
     "name": "monokai++",
     "palette": {
       "background": "#221F22",
-      "surface": "#19181A",
+      "surface": "#262226",
       "text": "#FCFCFA",
       "primary": "#FF6188",
       "accent": "#FF6188",
@@ -62,7 +62,7 @@
       "error": "#FF5F5F",
       "dim": "#6C696E",
       "border": "#454147",
-      "code_bg": "#2D2A2E"
+      "code_bg": "#353238"
     }
   },
   "projects": {

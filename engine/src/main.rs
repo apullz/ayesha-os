@@ -21,6 +21,7 @@ mod theme;
 mod syntax;
 mod render;
 mod session;
+mod vision;
 
 use std::io::Write;
 use theme::Role;
@@ -45,7 +46,7 @@ enum ActiveBackend {
 /// Build the system prompt for a user, appending the skills hint if any
 /// skills are installed in the project's skills/ folder.
 fn build_system_prompt(user_name: &str, project_root: &std::path::Path) -> String {
-    let mut prompt = OllamaClient::system_prompt(user_name);
+    let mut prompt = OllamaClient::system_prompt(user_name, &project_root.to_string_lossy());
     if let Some(hint) = skills::system_prompt_hint(project_root) {
         prompt.push_str(&hint);
     }
@@ -55,6 +56,46 @@ fn build_system_prompt(user_name: &str, project_root: &std::path::Path) -> Strin
 /// Heuristic: does this user message likely need tool calls?
 fn might_need_tools(msg: &str) -> bool {
     agent::needs_tools(msg)
+}
+
+/// Run a vision query across the model chain (user-selected → cloudflare →
+/// gpt-4o) until one succeeds. Returns a steering message if the user
+/// interrupted mid-stream.
+async fn run_vision(
+    registry: &ModelRegistry,
+    vision_model: &str,
+    data_uri: &str,
+    label: &str,
+    question: &str,
+    steer_rx: &std::sync::mpsc::Receiver<String>,
+) -> Option<String> {
+    ui::show_system(&format!("seeing '{}' with {}", label, vision_model));
+
+    let mut chain: Vec<(String, String)> = Vec::new();
+    let vp = registry
+        .cloud_provider(vision_model)
+        .unwrap_or_else(|| "ollama".to_string());
+    chain.push((vision_model.to_string(), vp));
+    for (m, p) in vision::DEFAULT_FALLBACKS.iter().copied() {
+        if !chain.iter().any(|(cm, _)| cm == m) {
+            chain.push((m.to_string(), p.to_string()));
+        }
+    }
+
+    let prompt = vision::describe_prompt(question);
+    for (model, provider) in &chain {
+        let attempt = format!("{} ({})", model, provider);
+        let result = if provider == "ollama" {
+            vision::describe_ollama(model, data_uri, &prompt, steer_rx).await
+        } else {
+            vision::describe_cloud(model, provider, data_uri, &prompt, steer_rx).await
+        };
+        match result {
+            Ok(r) => return r.steering,
+            Err(e) => ui::show_error(&format!("vision via {} failed: {}", attempt, e)),
+        }
+    }
+    None
 }
 
 /// Truncate tool results to prevent context overflow
@@ -394,6 +435,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     winapi::init_console();
+    theme::force_truecolor();
     theme::apply_no_color();
     theme::load_from_config(None);
 
@@ -401,9 +443,32 @@ async fn main() -> anyhow::Result<()> {
     let sandbox = Sandbox::default_workspace();
     let mut manager = AppletManager::new();
     let executor = ToolExecutor::new(sandbox);
-    let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
-    let mut tool_client = ActiveBackend::Ollama(OllamaClient::new("qwen2.5:7b"));
-    let mut tool_model_name = "qwen2.5:7b".to_string();
+    let mut current_model = "opencode/big-pickle".to_string();
+    let fallback_model = "nvidia/nemotron-3-super-120b-a12b:free";
+    let mut client = match CloudClient::new("opencode/big-pickle", "opencode") {
+        Ok(cc) => ActiveBackend::Cloud(cc),
+        Err(_) => match CloudClient::new(fallback_model, "openrouter") {
+            Ok(cc) => {
+                current_model = fallback_model.to_string();
+                ActiveBackend::Cloud(cc)
+            }
+            Err(_) => {
+                current_model = "ayesha".to_string();
+                ActiveBackend::Ollama(OllamaClient::new("ayesha"))
+            }
+        },
+    };
+    let mut tool_client = match CloudClient::new("opencode/big-pickle", "opencode") {
+        Ok(cc) => ActiveBackend::Cloud(cc),
+        Err(_) => match CloudClient::new(fallback_model, "openrouter") {
+            Ok(cc) => ActiveBackend::Cloud(cc),
+            Err(_) => ActiveBackend::Ollama(OllamaClient::new("qwen2.5:7b")),
+        },
+    };
+    let mut tool_model_name = match &tool_client {
+        ActiveBackend::Cloud(c) => c.model.clone(),
+        ActiveBackend::Ollama(_) => "qwen2.5:7b".to_string(),
+    };
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
 
@@ -472,6 +537,41 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    let mut messages: Vec<ChatMessage> = vec![
+        ChatMessage {
+            role: "system".to_string(),
+            content: build_system_prompt(&user_name, &project_root),
+            tool_calls: None,
+            tool_call_id: None,
+        },
+    ];
+
+    // Resume last session? (config: "resume_prompt": false to disable the prompt)
+    // Must run in cooked mode, BEFORE raw mode is enabled and BEFORE the input
+    // thread starts. In raw mode Enter arrives as \r (never \n), so read_line()
+    // blocks forever, and the input thread races us for the console anyway.
+    if config.get("resume_prompt").and_then(|v| v.as_bool()).unwrap_or(true)
+        && session::session_exists(&project_root, session::DEFAULT_SESSION)
+    {
+        print!("  {} {} ",
+            theme::bold(Role::Primary, "⟲"),
+            theme::paint(Role::Text, "resume last session? (y/n)"));
+        std::io::stdout().flush()?;
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        let answer = answer.trim().to_lowercase();
+        if answer == "y" || answer == "yes" {
+            match session::load_session(&project_root, session::DEFAULT_SESSION) {
+                Ok(saved) => {
+                    let n = saved.len().saturating_sub(1);
+                    messages.extend(saved.into_iter().skip(1));
+                    ui::show_system(&format!("resumed last session ({} messages)", n));
+                }
+                Err(e) => ui::show_error(&format!("failed to resume session: {}", e)),
+            }
+        }
+    }
+
     // Enable raw mode for Ctrl+M detection
     let _ = crossterm::terminal::enable_raw_mode();
 
@@ -498,46 +598,15 @@ async fn main() -> anyhow::Result<()> {
     ui::print_banner();
     ui::show_system(&memory.summary());
 
-    let mut messages: Vec<ChatMessage> = vec![
-        ChatMessage {
-            role: "system".to_string(),
-            content: build_system_prompt(&user_name, &project_root),
-            tool_calls: None,
-            tool_call_id: None,
-        },
-    ];
-
-    // Resume last session? (config: "resume_prompt": false to disable the prompt)
-    if config.get("resume_prompt").and_then(|v| v.as_bool()).unwrap_or(true)
-        && session::session_exists(&project_root, session::DEFAULT_SESSION)
-    {
-        print!("  {} {} ",
-            theme::bold(Role::Primary, "⟲"),
-            theme::paint(Role::Text, "resume last session? (y/n)"));
-        std::io::stdout().flush()?;
-        let mut answer = String::new();
-        std::io::stdin().read_line(&mut answer)?;
-        let answer = answer.trim().to_lowercase();
-        if answer == "y" || answer == "yes" {
-            match session::load_session(&project_root, session::DEFAULT_SESSION) {
-                Ok(saved) => {
-                    let n = saved.len().saturating_sub(1);
-                    messages.extend(saved.into_iter().skip(1));
-                    ui::show_system(&format!("resumed last session ({} messages)", n));
-                }
-                Err(e) => ui::show_error(&format!("failed to resume session: {}", e)),
-            }
-        }
-    }
-
     let tools = OllamaClient::tool_definitions_core();
-    let mut current_model = "ayesha:latest".to_string();
+    let mut vision_model = "llama3.2-vision".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
-    // Warm up ollama — preload both models into memory so first user interaction is fast.
-    // Runs off the boot path: the prompt appears instantly while models preload in the
-    // background. Set "boot_warmup": false in config.json to disable entirely.
-    if config.get("boot_warmup").and_then(|v| v.as_bool()).unwrap_or(true) {
+    // Warm up ollama — preload local models into memory so first interaction is
+    // fast. Skipped when the default model is cloud (big pickle), which has no
+    // local preload. Set "boot_warmup": false in config.json to disable entirely.
+    let default_is_local = !registry.is_cloud_model(&current_model);
+    if default_is_local && config.get("boot_warmup").and_then(|v| v.as_bool()).unwrap_or(true) {
         let tool_model = tool_model_name.clone();
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
@@ -581,13 +650,16 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Pin status bar + input prompt to the bottom of the screen, opencode-style.
+    ui::dock_init(&format!("{} | tool: {}", current_model, tool_model_name));
+
     loop {
         // ── read user input ──
         let input = if let Some(p) = pending_input.take() {
             p
         } else {
             match input_mode {
-                InputMode::Normal => ui::prompt_line(),
+                InputMode::Normal => ui::dock_prompt(),
                 InputMode::AppletMenu => ui::menu_prompt(),
             }
             let inp = match steer_rx.recv() {
@@ -598,13 +670,16 @@ async fn main() -> anyhow::Result<()> {
                 if matches!(input_mode, InputMode::AppletMenu) {
                     menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
                     input_mode = InputMode::Normal;
-                    let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
-                    let _ = std::io::stdout().flush();
+                    ui::popup_leave();
                 }
                 continue;
             }
             inp
         };
+
+        // All output this turn (slash commands, user card, model stream)
+        // renders inside the docked region, above the pinned prompt.
+        ui::dock_submit_goto();
 
         // ── control keys (work from normal input and steering interrupts) ──
         // Ctrl+C → exit (graceful: save memory, stop applets, release raw mode)
@@ -629,11 +704,10 @@ async fn main() -> anyhow::Result<()> {
             // Drain stale keystrokes queued before the menu opened
             while steer_rx.try_recv().is_ok() {}
             menu_flag.store(true, std::sync::atomic::Ordering::Relaxed);
-            // Save cursor once before the menu; each redraw restores to this point.
-            let _ = write!(std::io::stdout(), "\x1B[s");
-            let (rendered, _line_count) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
-            let _ = write!(std::io::stdout(), "{}", rendered);
-            let _ = std::io::stdout().flush();
+            // Draw the menu on a clean alternate-screen popup, centered.
+            ui::popup_enter();
+            let (rendered, line_count) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+            ui::draw_popup_centered(&rendered, line_count);
 
             // Inner menu loop
             let mut selected: Option<String> = None;
@@ -645,15 +719,14 @@ async fn main() -> anyhow::Result<()> {
                 match menu_input.as_str() {
                     "\0ctrl-c" => {
                         menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
+                        ui::popup_leave();
                         graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
                         return Ok(());
                     }
                     "\0menu-up" => {
                         menu_idx = menu_idx.saturating_sub(1);
-                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
-                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
-                        let _ = write!(std::io::stdout(), "{}", rendered);
-                        let _ = std::io::stdout().flush();
+                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        ui::draw_popup_centered(&rendered, lc);
                     }
                     "\0menu-down" => {
                         let filtered_len = menu_pages.iter().filter(|(n, d, _, _)| {
@@ -663,18 +736,14 @@ async fn main() -> anyhow::Result<()> {
                         if filtered_len > 0 && menu_idx + 1 < filtered_len {
                             menu_idx += 1;
                         }
-                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
-                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
-                        let _ = write!(std::io::stdout(), "{}", rendered);
-                        let _ = std::io::stdout().flush();
+                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        ui::draw_popup_centered(&rendered, lc);
                     }
                     "\0menu-backspace" => {
                         menu_filter.pop();
                         menu_idx = 0;
-                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
-                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
-                        let _ = write!(std::io::stdout(), "{}", rendered);
-                        let _ = std::io::stdout().flush();
+                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        ui::draw_popup_centered(&rendered, lc);
                     }
                     "\0menu-esc" => {
                         break;
@@ -718,24 +787,50 @@ async fn main() -> anyhow::Result<()> {
                             }
                             menu_idx = 0;
                         }
-                        let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
-                        let (rendered, _lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
-                        let _ = write!(std::io::stdout(), "{}", rendered);
-                        let _ = std::io::stdout().flush();
+                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        ui::draw_popup_centered(&rendered, lc);
                     }
                     _ => {}
                 }
             }
 
-            // Exit menu: clear region and switch off
+            // Exit menu: leave the popup screen and switch off
             menu_flag.store(false, std::sync::atomic::Ordering::Relaxed);
-            let _ = write!(std::io::stdout(), "\x1B[u\x1B[J");
-            let _ = std::io::stdout().flush();
+            ui::popup_leave();
             input_mode = InputMode::Normal;
 
             // If Enter selected something, take action
             if let Some(name) = selected {
                 switch_applet_page(&mut manager, &name, &steer_tx, &steer_rx, &mut input_flag, &menu_flag);
+            }
+            continue;
+        }
+
+        // Ctrl+V → see what's on the clipboard (image or copied image file)
+        if input == "\0paste-vision" || input.starts_with("\0paste-vision:") {
+            let data_uri: Option<(String, String)> = if let Some(p) = input.strip_prefix("\0paste-vision:") {
+                vision::image_data_uri(&std::path::PathBuf::from(p))
+                    .ok()
+                    .map(|u| (u, p.to_string()))
+            } else if let Some(uri) = vision::clipboard_image_data_uri() {
+                Some((uri, "clipboard".to_string()))
+            } else {
+                // clipboard text that is a path to an image file
+                let text = arboard::Clipboard::new()
+                    .ok()
+                    .and_then(|mut cb| cb.get_text().ok())
+                    .unwrap_or_default();
+                vision::resolve_path(&text)
+                    .and_then(|p| vision::image_data_uri(&p).ok().map(|u| (u, p.display().to_string())))
+            };
+
+            match data_uri {
+                Some((uri, label)) => {
+                    if let Some(steer) = run_vision(&registry, &vision_model, &uri, &label, "", &steer_rx).await {
+                        pending_input = Some(steer);
+                    }
+                }
+                None => ui::show_system("no image in clipboard — copy an image file or take a screenshot (win+shift+s), then ctrl+v"),
             }
             continue;
         }
@@ -792,6 +887,7 @@ async fn main() -> anyhow::Result<()> {
             "clear" | "cls" => {
                 print!("\x1B[2J\x1B[1;1H");
                 std::io::stdout().flush()?;
+                ui::dock_redraw_bottom();
                 continue;
             }
             "reset" => {
@@ -903,8 +999,11 @@ async fn main() -> anyhow::Result<()> {
                                 Err(e) => {
                                     ui::show_error(&format!("cloud setup failed: {}. run .\\scripts\\setup-cloud.ps1", e));
                                     // Revert to default
-                                    current_model = "ayesha".to_string();
-                                    client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
+                                    current_model = "opencode/big-pickle".to_string();
+                                    client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                                        Ok(cc) => ActiveBackend::Cloud(cc),
+                                        Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                                    };
                                 }
                             }
                         } else {
@@ -915,6 +1014,7 @@ async fn main() -> anyhow::Result<()> {
                     Err(e) => ui::show_error(&e.to_string()),
                 }
                 registry.detect().await;
+                ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
                 continue;
             }
             _ if lower.starts_with("toolmodel ") || lower == "toolmodel" => {
@@ -936,11 +1036,76 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     ui::show_error(&format!("model '{}' not found. use 'models' to list available models", name));
                 }
+                ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
                 continue;
             }
             _ if lower.starts_with("pull ") || lower == "pull" => {
                 let name = input.get(5..).unwrap_or("").trim();
                 ui::show_system(&format!("run `ollama pull {}` in another terminal, then `models` to refresh", name));
+                continue;
+            }
+            _ if lower == "visionmodels" => {
+                let mut names: Vec<String> = registry.models.iter()
+                    .filter(|m| m.capabilities.contains(&model_registry::Capability::Vision))
+                    .map(|m| m.name.clone())
+                    .collect();
+                names.sort();
+                println!("\n  {}  (current: {})", theme::bold(Role::Accent, "vision models"), vision_model);
+                for n in names {
+                    let arrow = if n == vision_model { " << active" } else { "" };
+                    println!("  {:<45}{}", n, arrow);
+                }
+                println!();
+                continue;
+            }
+            _ if lower.starts_with("visionmodel ") || lower == "visionmodel" => {
+                let name = input.get(12..).unwrap_or("").trim();
+                if name.is_empty() {
+                    ui::show_system(&format!("vision model: {}", vision_model));
+                } else {
+                    vision_model = name.to_string();
+                    ui::show_system(&format!("vision model set to: {}", vision_model));
+                }
+                continue;
+            }
+            _ if lower.starts_with("vision") => {
+                // /vision [path|--latest] [question...]
+                let rest = input.get(7..).unwrap_or("").trim();
+                let (path_arg, question) = if rest.is_empty() {
+                    (String::new(), String::new())
+                } else {
+                    let mut parts = rest.splitn(2, ' ');
+                    let p = parts.next().unwrap_or("").trim().to_string();
+                    (p, parts.next().unwrap_or("").trim().to_string())
+                };
+
+                let path = if path_arg.is_empty() || path_arg == "--latest" {
+                    match vision::latest_screenshot() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            ui::show_error(&e.to_string());
+                            continue;
+                        }
+                    }
+                } else {
+                    std::path::PathBuf::from(&path_arg)
+                };
+
+                if !path.exists() {
+                    ui::show_error(&format!("image not found: {}", path.display()));
+                    continue;
+                }
+
+                let data_uri = match vision::image_data_uri(&path) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        ui::show_error(&e.to_string());
+                        continue;
+                    }
+                };
+                if let Some(steer) = run_vision(&registry, &vision_model, &data_uri, &path.display().to_string(), &question, &steer_rx).await {
+                    pending_input = Some(steer);
+                }
                 continue;
             }
             _ if lower.starts_with("name ") || lower == "name" => {
@@ -1389,11 +1554,15 @@ async fn main() -> anyhow::Result<()> {
                     let provider = registry.cloud_provider(&current_model).unwrap_or_default();
                     match CloudClient::new(&current_model, &provider) {
                         Ok(cc) => client = ActiveBackend::Cloud(cc),
-                        Err(_) => client = ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                        Err(_) => client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                            Ok(cc) => ActiveBackend::Cloud(cc),
+                            Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                        },
                     }
                 } else {
                     client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
                 }
+                ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
             }
             query
         } else {
@@ -1406,11 +1575,15 @@ async fn main() -> anyhow::Result<()> {
             if target.name != current_model {
                 ui::show_routing(&target.name);
                 current_model = target.name.clone();
+                ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
                 if registry.is_cloud_model(&current_model) {
                     let provider = registry.cloud_provider(&current_model).unwrap_or_default();
                     match CloudClient::new(&current_model, &provider) {
                         Ok(cc) => client = ActiveBackend::Cloud(cc),
-                        Err(_) => client = ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                        Err(_) => client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                            Ok(cc) => ActiveBackend::Cloud(cc),
+                            Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                        },
                     }
                 } else {
                     client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
@@ -1434,9 +1607,9 @@ async fn main() -> anyhow::Result<()> {
 
         let mut steer_happened = false;
 
-        // Step 1: Call ayesha (no tools) for personality response
+        // Step 1: Call ayesha WITH tools — she's a real agent and can act directly
         let first_result = client
-            .chat_stream_visible(&messages, None, &steer_rx)
+            .chat_stream_visible(&messages, Some(&tools), &steer_rx)
             .await;
 
         let first_result = match first_result {
@@ -1531,7 +1704,7 @@ async fn main() -> anyhow::Result<()> {
 
             // Get final ayesha response after tool execution
             let final_result = client
-                .chat_stream_visible(&messages, None, &steer_rx)
+                .chat_stream_visible(&messages, Some(&tools), &steer_rx)
                 .await;
 
             if let Ok(r) = final_result {
@@ -1793,7 +1966,7 @@ async fn main() -> anyhow::Result<()> {
                     // Final response from ayesha
                     if !steer_happened {
                         let final_result = client
-                            .chat_stream_visible(&messages, None, &steer_rx)
+                            .chat_stream_visible(&messages, Some(&tools), &steer_rx)
                             .await;
 
                         if let Ok(r) = final_result {

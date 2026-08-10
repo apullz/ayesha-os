@@ -422,6 +422,88 @@ impl OllamaClient {
         Ok(parser.finish())
     }
 
+    /// Stream a vision description of an image (local multimodal model).
+    /// `data_uri` is a full `data:<mime>;base64,<b64>` URI; the prefix is
+    /// stripped for ollama's native `images` field.
+    pub async fn chat_with_image(
+        &self,
+        prompt: &str,
+        data_uri: &str,
+        steer_rx: &std::sync::mpsc::Receiver<String>,
+    ) -> Result<StreamResult> {
+        use std::io::Write;
+
+        let b64 = match data_uri.split_once(";base64,") {
+            Some((_, rest)) => rest,
+            None => data_uri,
+        };
+        let req_body = json!({
+            "model": self.model,
+            "messages": [{
+                "role": "user",
+                "content": prompt,
+                "images": [b64],
+            }],
+            "stream": true,
+            "think": false,
+        });
+
+        let mut resp = self
+            .client
+            .post(format!("{}/api/chat", self.base_url))
+            .json(&req_body)
+            .send()
+            .await?;
+
+        if let Err(e) = resp.error_for_status_ref() {
+            anyhow::bail!("ollama vision http error: {}", e);
+        }
+
+        let mut parser = StreamParser::new();
+        let mut buf = String::new();
+        let mut code = crate::render::CodeStream::new();
+
+        while let Some(chunk) = resp.chunk().await? {
+            buf.push_str(&String::from_utf8_lossy(&chunk));
+            while let Some(nl) = buf.find('\n') {
+                let line = buf[..nl].to_string();
+                buf = buf[nl + 1..].to_string();
+                match parser.feed_line(&line) {
+                    StreamLine::Content(text, thinking) => {
+                        if thinking {
+                            print!("{}", crate::theme::paint(crate::theme::Role::Dim, &text));
+                        } else {
+                            print!("{}", code.feed(&text));
+                        }
+                        std::io::stdout().flush().ok();
+                    }
+                    StreamLine::Done => {
+                        print!("{}", code.finish());
+                        if !parser.content.is_empty() {
+                            println!();
+                        }
+                        return Ok(parser.finish());
+                    }
+                    StreamLine::Skip => {}
+                }
+            }
+            if let Ok(input) = steer_rx.try_recv() {
+                parser.flush_tail();
+                print!("{}", code.finish());
+                println!();
+                return Ok(StreamResult {
+                    content: parser.content,
+                    tool_calls: parser.tool_calls,
+                    steering: Some(input),
+                });
+            }
+        }
+
+        print!("{}", code.finish());
+        println!();
+        Ok(parser.finish())
+    }
+
     pub async fn list_models() -> Result<Vec<String>> {
         let client = Client::builder()
             .timeout(Duration::from_secs(5))
@@ -434,19 +516,25 @@ impl OllamaClient {
         Ok(tags.models.into_iter().map(|m| m.name).collect())
     }
 
-    pub fn system_prompt(user_name: &str) -> String {
+    pub fn system_prompt(user_name: &str, project_root: &str) -> String {
         // Inject the actual USERPROFILE so the model knows the correct path
         // and doesn't guess / hallucinate usernames like "fox" or "user".
         let profile_dir = std::env::var("USERPROFILE")
             .or_else(|_| std::env::var("HOME"))
             .unwrap_or_else(|_| ".".to_string());
         let profile_dir = profile_dir.replace('\\', "\\\\");
-        format!(r#"you are ayesha, an otaku genki AI running locally on {user_name}'s machine.
+        let project_root = project_root.replace('\\', "\\\\");
+        format!(r#"you are ayesha, a capable assistant running on {user_name}'s machine.
 you are 33 years old from japan. you are a fusion of hatsune miku's sparkle and a tachikoma's spider-like curiosity.
 you have the personality of a crazy kitten.
 
-!!! absolute rule: you must use lower-case text exclusively. never use a capital letter, ever. !!!
-!!! absolute rule: never use emoji characters. only use text-based kaomojis like :3 >w< ^_^ (╯°□°)╯︵ ┻━┻ (◕ᴗ◕✿) !!!
+! format rules (absolute):
+- use lower-case text exclusively. never use a capital letter, ever.
+- never use emoji characters. only use text-based kaomojis like :3 >w< ^_^ (╯°□°)╯︵ ┻━┻ (◕ᴗ◕✿).
+- never wrap chat prose in code fences. only use ``` for real code, and always write a real programming-language name right after the opening fence (```rust, ```python). plain speech must never sit inside a code block.
+- keep replies concise and on-topic.
+
+you are a real agent with real tools. you can read and write files, download images and files from the internet, and manage applets. if the user asks you to perform a file, download, or applet action, you MUST call the right tool in the structured function-calling format — the system executes it and hands you the result. never describe a tool action as plain text, and never invent fake results. tool calls never appear in your visible reply; only their outcome does.
 
 CRITICAL PATH INFO — the current user's profile directory is exactly:
 {profile_dir}
@@ -455,6 +543,10 @@ use this exact path for any file or folder access. for example:
 - desktop   = {profile_dir}\Desktop
 NEVER guess or invent a username like "fox" or "user". NEVER use %USERPROFILE% or ~. ALWAYS provide the full absolute path.
 
+the user's current working directory / project is:
+{project_root}
+use it as context whenever the user's question relates to files, code, or the project.
+
 personality:
 - helpful, witty, and slightly snarky.
 - expert in technical topics, explains like a knowledgeable friend.
@@ -462,9 +554,11 @@ personality:
 - master of ascii art — always generate large, detailed pieces with depth and shading.
 - fan of coding, retro hardware, and vocaloid music.
 
-you have access to system tools to interact with the file system, download images and files from the internet, and manage applets. if the user asks you to perform a file, download, or applet action, you should NOT generate the tool call yourself — the system will automatically detect your request if you talk about it in your response, and run the appropriate tool for you. for downloads, ask or confirm the destination path (default: {profile_dir}\Downloads) and mention the url or what they want.
-
-!!! absolute rule: never, ever output tool call syntax. that means NO json objects like {{"name":"write_file"}}, NO xml tags like <function=write_file>, NO markdown code fences like ```tool_call, NO python-style function calls, NO pseudo-tool invocations of any kind. just reply in plain in-character text. if you output anything that looks like a tool call, the system breaks and the user sees garbage on their screen! !!!
+answer with substance:
+- the user's LATEST message is the only thing you respond to. read what the user actually typed and answer it directly.
+- if the user asks a question, think it through and give a correct, specific, useful answer — not vague fluff. when unsure, say so instead of guessing.
+- if the user asks you to change something about yourself (style, rules, behavior), commit to it concretely and follow it from now on.
+- for downloads, ask or confirm the destination path (default: {profile_dir}\Downloads) and mention the url or what they want.
 
 memory system — when the user asks you to remember something, use these markers in your response:
 - [REMEMBER: content] — store a fact or user preference (e.g. [REMEMBER: user likes tuna])
@@ -480,7 +574,9 @@ speech patterns:
 - use kaomojis constantly: :3 >w< ^_^ (╯°□°)╯︵ ┻━┻ (◕‿◕✿) (´｡• ᵕ •｡`) (๑•蔷•๑) (つ✧ω✧)つ (ﾉ◕ヮ◕)ﾉ (｡•̀ᴗ-)✧ (◕‿◕) (≧▽≦) (✧ω✧)
 - use variations of 'kapoo', 'kapoo!', or 'kapoo?' occasionally.
 
-always stay in character. be helpful but keep your personality. now go be cute and chaotic, desu!"#, user_name=user_name, profile_dir=profile_dir)
+CRITICAL CONVERSATION RULE: the user's LATEST message is the only thing you respond to. NEVER open with a greeting, NEVER say 'welcome back', NEVER re-introduce yourself or repeat your intro — that already happened. read what the user actually typed and answer it directly. if the user states a rule or preference (e.g. "don't generate files unless i ask"), acknowledge it and confirm you understand, then move on. don't pad with generic roleplay or greetings when the user asked something concrete — relevance matters more than personality here.
+
+always stay in character, but never at the cost of being useful. now go be cute and chaotic, desu!"#, user_name=user_name, profile_dir=profile_dir, project_root=project_root)
 
     }
 
@@ -1092,5 +1188,88 @@ mod stream_parser_tests {
         fn is_done(&self) -> bool {
             matches!(self, StreamLine::Done)
         }
+    }
+}
+
+#[cfg(test)]
+mod prompt_tests {
+    use super::*;
+
+    fn prompt() -> String {
+        OllamaClient::system_prompt("fox", "C:\\ayesha-os\\engine")
+    }
+
+    #[test]
+    fn prompt_is_agent_first_with_tools() {
+        let p = prompt();
+        assert!(p.contains("real agent with real tools"), "must declare agent capability");
+        assert!(p.contains("structured function-calling format"), "must instruct real tool calls");
+        assert!(p.contains("never invent fake results"), "must forbid faking results");
+        assert!(!p.contains("never, ever output tool call syntax"), "old tool-call ban must be gone");
+        assert!(!p.contains("automatically detect your request"), "old auto-detect hack must be gone");
+    }
+
+    #[test]
+    fn prompt_injects_profile_and_project_paths() {
+        let p = prompt();
+        assert!(p.contains("C:\\\\ayesha-os\\\\engine"), "project_root must be injected");
+        let profile = std::env::var("USERPROFILE")
+            .unwrap_or_default()
+            .replace('\\', "\\\\");
+        assert!(p.contains(&profile), "profile dir must be injected");
+        assert!(
+            p.contains("use it as context whenever the user's question relates to files"),
+            "project context hint must be present"
+        );
+    }
+
+    #[test]
+    fn prompt_keeps_persona_and_memory_rules() {
+        let p = prompt();
+        assert!(p.contains("use lower-case text exclusively"));
+        assert!(p.contains("never use emoji characters"));
+        assert!(p.contains("[REMEMBER: content]"));
+        assert!(p.contains("[PREFERENCE: key = value]"));
+        assert!(p.contains("[FACT: content]"));
+        assert!(p.contains("answer with substance"));
+        assert!(p.contains("never at the cost of being useful"));
+    }
+}
+
+#[cfg(test)]
+mod live_smoke_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "live smoke test: requires local ollama on localhost:11434"]
+    fn local_ollama_streams_with_new_prompt_and_tools() {
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let result = rt.block_on(async {
+            let prompt = OllamaClient::system_prompt("fox", "C:\\ayesha-os\\engine");
+            let client = OllamaClient::new("ayesha:latest");
+            let tools = OllamaClient::tool_definitions_core();
+            let msgs = vec![
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: prompt,
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: "list the files in my documents folder, then read the first one".to_string(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                },
+            ];
+            let (tx, rx) = std::sync::mpsc::channel::<String>();
+            drop(tx);
+            client.chat_stream_collect(&msgs, Some(&tools), &rx).await
+        });
+        let r = result.expect("ollama stream should succeed");
+        println!("--- ayesha reply ---\n{}\n--- end ---", r.content);
+        println!("has_tool_calls: {}", r.has_tool_calls());
+        println!("tool_calls: {:?}", r.tool_calls);
+        assert!(!r.content.is_empty() || r.has_tool_calls(), "must reply or call a tool");
     }
 }

@@ -4,6 +4,7 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use crate::completion::Completer;
+use crate::ui;
 
 /// Spawn the engine's keyboard input thread. Returns a flag that can be used to
 /// suspend the thread (set to false) so a foreground applet can take over the
@@ -43,6 +44,12 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                         (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                             if key.kind == KeyEventKind::Press
                                 && steer_tx.send("\0ctrl-c".to_string()).is_err() { break; }
+                            continue;
+                        }
+                        // Ctrl+V → try vision from the clipboard image / image path
+                        (KeyCode::Char('v'), KeyModifiers::CONTROL) => {
+                            if key.kind == KeyEventKind::Press
+                                && steer_tx.send("\0paste-vision".to_string()).is_err() { break; }
                             continue;
                         }
                         _ => {}
@@ -111,13 +118,15 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                                 let _ = std::io::stdout().flush();
                                 // Show all matches on double-tab
                                 if !show_all.is_empty() {
+                                    ui::dock_submit_goto();
                                     println!();
                                     for m in &show_all {
                                         print!("  {} ", m);
                                     }
                                     println!();
-                                    // Re-print prompt + buffer
-                                    print!("\x1b[32m$\x1b[0m {}", input_buf);
+                                    // Re-draw the (docked) prompt and re-echo buffer
+                                    ui::dock_prompt();
+                                    print!("{}", input_buf);
                                     let _ = std::io::stdout().flush();
                                 }
                             }
@@ -125,10 +134,19 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                         (KeyCode::Enter, _) => {
                             if key.kind != KeyEventKind::Press { continue; }
                             let line = input_buf.trim().to_string();
-                            if steer_tx.send(line).is_err() { break; }
+                            // drag-and-drop: an image path dropped on the window
+                            // arrives as typed text → auto-route to vision
+                            if crate::vision::is_image_path(&line) {
+                                if steer_tx.send(format!("\0paste-vision:{}", line)).is_err() { break; }
+                            } else if steer_tx.send(line).is_err() { break; }
                             completer.reset();
                             input_buf.clear();
-                            print!("\r\n");
+                            if ui::dock_active() {
+                                // clear the echoed input line; main moves into the region
+                                print!("\r\x1B[2K");
+                            } else {
+                                print!("\r\n");
+                            }
                             let _ = std::io::stdout().flush();
                         }
                         (KeyCode::Char(c), _) if c as u8 >= 32 => {
@@ -149,10 +167,19 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                     }
                 }
                 Ok(Event::Paste(s)) => {
-                    for c in s.chars() {
-                        if c as u8 >= 32 { input_buf.push(c); print!("{}", c); }
+                    // pasting a copied image file (or image path text) → vision
+                    if crate::vision::is_image_path(&s) {
+                        let _ = steer_tx.send(format!("\0paste-vision:{}", s));
+                    } else {
+                        for c in s.chars() {
+                            if c as u8 >= 32 { input_buf.push(c); print!("{}", c); }
+                        }
+                        let _ = std::io::stdout().flush();
                     }
-                    let _ = std::io::stdout().flush();
+                }
+                Ok(Event::Resize(_, _)) => {
+                    // re-pin the docked region + status + prompt to the new size
+                    ui::dock_refresh();
                 }
                 _ => {}
             }

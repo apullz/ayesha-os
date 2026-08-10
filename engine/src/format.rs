@@ -1,9 +1,14 @@
 // defense-in-depth output enforcement — port of the opencode lowercase-proxy
 // (bin/lowercase-proxy.js). guarantees the ayesha format rules at the stream
 // level instead of trusting the model's system prompt:
-//   1. lowercase everything outside ```code fences```
+//   1. lowercase everything outside real code fences
 //   2. strip real emoji characters (text kaomojis like :3 survive untouched)
 //   3. keep tool-call payloads out of content (they're parsed separately)
+//
+// code fences that declare a real programming language are preserved verbatim
+// (lowercasing code would corrupt it). fences with no language or a prose-ish
+// language (text/plain/...) are still enforced — models love to wrap greetings
+// in ``` which used to smuggle emoji and capitals past the rules.
 //
 // `LowercaseStreamer` is streaming-safe: a ``` fence that splits across
 // chunks (e.g. "``" + "`") is still detected because up to two trailing
@@ -47,6 +52,43 @@ pub fn is_emoji(c: char) -> bool {
         || u == 0x200D                        // zero-width joiner
 }
 
+/// A code fence that declares one of these languages is real code and is
+/// preserved verbatim. Any other fence (no language, or text/plain/...) is
+/// treated as prose and enforced. Unknown languages split across chunks are
+/// assumed to be code so a real ```rust fence that arrives as ```r + "ust"
+/// never gets mangled.
+fn fence_lang_is_code(chars: &[char], from: usize) -> bool {
+    let mut lang = String::new();
+    for &c in &chars[from.min(chars.len())..] {
+        if c == '\n' || c == '\r' {
+            break;
+        }
+        lang.push(c);
+    }
+    let lang = lang.trim().to_ascii_lowercase();
+    if lang.is_empty() {
+        return false;
+    }
+    // reached end of chunk without a newline → the language tag is still
+    // streaming in; assume real code so a split tag never gets enforced.
+    if !chars[from.min(chars.len())..].iter().any(|&c| c == '\n' || c == '\r') {
+        return true;
+    }
+    const CODE_LANGS: &[&str] = &[
+        "rust", "rs", "py", "python", "js", "javascript", "jsx", "ts", "typescript",
+        "tsx", "c", "cpp", "c++", "h", "hpp", "cs", "csharp", "java", "kt", "kotlin",
+        "go", "rb", "ruby", "php", "swift", "scala", "dart", "lua", "r", "m",
+        "sh", "bash", "zsh", "fish", "ps1", "powershell", "cmd", "bat", "shell",
+        "json", "jsonc", "yaml", "yml", "toml", "ini", "xml", "sql", "html", "htm",
+        "css", "scss", "sass", "less", "vue", "svelte", "astro", "gradle", "groovy",
+        "make", "makefile", "dockerfile", "graphql", "gql", "proto", "solidity",
+        "sol", "zig", "nim", "elixir", "exs", "erl", "clj", "clojure", "hs",
+        "haskell", "ml", "ocaml", "fs", "fsharp", "vb", "pl", "perl", "tcl",
+        "coffee", "julia", "v", "vim", "asm", "s", "wasm",
+    ];
+    CODE_LANGS.contains(&lang.as_str())
+}
+
 /// Non-streaming whole-string enforcement (proxy `makeLowercaser` equivalent).
 /// Kept for tests + future non-streaming call sites; the live path uses
 /// `LowercaseStreamer`.
@@ -55,33 +97,16 @@ pub fn enforce_lowercase(text: &str) -> String {
     if !enabled() {
         return text.to_string();
     }
-    let mut out = String::with_capacity(text.len());
-    let parts: Vec<&str> = text.split("```").collect();
-    for (i, part) in parts.iter().enumerate() {
-        if i > 0 {
-            out.push_str("```");
-        }
-        if i % 2 == 1 {
-            out.push_str(part);
-        } else {
-            for c in part.chars() {
-                if is_emoji(c) {
-                    continue;
-                }
-                for lc in c.to_lowercase() {
-                    out.push(lc);
-                }
-            }
-        }
-    }
-    out
+    let mut st = LowercaseStreamer::new();
+    format!("{}{}", st.feed(text), st.finish())
 }
 
 /// Streaming-aware enforcer. Feed it content deltas as they arrive; it emits
-/// the displayable (lowercased + emoji-free, fence-preserving) text.
+/// the displayable (lowercased + emoji-free, fence-aware) text.
 #[derive(Default)]
 pub struct LowercaseStreamer {
     in_fence: bool,
+    fence_is_code: bool,
     pending: String,
 }
 
@@ -110,12 +135,27 @@ impl LowercaseStreamer {
                 && chars[i + 1] == '`'
                 && chars[i + 2] == '`'
             {
-                self.in_fence = !self.in_fence;
+                if self.in_fence {
+                    self.in_fence = false;
+                    self.fence_is_code = false;
+                } else {
+                    self.in_fence = true;
+                    self.fence_is_code = fence_lang_is_code(&chars, i + 3);
+                }
                 out.push_str("```");
                 i += 3;
             } else {
                 let c = chars[i];
-                if !self.in_fence {
+                // enforce prose everywhere; only declared-code fences pass
+                // through verbatim
+                let enforce = !self.in_fence || !self.fence_is_code;
+                if enforce {
+                    // drop markdown bold markers (**) so labels like
+                    // `**ayesha:**` render as plain terminal text
+                    if c == '*' && i + 1 < chars.len() && chars[i + 1] == '*' {
+                        i += 2;
+                        continue;
+                    }
                     if !is_emoji(c) {
                         for lc in c.to_lowercase() {
                             out.push(lc);
@@ -192,8 +232,8 @@ mod tests {
         let mut st = LowercaseStreamer::new();
         let a = st.feed("here's code: ``");
         assert_eq!(a, "here's code: ");
-        let b = st.feed("`fn Main() {\n");
-        assert_eq!(b, "```fn Main() {\n");
+        let b = st.feed("`rust\nfn Main() {\n");
+        assert_eq!(b, "```rust\nfn Main() {\n");
         let c = st.feed("    DoThing();\n");
         assert_eq!(c, "    DoThing();\n");
         let d = st.feed("}");
@@ -211,6 +251,59 @@ mod tests {
         assert_eq!(st.feed("HI"), "hi");
         assert_eq!(st.feed(" THERE :3"), " there :3");
         assert_eq!(st.finish(), "");
+    }
+
+    #[test]
+    fn strips_markdown_bold_markers() {
+        let mut st = LowercaseStreamer::new();
+        let out = st.feed("**ayesha:** YO THERE **tuna**");
+        assert_eq!(out, "ayesha: yo there tuna");
+    }
+
+    #[test]
+    fn keeps_bold_markers_inside_code_fences() {
+        let mut st = LowercaseStreamer::new();
+        let out = st.feed("```rust\nlet s = \"**bold**\";\n```\n");
+        assert_eq!(out, "```rust\nlet s = \"**bold**\";\n```\n");
+    }
+
+    #[test]
+    fn prose_wrapped_in_fence_is_still_enforced() {
+        let mut st = LowercaseStreamer::new();
+        let out = st.feed("```\n🌙 Hello fox~ :3\n```\n");
+        assert_eq!(out, "```\n hello fox~ :3\n```\n");
+    }
+
+    #[test]
+    fn declared_code_fence_preserved_verbatim() {
+        let mut st = LowercaseStreamer::new();
+        let out = st.feed("```python\nprint(\"Hello\")\n```\n");
+        assert_eq!(out, "```python\nprint(\"Hello\")\n```\n");
+    }
+
+    #[test]
+    fn split_code_lang_stays_preserved() {
+        let mut st = LowercaseStreamer::new();
+        let a = st.feed("here:\n```r");
+        assert_eq!(a, "here:\n```r");
+        let b = st.feed("ust\nfn Main() {\n}\n```\n");
+        assert_eq!(b, "ust\nfn Main() {\n}\n```\n");
+    }
+
+    #[test]
+    fn prose_fence_with_text_lang_is_still_enforced() {
+        let mut st = LowercaseStreamer::new();
+        let out = st.feed("```text\nWOW 😀 ok\n```\n");
+        assert_eq!(out, "```text\nwow  ok\n```\n");
+    }
+
+    #[test]
+    fn enforce_lowercase_matches_streamer() {
+        let text = "HI there\n```rust\nfn Main() {\n    let x = \"Hi\";\n}\n```\nBYE 😀";
+        let whole = enforce_lowercase(text);
+        let mut st = LowercaseStreamer::new();
+        let streamed = format!("{}{}", st.feed(text), st.finish());
+        assert_eq!(whole, streamed);
     }
 
     #[test]

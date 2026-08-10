@@ -228,9 +228,10 @@ fn preset_hexes(name: &str) -> Option<[&'static str; ROLE_COUNT]> {
             "#FFFFFF", "#BBBBBB", "#FF6B6B", "#666666", "#333333", "#181818",
         ]),
         // monokai++ — ported from ~/.config/opencode/themes/monokai++.json
+        // background stack matches opencode: bg / bgDeeper / bgSubtle
         "monokai++" | "monokai" => Some([
-            "#221F22", "#19181A", "#FCFCFA", "#FF6188", "#FF6188", "#78DCE8",
-            "#A9DC76", "#FFD866", "#FF5F5F", "#6C696E", "#454147", "#2D2A2E",
+            "#221F22", "#262226", "#FCFCFA", "#FF6188", "#FF6188", "#78DCE8",
+            "#A9DC76", "#FFD866", "#FF5F5F", "#6C696E", "#454147", "#353238",
         ]),
         _ => None,
     }
@@ -242,14 +243,14 @@ pub fn preset(name: &str) -> Option<Theme> {
     if name == "monokai++" || name == "monokai" {
         t.syntax = [
             "#FF6188".to_string(), // keyword
-            "#FFD866".to_string(), // string
+            "#A6E22E".to_string(), // string
             "#AB9DF2".to_string(), // number
             "#6C696E".to_string(), // comment
             "#78DCE8".to_string(), // function
             "#78DCE8".to_string(), // type
             "#FF6188".to_string(), // operator
             "#FCFCFA".to_string(), // punctuation
-            "#FFD866".to_string(), // inline code
+            "#A6E22E".to_string(), // inline code
         ];
     }
     Some(t)
@@ -360,6 +361,21 @@ pub fn apply_no_color() {
     }
 }
 
+/// Make the `colored` crate emit 24-bit truecolor escapes. colored 2.x only
+/// enables truecolor when it sees `COLORTERM=truecolor` (or `=24bit`) and
+/// otherwise snaps every `Color::TrueColor` to the nearest 8-color ANSI —
+/// monokai's #FF6188 pink renders as flat magenta. The rest of the UI already
+/// assumes truecolor (raw `48;2;` fills, the `\x1b]11;` background OSC), so
+/// force it for the crate too. An explicitly-set COLORTERM is left alone.
+pub fn force_truecolor() {
+    let already = std::env::var("COLORTERM")
+        .map(|v| v == "truecolor" || v == "24bit")
+        .unwrap_or(false);
+    if !already {
+        std::env::set_var("COLORTERM", "truecolor");
+    }
+}
+
 // Convenience wrappers so call sites don't need to pull the Theme object.
 pub fn paint(role: Role, text: impl AsRef<str>) -> colored::ColoredString {
     get().paint(role, text)
@@ -372,6 +388,21 @@ pub fn bold(role: Role, text: impl AsRef<str>) -> colored::ColoredString {
 #[allow(dead_code)]
 pub fn bg(role: Role, text: impl AsRef<str>) -> colored::ColoredString {
     get().bg(role, text)
+}
+
+/// Wrap a (possibly already ANSI-colored) string so every cell — including
+/// after each inner reset — sits on a solid `role` background. Used for
+/// popup panels and code blocks where token colors must not punch holes in
+/// the fill.
+pub fn bg_fill(role: Role, text: impl AsRef<str>) -> String {
+    let color = get().color(role);
+    let (r, g, b) = match color {
+        colored::Color::TrueColor { r, g, b } => (r, g, b),
+        _ => (0, 0, 0),
+    };
+    let bg = format!("\x1b[48;2;{r};{g};{b}m");
+    let reset = "\x1b[0m";
+    format!("{bg}{}{reset}", text.as_ref().replace(reset, &format!("{reset}{bg}")))
 }
 
 pub fn code_line(text: impl AsRef<str>) -> colored::ColoredString {
@@ -435,7 +466,7 @@ mod tests {
         assert_eq!(t.hex(Role::Primary), "#FF6188");
         assert_eq!(t.hex(Role::Background), "#221F22");
         assert_eq!(t.syntax_hex(SyntaxRole::Keyword), "#FF6188");
-        assert_eq!(t.syntax_hex(SyntaxRole::String), "#FFD866");
+        assert_eq!(t.syntax_hex(SyntaxRole::String), "#A6E22E");
         assert_eq!(t.syntax_hex(SyntaxRole::Number), "#AB9DF2");
     }
 

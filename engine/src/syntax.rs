@@ -4,7 +4,7 @@
 // it is deliberately simple — good enough to make fenced code readable in
 // the terminal without pulling in a full highlighting engine.
 
-use crate::theme::{self, SyntaxRole};
+use crate::theme::{self, Role, SyntaxRole};
 
 const KEYWORDS: &[&str] = &[
     // common across many languages
@@ -100,8 +100,12 @@ pub fn highlight_line(line: &str) -> String {
         // identifiers: keyword / builtin / function / type
         if is_ident_start(c) {
             let (tok, after) = scan_ident(rest);
-            let role = classify_ident(&tok, after);
-            out.push_str(&format!("{}", theme::paint_syntax(role, &tok)));
+            match classify_ident(&tok, after) {
+                Some(role) => out.push_str(&format!("{}", theme::paint_syntax(role, &tok))),
+                // plain identifier — no dedicated monokai token, so paint it in
+                // the theme's light text colour instead of keyword pink
+                None => out.push_str(&format!("{}", theme::paint(Role::Text, &tok))),
+            }
             rest = after;
             continue;
         }
@@ -153,21 +157,23 @@ fn scan_string(line: &str, quote: char) -> Option<(String, &str)> {
     None
 }
 
-fn classify_ident(tok: &str, after: &str) -> SyntaxRole {
+/// Classify a scanned identifier. `None` means "plain identifier" — no
+/// dedicated syntax token, rendered in the theme's text colour.
+fn classify_ident(tok: &str, after: &str) -> Option<SyntaxRole> {
     if KEYWORDS.contains(&tok) {
-        return SyntaxRole::Keyword;
+        return Some(SyntaxRole::Keyword);
     }
     // function call: identifier immediately followed by `(`
     if let Some(next) = after.chars().next() {
         if next == '(' {
-            return SyntaxRole::Function;
+            return Some(SyntaxRole::Function);
         }
     }
     // type-ish: starts uppercase (Rust/TS convention)
     if tok.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
-        return SyntaxRole::Type;
+        return Some(SyntaxRole::Type);
     }
-    SyntaxRole::Keyword
+    None
 }
 
 #[cfg(test)]
@@ -194,6 +200,8 @@ mod tests {
     }
 
     fn set_monokai() {
+        colored::control::set_override(true);
+        std::env::set_var("COLORTERM", "truecolor");
         theme::set_active(theme::preset("monokai++").unwrap());
     }
 
@@ -227,6 +235,19 @@ mod tests {
         set_monokai();
         let out = highlight_line("println!(\"ok\")");
         assert_eq!(strip_ansi(&out), "println!(\"ok\")");
+    }
+
+    #[test]
+    fn plain_identifiers_use_text_color_not_keyword() {
+        set_monokai();
+        let out = highlight_line("let value = compute();");
+        assert_eq!(strip_ansi(&out), "let value = compute();");
+        // keyword "let" → monokai pink
+        assert!(out.contains("38;2;255;97;136"), "keyword color missing: {out:?}");
+        // plain identifier "value" → theme text #FCFCFA, NOT keyword pink
+        assert!(out.contains("38;2;252;252;250"), "text color missing: {out:?}");
+        // function call "compute(" → monokai cyan
+        assert!(out.contains("38;2;120;220;232"), "function color missing: {out:?}");
     }
 
     #[test]

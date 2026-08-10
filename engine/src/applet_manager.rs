@@ -288,6 +288,7 @@ impl AppletManager {
         print!("\x1B[2J\x1B[1;1H");
         let _ = std::io::stdout().flush();
         crate::ui::print_banner();
+        crate::ui::dock_redraw_bottom();
 
         Ok(())
     }
