@@ -138,6 +138,14 @@
   this creates a standalone dist\ayesha-os.exe with bundled
   config, models, and applets.
 
+  linux / termux (no msvc/vcvars/rc.exe needed — build.rs is a
+  no-op off-windows, reqwest uses rustls-tls):
+    bash ../scripts/build-linux.sh        # -> dist/ayesha-os (bundled the same way)
+
+  on termux: pkg install rust first; the script auto-detects
+  $TERMUX_VERSION and installs hivepipe -> $PREFIX/bin for
+  hivebeat pulse audio.
+
   ── U S A G E ──
 
   $ cargo run --release

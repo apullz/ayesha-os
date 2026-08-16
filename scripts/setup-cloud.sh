@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+#  ayesha-os cloud model setup (bash port of scripts/setup-cloud.ps1)
+#  run:  ./scripts/setup-cloud.sh
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_FILE="$ROOT/.env"
+
+echo ""
+echo "  ╔══════════════════════════════════════════════╗"
+echo "  ║   ayesha-os cloud model setup   (◕‿◕✿)      ║"
+echo "  ╚══════════════════════════════════════════════╝"
+echo ""
+echo "  this will set up free cloud AI models, desu~"
+echo ""
+
+# ── load existing .env if present ──
+declare -A existing=()
+if [ -f "$ENV_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]]; then
+            existing["${BASH_REMATCH[1]}"]="${BASH_REMATCH[2]}"
+        fi
+    done < "$ENV_FILE"
+fi
+
+# ── provider menu ──
+echo "  which provider(s) do you want to set up?"
+echo ""
+echo "  [1] OpenRouter  (nemotron-3-super, llama-3.3-70b, deepseek-r1, qwen-coder — all FREE)"
+echo "  [2] OpenCode Zen  (big-pickle — FREE stealth coding model)"
+echo "  [3] Both"
+echo ""
+read -r -p "  enter 1, 2, or 3: " choice
+
+do_openrouter=false
+do_opencode=false
+[ "$choice" = "1" ] || [ "$choice" = "3" ] && do_openrouter=true
+[ "$choice" = "2" ] || [ "$choice" = "3" ] && do_opencode=true
+
+env_lines=()
+
+# ── openrouter setup ──
+if $do_openrouter; then
+    echo ""
+    echo "  ── openrouter setup ──"
+    echo ""
+
+    if [ -n "${existing[OPENROUTER_API_KEY]:-}" ]; then
+        masked="${existing[OPENROUTER_API_KEY]:0:12}..."
+        echo "  existing key found: $masked"
+        read -r -p "  keep it? (y/n): " reuse
+        if [ -z "$reuse" ] || [ "$reuse" = "y" ] || [ "$reuse" = "Y" ]; then
+            env_lines+=("OPENROUTER_API_KEY=${existing[OPENROUTER_API_KEY]}")
+            echo "  ✔ kept existing key"
+            do_openrouter=false
+        fi
+    fi
+
+    if $do_openrouter; then
+        echo "  1. go to: https://openrouter.ai/keys"
+        echo "  2. sign up (free) or log in"
+        echo "  3. create a new API key"
+        echo "  4. paste it below"
+        echo ""
+        # open the browser when one exists (headless shells / termux: no-op)
+        if command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "https://openrouter.ai/keys" >/dev/null 2>&1 || true
+        elif command -v open >/dev/null 2>&1; then
+            open "https://openrouter.ai/keys" >/dev/null 2>&1 || true
+        fi
+        echo "  (opened browser for you, if one is available)"
+        echo ""
+        read -r -p "  paste your OpenRouter API key: " or_key
+        # trim whitespace
+        or_key="${or_key#"${or_key%%[![:space:]]*}"}"
+        or_key="${or_key%"${or_key##*[![:space:]]}"}"
+        if [ -n "$or_key" ]; then
+            env_lines+=("OPENROUTER_API_KEY=$or_key")
+            echo "  ✔ openrouter key saved"
+        else
+            echo "  ✘ skipped (no key entered)"
+        fi
+    fi
+fi
+
+# ── opencode zen setup ──
+if $do_opencode; then
+    echo ""
+    echo "  ── opencode zen setup ──"
+    echo ""
+
+    if [ -n "${existing[OPENCODE_API_KEY]:-}" ]; then
+        masked="${existing[OPENCODE_API_KEY]:0:12}..."
+        echo "  existing key found: $masked"
+        read -r -p "  keep it? (y/n): " reuse
+        if [ -z "$reuse" ] || [ "$reuse" = "y" ] || [ "$reuse" = "Y" ]; then
+            env_lines+=("OPENCODE_API_KEY=${existing[OPENCODE_API_KEY]}")
+            echo "  ✔ kept existing key"
+            do_opencode=false
+        fi
+    fi
+
+    if $do_opencode; then
+        echo "  1. go to: https://opencode.ai"
+        echo "  2. sign up (free) and get your API key"
+        echo "  3. paste it below"
+        echo ""
+        if command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "https://opencode.ai" >/dev/null 2>&1 || true
+        elif command -v open >/dev/null 2>&1; then
+            open "https://opencode.ai" >/dev/null 2>&1 || true
+        fi
+        echo "  (opened browser for you, if one is available)"
+        echo ""
+        read -r -p "  paste your OpenCode Zen API key: " oc_key
+        oc_key="${oc_key#"${oc_key%%[![:space:]]*}"}"
+        oc_key="${oc_key%"${oc_key##*[![:space:]]}"}"
+        if [ -n "$oc_key" ]; then
+            env_lines+=("OPENCODE_API_KEY=$oc_key")
+            echo "  ✔ opencode key saved"
+        else
+            echo "  ✘ skipped (no key entered)"
+        fi
+    fi
+fi
+
+# ── preserve any other existing env vars ──
+if [ -f "$ENV_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^([A-Z_]+)= ]]; then
+            key="${BASH_REMATCH[1]}"
+            if [ "$key" != "OPENROUTER_API_KEY" ] && [ "$key" != "OPENCODE_API_KEY" ]; then
+                env_lines+=("$line")
+            fi
+        fi
+    done < "$ENV_FILE"
+fi
+
+# ── write .env ──
+if [ ${#env_lines[@]} -gt 0 ]; then
+    {
+        echo "# ayesha-os cloud config — auto-generated by setup-cloud.ps1"
+        printf '%s\n' "${env_lines[@]}"
+    } > "$ENV_FILE"
+    echo ""
+    echo "  ✔ saved to .env"
+fi
+
+# ── summary ──
+has_key() {
+    local want="$1" line
+    for line in "${env_lines[@]:-}"; do
+        [[ "$line" == "$want="* ]] && return 0
+    done
+    return 1
+}
+
+echo ""
+echo "  ═══════════════════════════════════════════════"
+echo "  setup complete! available free cloud models:"
+echo ""
+
+if has_key "OPENROUTER_API_KEY"; then
+    echo "  openrouter (free tier):"
+    echo "    • nvidia/nemotron-3-super:free   (120B MoE, 1M context)"
+    echo "    • meta-llama/llama-3.3-70b:free   (70B instruct)"
+    echo "    • deepseek/deepseek-r1:free       (reasoning/thinking)"
+    echo "    • qwen/qwen-2.5-coder-32b:free    (coding specialist)"
+    echo ""
+fi
+
+if has_key "OPENCODE_API_KEY"; then
+    echo "  opencode zen (free):"
+    echo "    • opencode/big-pickle             (stealth coding, 200k ctx)"
+    echo ""
+fi
+
+echo "  to use in ayesha engine:"
+echo "    /model nvidia/nemotron-3-super:free"
+echo "    /model opencode/big-pickle"
+echo "    /models                              (list all)"
+echo ""
+echo "  kapoo! you're all set (◕ᴗ◕✿)"
+echo ""

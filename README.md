@@ -30,9 +30,9 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
        │                      │
        │              ┌───────▼─────────┐      ┌──────────────────────┐
        │              │  applets/       │      │  ayesha-bot-mobile   │
-       │              │  ├─ desktop-cat │      │  (expo / react       │
-       │              │  └─ flora-cli   │      │   native chat client)│
-       │              └─────────────────┘      └─────────┬────────────┘
+       │              │  └─ flora-cli   │      │  (expo / react       │
+       │              └─────────────────┘      │   native chat client)│
+                                               └─────────┬────────────┘
        │                                                │
        │                    ┌───────────────────────────▼─────────────┐
        │                    │  hf space apullz/ayesha-bot             │
@@ -46,7 +46,6 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 | project | lang | description |
 |---------|------|-------------|
 | **engine/** | rust | agentic coding assistant + jarvis chatbot with tool-calling, model routing, streaming (syntax-highlighted), themes, sessions, self-improvement, pixel art generation |
-| **core/** | python | hivemind orchestrator with gradio web ui, fastapi mobile api, tri-node mind integration |
 | **ayesha-bot-mobile/** | typescript (expo) | pastel "magical chat" mobile client that streams from the hf bot space via gradio SSE |
 | **_hf-ayesha-bot/** | docker + gradio | huggingface space that runs ollama (`nemotron-3-nano:4b`) as the `ayesha` personality and serves it behind a phone-frame chat overlay |
 | **tri_mind_sync/** | python | bidirectional sync engine (github, huggingface, local) |
@@ -58,9 +57,7 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 
 | applet | lang | description |
 |--------|------|-------------|
-| **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
 | **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
-| **poopy-tui/** | python | full-featured discord terminal client with voice, QR login, TUI (separate private repo — not bundled) |
 | **hivebeat/** | python | live-coding terminal music synth (numpy, sample-accurate loop scheduler) — `python repl.py`; live audio via termux pulse, offline wav render anywhere |
 
 ## quick start
@@ -82,7 +79,7 @@ already have it / got a release zip? just skip ahead.
 | **ollama** | local model runtime (API on `localhost:11434`) | `ollama --version` |
 | **git** | clone the repo | `git --version` |
 
-**end users** only need the exe (step 3a) — no rust toolchain required.
+**end users** only need the app binary (step 3a / step 3c) — no rust toolchain required.
 **developers** who rebuild from source also need:
 
 - **rust toolchain** (stable) — `rustup --version`
@@ -117,8 +114,9 @@ cd dist
 .\ayesha-os.exe
 ```
 
-`dist\ayesha-os.exe` is the app — a self-contained build with config, models, and applets
-bundled in. no rust, no build tools needed.
+`dist\ayesha-os.exe` (windows) and `dist/ayesha-os` (linux/termux) are the app — a
+self-contained build with config, models, and applets bundled in. no rust, no build
+tools needed.
 
 > don't have `dist\`? rebuild it (developer path below) or grab a release.
 
@@ -138,6 +136,30 @@ cargo run --release
 ```
 
 > rebuild the exe after any engine/applet change with `.\scripts\build-exe.ps1`
+> (linux/termux twin: `./scripts/build-linux.sh`)
+
+### step 3c — run: linux & termux
+
+on linux (and termux on android) the same engine builds to an elf:
+
+```bash
+./scripts/build-linux.sh     # compile release + bundle dist/ (auto-detects termux)
+./ayesha.sh                  # launch dist/ayesha-os
+```
+
+or `cd dist && ./ayesha-os` directly — `dist/ayesha-os` is the linux app, a
+self-contained build with config, models, and applets bundled in, just like the
+exe on windows.
+
+termux prerequisites: `pkg install rust` (plus `nodejs` for flora-cli; hivebeat
+needs `python python-numpy pulseaudio` — run `bash applets/hivebeat/setup_termux.sh`
+for the audio setup, which the build script also reminds you about). clipboard
+tools (`read_clipboard`, ctrl+v vision) are no-ops on termux — there's no android
+clipboard backend — and `--headless` / `--selftest` run fine with no display.
+
+for local models on termux either `pkg install ollama` (native aarch64) or point
+`ayesha.json`'s `ollama.endpoint` at a remote box (`"http://<host>:11434"`). cloud
+keys work the same as windows: `./scripts/setup-cloud.sh`.
 
 ### step 4 — (optional) enable free cloud models
 
@@ -161,7 +183,8 @@ fox> auto                            # back to auto-routing
 ### step 5 — verify it works
 
 ```cmd
-.\dist\ayesha-os.exe --selftest      # headless end-to-end smoke test (exit 0 = ok)
+.\dist\ayesha-os.exe --selftest      # headless E2E smoke test, windows (exit 0 = ok)
+./dist/ayesha-os --selftest          # ...and the linux/termux elf (no display needed)
 cd engine && cargo test              # 191 unit tests, 1 warning (dead code)
 ```
 
@@ -391,30 +414,9 @@ or use the all-in-one script:
 
 ## applets detail
 
-### desktop-cat
-
-pixel art desktop pet cat with:
-- multi-directional cursor tracking (8 directions)
-- 15 animation states (idle, walking, sleeping, scratching, hearts)
-- system tray toggle
-- transparent click-through window (Win32 API)
-- auto-start option via `run.py`
-
 ### flora-cli
 
 interactive TypeScript terminal for exploring scottish flora phylogeny. uses ollama for natural language queries about plant taxonomy.
-
-### poopy-tui
-
-full-featured Discord terminal client built with Textual:
-- server/channel/DM navigation
-- QR code + email/password + token login
-- voice mute/deafen/leave
-- message send/edit/delete with reactions
-- friends list management
-- real-time event display
-
-> poopy-tui lives in a separate private repo (it needs a Discord token) and is not bundled with the monorepo.
 
 ### hivebeat
 
@@ -489,21 +491,35 @@ $env:HF_TOKEN = "hf_..."
 | script | purpose |
 |--------|---------|
 | `build-exe.ps1` | build `dist\ayesha-os.exe` with config, models, applets bundled |
+| `build-linux.sh` | linux/termux twin — builds `dist/ayesha-os`, installs hivepipe on termux |
 | `sync-all.ps1` | push github + hf model + hf space |
 | `setup-cloud.ps1` | interactive `.env` setup for openrouter + opencode cloud keys |
+| `setup-cloud.sh` | bash twin of `setup-cloud.ps1` (linux/termux) |
 | `launcher.py` | system-tray applet launcher (pystray) |
 | `automation_harness.py` | zero-touch task queue / lint / self-correct loop |
 | `import-takeout-memories.py` | distill google takeout activity into ayesha memories |
 | `theme-from-image.py` | extract a color palette from an image → `ayesha.json` theme |
 | `space-app.py` | static themed gradio demo for the hf space |
 
-### building the standalone exe
+### building the standalone exe / elf
+
+windows (powershell):
 
 ```powershell
 .\scripts\build-exe.ps1
 ```
 
 creates `dist\ayesha-os.exe` with bundled config, models, and applets.
+
+linux / termux (bash):
+
+```bash
+./scripts/build-linux.sh
+```
+
+creates `dist/ayesha-os` with the same bundle — and when run inside termux it
+auto-detects `$TERMUX_VERSION` and installs the hivebeat audio player
+(`hivepipe`) into `$PREFIX/bin` for you.
 
 ## license
 

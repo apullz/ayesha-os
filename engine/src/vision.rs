@@ -35,6 +35,7 @@ pub fn encode_data_uri(bytes: &[u8], format: image::ImageFormat) -> Result<Strin
 
 /// If the clipboard currently holds an image bitmap (e.g. Win+Shift+S), return
 /// it as a PNG data URI. Clears the clipboard so Ctrl+V isn't hijacked twice.
+#[cfg(not(target_os = "android"))]
 pub fn clipboard_image_data_uri() -> Option<String> {
     let mut cb = arboard::Clipboard::new().ok()?;
     let img = cb.get_image().ok()?;
@@ -48,6 +49,13 @@ pub fn clipboard_image_data_uri() -> Option<String> {
         .write_to(&mut out, image::ImageFormat::Png)
         .ok()?;
     encode_data_uri(&out.into_inner(), image::ImageFormat::Png).ok()
+}
+
+/// On android/termux there is no clipboard backend (arboard is excluded from
+/// the android build) — graceful no-op so ctrl+v just reports nothing.
+#[cfg(target_os = "android")]
+pub fn clipboard_image_data_uri() -> Option<String> {
+    None
 }
 
 /// Check whether a string looks like a path to an existing image file.

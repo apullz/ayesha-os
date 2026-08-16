@@ -548,7 +548,7 @@ fn show_sync_state(root: &std::path::Path) {
 }
 
 /// Match natural-language applet phrases like "launch flora cli", "open
-/// desktop-cat", or "stop poopy-tui" to a registered applet name.
+/// hivebeat", or "stop flora-cli" to a registered applet name.
 /// Returns (applet name, is_stop).
 fn parse_applet_phrase(names: &[String], input: &str) -> Option<(String, bool)> {
     let normalize = |s: &str| -> String {
@@ -634,6 +634,69 @@ fn graceful_shutdown(
     println!("  {} {}", theme::paint(Role::Success, "●"), theme::paint(Role::Accent, "ayesha-os shutting down"));
     println!("  {} {}", theme::paint(Role::Accent, "◆"), theme::paint(Role::Dim, format!("saved {}", memory.summary())));
     println!();
+}
+
+/// Backend/provider tag for a model's quick-switcher row (the dim tag
+/// column next to the model name), e.g. "ollama", "openrouter", "opencode".
+fn model_backend_tag(m: &model_registry::ModelProfile) -> String {
+    match &m.backend {
+        model_registry::Backend::Ollama => "ollama".to_string(),
+        model_registry::Backend::Cloud { provider } => provider.clone(),
+    }
+}
+
+/// Compact context-length label for a model's quick-switcher row
+/// (right-aligned column), e.g. "32k", "200k", "1m".
+fn model_ctx_label(ctx: u32) -> String {
+    if ctx >= 1_000_000 && ctx % 1_000_000 == 0 {
+        format!("{}m", ctx / 1_000_000)
+    } else if ctx >= 1_000 {
+        format!("{}k", ctx / 1_000)
+    } else {
+        ctx.to_string()
+    }
+}
+
+/// Switch the active model: update the registry, rebuild the client backend
+/// (cloud setup-failure reverts to opencode/big-pickle), refresh the dock
+/// status, and report the result. Shared by the `/model` command and the
+/// ctrl+p quick-switcher's model rows.
+async fn apply_model_switch(
+    registry: &mut ModelRegistry,
+    current_model: &mut String,
+    client: &mut ActiveBackend,
+    name: &str,
+    tool_model_name: &str,
+) {
+    match registry.set_model(name) {
+        Ok(()) => {
+            *current_model = name.to_string();
+            if registry.is_cloud_model(name) {
+                let provider = registry.cloud_provider(name).unwrap_or_default();
+                match CloudClient::new(name, &provider) {
+                    Ok(cc) => {
+                        *client = ActiveBackend::Cloud(cc);
+                        ui::show_system(&format!("switched to cloud model: {} ({})", name, provider));
+                    }
+                    Err(e) => {
+                        ui::show_error(&format!("cloud setup failed: {}. run .\\scripts\\setup-cloud.ps1", e));
+                        // Revert to default
+                        *current_model = "opencode/big-pickle".to_string();
+                        *client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                            Ok(cc) => ActiveBackend::Cloud(cc),
+                            Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                        };
+                    }
+                }
+            } else {
+                *client = ActiveBackend::Ollama(OllamaClient::new(current_model));
+                ui::show_system(&format!("switched to: {}", name));
+            }
+        }
+        Err(e) => ui::show_error(&e.to_string()),
+    }
+    registry.detect().await;
+    ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
 }
 
 #[tokio::main]
@@ -861,15 +924,43 @@ async fn main() -> anyhow::Result<()> {
     let mut input_mode = InputMode::Normal;
     let mut applet_cycle_idx: Option<usize> = None;
 
-    // Build the applet page list once at startup; statuses refresh on each menu open.
-    let mut menu_pages: Vec<(String, String, bool, bool)> = Vec::new();
+    // Build the quick-switcher item list once at startup (all applets first,
+    // then all registered models); statuses refresh on each menu open.
+    let mut menu_items: Vec<ui::MenuItem> = Vec::new();
     {
-        menu_pages.push(("engine".to_string(), "terminal persona host — that's me".to_string(), true, true));
+        menu_items.push(ui::MenuItem {
+            name: "engine".to_string(),
+            desc: "terminal persona host — that's me".to_string(),
+            kind: ui::MenuItemKind::Applet,
+            running: true,
+            active: false,
+            foreground: true,
+            ctx: None,
+        });
         for name in manager.names() {
             if name == "engine" { continue; }
             if let Some(e) = manager.entries.get(&name) {
-                menu_pages.push((name.clone(), e.desc.clone(), manager.is_running(&name), e.foreground));
+                menu_items.push(ui::MenuItem {
+                    name: name.clone(),
+                    desc: e.desc.clone(),
+                    kind: ui::MenuItemKind::Applet,
+                    running: manager.is_running(&name),
+                    active: false,
+                    foreground: e.foreground,
+                    ctx: None,
+                });
             }
+        }
+        for m in &registry.models {
+            menu_items.push(ui::MenuItem {
+                name: m.name.clone(),
+                desc: model_backend_tag(m),
+                kind: ui::MenuItemKind::Model,
+                running: false,
+                active: m.name == current_model,
+                foreground: false,
+                ctx: Some(model_ctx_label(m.context_length)),
+            });
         }
     }
 
@@ -911,16 +1002,13 @@ async fn main() -> anyhow::Result<()> {
             graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
             break;
         }
-        // Ctrl+M / Ctrl+P → open interactive applet menu
+        // Ctrl+M / Ctrl+P → open interactive quick switcher (applets + models)
         if input == "\0ctrl-m" || input == "\0ctrl-p" {
             input_mode = InputMode::AppletMenu;
-            // Refresh statuses in the page list
-            for entry in menu_pages.iter_mut() {
-                if entry.0 == "engine" {
-                    entry.2 = true;
-                } else {
-                    entry.2 = manager.is_running(&entry.0);
-                }
+            // Refresh applet running statuses (model rows are static)
+            for item in menu_items.iter_mut() {
+                if item.kind != ui::MenuItemKind::Applet { continue; }
+                item.running = item.name == "engine" || manager.is_running(&item.name);
             }
             let mut menu_idx: usize = 0;
             let mut menu_filter: String = String::new();
@@ -929,7 +1017,7 @@ async fn main() -> anyhow::Result<()> {
             menu_flag.store(true, std::sync::atomic::Ordering::Relaxed);
             // Draw the menu on a clean alternate-screen popup, centered.
             ui::popup_enter();
-            let (rendered, line_count) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+            let (rendered, line_count) = ui::draw_launcher_menu(&menu_items, menu_idx, &menu_filter);
             ui::draw_popup_centered(&rendered, line_count);
 
             // Inner menu loop
@@ -948,59 +1036,69 @@ async fn main() -> anyhow::Result<()> {
                     }
                     "\0menu-up" => {
                         menu_idx = menu_idx.saturating_sub(1);
-                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let (rendered, lc) = ui::draw_launcher_menu(&menu_items, menu_idx, &menu_filter);
                         ui::draw_popup_centered(&rendered, lc);
                     }
                     "\0menu-down" => {
-                        let filtered_len = menu_pages.iter().filter(|(n, d, _, _)| {
-                            if menu_filter.is_empty() { true }
-                            else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
+                        let lower = menu_filter.to_lowercase();
+                        let filtered_len = menu_items.iter().filter(|it| {
+                            menu_filter.is_empty()
+                                || it.name.to_lowercase().contains(&lower)
+                                || it.desc.to_lowercase().contains(&lower)
                         }).count();
                         if filtered_len > 0 && menu_idx + 1 < filtered_len {
                             menu_idx += 1;
                         }
-                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let (rendered, lc) = ui::draw_launcher_menu(&menu_items, menu_idx, &menu_filter);
                         ui::draw_popup_centered(&rendered, lc);
                     }
                     "\0menu-backspace" => {
                         menu_filter.pop();
                         menu_idx = 0;
-                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let (rendered, lc) = ui::draw_launcher_menu(&menu_items, menu_idx, &menu_filter);
                         ui::draw_popup_centered(&rendered, lc);
                     }
                     "\0menu-esc" => {
                         break;
                     }
                     "\0menu-enter" => {
-                        let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().filter(|&(n, d, _, _)| {
-                            if menu_filter.is_empty() { true }
-                            else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
-                        }).cloned().collect();
-                        if let Some((name, _desc, _running, _foreground)) = filtered.get(menu_idx) {
-                            selected = Some(name.clone());
+                        let lower = menu_filter.to_lowercase();
+                        let filtered: Vec<&ui::MenuItem> = menu_items.iter().filter(|it| {
+                            menu_filter.is_empty()
+                                || it.name.to_lowercase().contains(&lower)
+                                || it.desc.to_lowercase().contains(&lower)
+                        }).collect();
+                        if let Some(item) = filtered.get(menu_idx) {
+                            if item.kind == ui::MenuItemKind::Applet {
+                                selected = Some(item.name.clone());
+                            } else {
+                                // Model row → switch model, then close the menu
+                                let name = item.name.clone();
+                                apply_model_switch(&mut registry, &mut current_model, &mut client, &name, &tool_model_name).await;
+                            }
                         }
                         break;
                     }
                     s if s.starts_with("\0menu-char:") => {
                         let c = &s["\0menu-char:".len()..];
                         if menu_filter.is_empty() && c == "x" {
-                            // Stop action
-                            let filtered: Vec<(String, String, bool, bool)> = menu_pages.iter().filter(|&(n, d, _, _)| {
-                                if menu_filter.is_empty() { true }
-                                else { n.to_lowercase().contains(&menu_filter.to_lowercase()) || d.to_lowercase().contains(&menu_filter.to_lowercase()) }
-                            }).cloned().collect();
-                            if let Some((name, _, running, _)) = filtered.get(menu_idx) {
-                                if *running {
-                                    match manager.stop(name) {
-                                        Ok(()) => ui::show_system(&format!("stopped {}", name)),
-                                        Err(e) => ui::show_error(&e),
+                            // Stop action — applets only (filter is empty here,
+                            // so this list is every item in menu order)
+                            let filtered: Vec<&ui::MenuItem> = menu_items.iter().collect();
+                            if let Some(item) = filtered.get(menu_idx) {
+                                if item.kind == ui::MenuItemKind::Applet {
+                                    if item.running {
+                                        match manager.stop(&item.name) {
+                                            Ok(()) => ui::show_system(&format!("stopped {}", item.name)),
+                                            Err(e) => ui::show_error(&e),
+                                        }
+                                    } else {
+                                        ui::show_system(&format!("{} is not running", item.name));
                                     }
-                                } else {
-                                    ui::show_system(&format!("{} is not running", name));
-                                }
-                                for entry in menu_pages.iter_mut() {
-                                    if entry.0 != "engine" {
-                                        entry.2 = manager.is_running(&entry.0);
+                                    for entry in menu_items.iter_mut() {
+                                        if entry.kind == ui::MenuItemKind::Applet && entry.name != "engine" {
+                                            entry.running = manager.is_running(&entry.name);
+                                        }
                                     }
                                 }
                             }
@@ -1010,7 +1108,7 @@ async fn main() -> anyhow::Result<()> {
                             }
                             menu_idx = 0;
                         }
-                        let (rendered, lc) = ui::draw_applet_menu(&menu_pages, menu_idx, &menu_filter);
+                        let (rendered, lc) = ui::draw_launcher_menu(&menu_items, menu_idx, &menu_filter);
                         ui::draw_popup_centered(&rendered, lc);
                     }
                     _ => {}
@@ -1039,10 +1137,14 @@ async fn main() -> anyhow::Result<()> {
                 Some((uri, "clipboard".to_string()))
             } else {
                 // clipboard text that is a path to an image file
+                #[cfg(not(target_os = "android"))]
                 let text = arboard::Clipboard::new()
                     .ok()
                     .and_then(|mut cb| cb.get_text().ok())
                     .unwrap_or_default();
+                // android/termux has no clipboard backend — graceful no-op
+                #[cfg(target_os = "android")]
+                let text = String::new();
                 vision::resolve_path(&text)
                     .and_then(|p| vision::image_data_uri(&p).ok().map(|u| (u, p.display().to_string())))
             };
@@ -1230,35 +1332,7 @@ async fn main() -> anyhow::Result<()> {
             }
             _ if lower.starts_with("model ") => {
                 let name = input[6..].trim();
-                match registry.set_model(name) {
-                    Ok(()) => {
-                        current_model = name.to_string();
-                        if registry.is_cloud_model(name) {
-                            let provider = registry.cloud_provider(name).unwrap_or_default();
-                            match CloudClient::new(name, &provider) {
-                                Ok(cc) => {
-                                    client = ActiveBackend::Cloud(cc);
-                                    ui::show_system(&format!("switched to cloud model: {} ({})", name, provider));
-                                }
-                                Err(e) => {
-                                    ui::show_error(&format!("cloud setup failed: {}. run .\\scripts\\setup-cloud.ps1", e));
-                                    // Revert to default
-                                    current_model = "opencode/big-pickle".to_string();
-                                    client = match CloudClient::new("opencode/big-pickle", "opencode") {
-                                        Ok(cc) => ActiveBackend::Cloud(cc),
-                                        Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
-                                    };
-                                }
-                            }
-                        } else {
-                            client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
-                            ui::show_system(&format!("switched to: {}", name));
-                        }
-                    }
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                registry.detect().await;
-                ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
+                apply_model_switch(&mut registry, &mut current_model, &mut client, name, &tool_model_name).await;
                 continue;
             }
             _ if lower.starts_with("toolmodel ") || lower == "toolmodel" => {
@@ -1780,7 +1854,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         // ── natural-language applet phrases (no model round-trip) ──
-        // "launch flora cli", "open desktop-cat", "stop poopy-tui", etc.
+        // "launch flora cli", "open hivebeat", "stop flora-cli", etc.
         if let Some((name, is_stop)) = parse_applet_phrase(&manager.names(), &input) {
             if is_stop {
                 match manager.stop(&name) {
@@ -2744,17 +2818,49 @@ mod tests {
 
     #[test]
     fn applet_phrase_matches() {
-        let n = names(&["flora-cli", "desktop-cat", "poopy-tui", "engine"]);
+        let n = names(&["flora-cli", "hivebeat", "engine"]);
 
         assert_eq!(parse_applet_phrase(&n, "launch flora cli"), Some(("flora-cli".to_string(), false)));
         assert_eq!(parse_applet_phrase(&n, "launch flora-cli"), Some(("flora-cli".to_string(), false)));
-        assert_eq!(parse_applet_phrase(&n, "open Desktop Cat"), Some(("desktop-cat".to_string(), false)));
-        assert_eq!(parse_applet_phrase(&n, "start poopy tui"), Some(("poopy-tui".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "open Hive Beat"), Some(("hivebeat".to_string(), false)));
+        assert_eq!(parse_applet_phrase(&n, "start hivebeat"), Some(("hivebeat".to_string(), false)));
         assert_eq!(parse_applet_phrase(&n, "run engine"), Some(("engine".to_string(), false)));
-        assert_eq!(parse_applet_phrase(&n, "stop poopy-tui"), Some(("poopy-tui".to_string(), true)));
-        assert_eq!(parse_applet_phrase(&n, "launch poopy"), None);
+        assert_eq!(parse_applet_phrase(&n, "stop flora-cli"), Some(("flora-cli".to_string(), true)));
+        assert_eq!(parse_applet_phrase(&n, "launch flora"), None);
         assert_eq!(parse_applet_phrase(&n, "launch a test for me"), None);
         assert_eq!(parse_applet_phrase(&n, "what is the weather"), None);
+    }
+
+    #[test]
+    fn model_ctx_labels_are_compact() {
+        assert_eq!(model_ctx_label(1_000_000), "1m");
+        assert_eq!(model_ctx_label(200_000), "200k");
+        assert_eq!(model_ctx_label(131_072), "131k");
+        assert_eq!(model_ctx_label(65_536), "65k");
+        assert_eq!(model_ctx_label(32_768), "32k");
+        assert_eq!(model_ctx_label(8_192), "8k");
+        assert_eq!(model_ctx_label(4096), "4k");
+    }
+
+    #[tokio::test]
+    async fn model_switch_rebuilds_ollama_client() {
+        let mut registry = ModelRegistry::new();
+        let mut current_model = "opencode/big-pickle".to_string();
+        let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
+        apply_model_switch(&mut registry, &mut current_model, &mut client, "qwen2.5:7b", "qwen2.5:7b").await;
+        assert_eq!(current_model, "qwen2.5:7b");
+        assert!(matches!(client, ActiveBackend::Ollama(_)));
+        assert!(registry.models.iter().any(|m| m.name == "qwen2.5:7b"));
+    }
+
+    #[tokio::test]
+    async fn model_switch_unknown_model_keeps_current() {
+        let mut registry = ModelRegistry::new();
+        let mut current_model = "opencode/big-pickle".to_string();
+        let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
+        apply_model_switch(&mut registry, &mut current_model, &mut client, "no-such-model", "qwen2.5:7b").await;
+        assert_eq!(current_model, "opencode/big-pickle");
+        assert!(matches!(client, ActiveBackend::Ollama(_)));
     }
 
     #[test]

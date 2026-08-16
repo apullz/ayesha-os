@@ -26,7 +26,8 @@
                          self-improvement loop, command palette,
                          opencode-style compact UI,
                          autocomplete (Tab cycling for commands
-                         and applets), 191 unit tests, 1 dead-code warning.
+                         and applets), 203 unit tests, 1 pre-existing dead-code
+                         warning.
                          └ 30 slash commands:
                             help, clear, models, auto, sync, apps,
                             run, stop, model, toolmodel, pull, route,
@@ -37,22 +38,12 @@
                          └ model: ayesha (qwen2.5-coder:14b base)
                          └ --selftest for headless E2E verification
 
-  core/            [✔]  Gradio web UI, FastAPI mobile API,
-                         hivemind client for instance sync.
-                         └ needs ollama running locally
-
   tri_mind_sync/   [✔]  Bidirectional sync engine
                          (github, huggingface, local).
                          Fixed: now pushes modified files.
 
   git_middleware/   [✔]  Gitea webhook receiver + LLM task runner.
                          Code review, security scan, auto-summary.
-
-  desktop-cat/     [✔]  Desktop pet (no AI needed).
-                         └ pure tkinter + Win32 API
-                         └ click-to-drag (WS_EX_NOACTIVATE)
-                         └ speech bubbles (configurable phrases)
-                         └ reads config from ayesha.json
 
   flora-cli/       [→]  Scottish flora phylo explorer.
                          └ replaced gemini with ollama 07/2026
@@ -62,17 +53,6 @@
                          └ tree --depth=N limits display depth
                          └ fixed double-escaped ANSI codes
                          └ fixed package.json name + metadata
-
-  poopy-tui/       [✔]  Discord terminal client with voice + TUI.
-                         └ login: token / QR / email+password
-                         └ token persisted to ~/.poopy-tui/token
-                         └ requires DISCORD_TOKEN in .env OR first-run login
-                         └ r reply, a actions (pin/delete), + react
-                         └ Ctrl+f message search in messages view
-                         └ friends list: Enter opens DM
-                         └ typing indicator auto-clears + deduped
-                         └ Ctrl+End toggle auto-scroll
-                         └ JSONL message logging to logs/
 
   models/          [✔]  Modelfile for ayesha personality.
                            └ FROM qwen2.5-coder:14b
@@ -90,14 +70,27 @@
                           └ ↑/↓ navigate, type to filter, Enter launch
                           └ x stops selected applet, Esc/back exits
                           └ /run, /stop, /apps slash commands
-                          └ foreground applets (flora-cli, poopy-tui) run in
+                          └ foreground applets (flora-cli, hivebeat) run in
                             the current window as pages; ctrl+p switches back
                           └ scripts/launcher.py (tray companion)
 
-  ── K N O W N   I S S U E S ──
+  ── L I N U X  /  T E R M U X ──
 
-  ! poopy-tui: requires DISCORD_TOKEN in .env
-    └ uses discord.py-self for user account access
+  linux/           [✔]  engine builds natively to an elf (no windows-only crates,
+                          rustls-tls, build.rs no-op off-windows):
+                          └ ./scripts/build-linux.sh -> dist/ayesha-os
+                            (config + models + applets bundled, node_modules kept)
+                          └ launcher: ./ayesha.sh (twin of ayesha.bat)
+                          └ read_clipboard works on x11/wayland (arboard)
+
+  termux/          [✔]  builds on-device (pkg install rust) with the same script:
+                          └ auto-detects $TERMUX_VERSION, installs
+                            hivepipe -> $PREFIX/bin for hivebeat audio
+                          └ audio setup: bash applets/hivebeat/setup_termux.sh
+                          └ clipboard tools are no-ops (no android backend)
+                          └ --headless / --selftest work headlessly
+
+  ── K N O W N   I S S U E S ──
 
   ── S E C U R I T Y   N O T E S ──
 
@@ -128,3 +121,4 @@
   github:       git push origin master
   huggingface:  $env:HF_TOKEN = "hf_..."; .\scripts\sync-all.ps1
   standalone:   .\scripts\build-exe.ps1 -> dist\ayesha-os.exe
+                ./scripts/build-linux.sh -> dist/ayesha-os   (linux / termux)

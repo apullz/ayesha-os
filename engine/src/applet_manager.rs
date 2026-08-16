@@ -38,6 +38,23 @@ struct AyeshaConfig {
     pub plugins: Vec<crate::plugins::PluginConfig>,
 }
 
+/// Best-effort `npm install` for node applets that ship a package.json but no
+/// node_modules yet — the unix twin of the windows auto-install guard. Only
+/// the ts applet path is affected (flora-cli); python applets have no
+/// package.json and are skipped. Failures are ignored on purpose so a broken
+/// registry or offline box never blocks the launch.
+fn ensure_node_modules(work_dir: &std::path::Path, inherit_io: bool) {
+    if !work_dir.join("package.json").exists() || work_dir.join("node_modules").exists() {
+        return;
+    }
+    let mut cmd = Command::new("npm");
+    cmd.arg("install").current_dir(work_dir);
+    if !inherit_io {
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+    let _ = cmd.status();
+}
+
 pub struct AppletManager {
     pub entries: HashMap<String, AppletEntry>,
     pub processes: HashMap<String, Child>,
@@ -202,6 +219,7 @@ impl AppletManager {
                 .spawn()
                 .map_err(|e| format!("failed to launch {}: {}", name, e))?
         } else {
+            ensure_node_modules(&work_dir, false);
             Command::new(program)
                 .args(&parts[1..])
                 .current_dir(&work_dir)
@@ -254,6 +272,7 @@ impl AppletManager {
                 .spawn()
                 .map_err(|e| format!("failed to launch {} in this window: {}", name, e))?
         } else {
+            ensure_node_modules(&work_dir, true);
             Command::new(program)
                 .args(&parts[1..])
                 .current_dir(&work_dir)
@@ -306,7 +325,7 @@ impl AppletManager {
                 return Err(e);
             }
         };
-        // A foreground applet (hivebeat repl, poopy-tui) can run for minutes.
+        // A foreground applet (hivebeat repl, flora-cli) can run for minutes.
         // A raw std `child.wait()` here would block a tokio worker and stall
         // the executor, so hop into a blocking region: the input thread is
         // already suspended (step 1), so the applet owns the terminal and no

@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn applet_name_completion() {
-        let mut c = comp(&["flora-cli", "desktop-cat", "poopy-tui"]);
+        let mut c = comp(&["flora-cli", "hivebeat"]);
         let (sel, _) = c.complete("fl");
         assert_eq!(sel.as_deref(), Some("flora-cli"));
     }

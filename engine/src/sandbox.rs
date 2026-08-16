@@ -29,10 +29,13 @@ impl Sandbox {
     }
 
     pub fn default_workspace() -> Self {
-        Self::new(
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("C:\\"))
-        )
+        // Platform-aware home fallback: `C:\` only makes sense on windows.
+        #[cfg(windows)]
+        let fallback = || PathBuf::from("C:\\");
+        #[cfg(not(windows))]
+        let fallback = || std::env::temp_dir();
+
+        Self::new(dirs::home_dir().unwrap_or_else(fallback))
     }
 
     fn expand_env_vars(path: &str) -> String {

@@ -21,9 +21,13 @@ crossterm = { version = "0.28", features = ["event-stream"] }
 anyhow = "1"
 dirs = "5"
 image = "0.25"
-arboard = "3"
 
 [target.'cfg(windows)'.dependencies]
+arboard = "3"
+
+# arboard has no android clipboard backend (termux) — exclude it there; the
+# usage sites are cfg-gated to graceful no-ops. still present on windows/linux/macos.
+[target.'cfg(not(target_os = "android"))'.dependencies]
 arboard = "3"
 
 [build-dependencies]

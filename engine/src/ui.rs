@@ -997,6 +997,15 @@ fn reflow_buffer(st: &mut ScrollState, cols: usize) {
 
 const APP_MENU_WIDTH: usize = 68;
 
+/// Full popup box width (incl. rails + the 2-space indent) that fits
+/// `cols` terminal columns. Menus clamp the inner field to 24 cells so a
+/// tiny window still shows a usable list; APP_MENU_WIDTH (68) is the max.
+/// The centered draw derives its width from the SAME formula so the box
+/// centers on what it actually renders instead of a fixed 68.
+fn menu_box_width(cols: usize) -> usize {
+    APP_MENU_WIDTH.min(cols.saturating_sub(4)).max(28)
+}
+
 /// Switch to the alternate screen buffer so a popup can be drawn centered;
 /// leaving it restores the conversation scrollback exactly.
 pub fn popup_enter() {
@@ -1012,103 +1021,217 @@ pub fn popup_leave() {
     dock_redraw_bottom();
 }
 
-/// Clear the overlay and redraw `rendered` centered on both axes.
-/// Lines beyond the terminal height are clipped so a short window can't
-/// overflow the popup.
+/// Centered-overlay geometry (pure, so the math is testable): 1-based
+/// (row, col) for a `box_w`-cell box of `clip` lines inside a `cols` x
+/// `rows` terminal. `clip` is capped to rows-2 so a scrollable terminal
+/// always keeps a 1-row margin top/bottom when there's room.
+fn popup_geometry(cols: usize, rows: usize, box_w: usize, clip: usize) -> (usize, usize) {
+    let max_rows = rows.saturating_sub(2).max(1);
+    let clip = clip.min(max_rows);
+    let row = (rows.saturating_sub(clip) / 2).saturating_add(1).max(1);
+    let col = (cols.saturating_sub(box_w) / 2).saturating_add(1).max(1);
+    (row, col)
+}
+
+/// Clear the overlay and redraw `rendered` centered on both axes. The
+/// box width is derived from the terminal width (shrinks on narrow
+/// windows) and lines beyond the terminal height are clipped so a short
+/// window can't overflow the popup.
 pub fn draw_popup_centered(rendered: &str, line_count: usize) {
     let (cols, rows) = crossterm::terminal::size().unwrap_or((120, 30));
-    let max_rows = (rows as usize).saturating_sub(2).max(1);
+    let cols = cols as usize;
+    let rows = rows as usize;
+    let max_rows = rows.saturating_sub(2).max(1);
     let clip = line_count.min(max_rows);
     let clipped: String = rendered.lines().take(clip).collect::<Vec<_>>().join("\n");
-    let row = (rows as usize).saturating_sub(clip) / 2;
-    // menu box (incl. the 2-space indent) is 68 chars; center the box itself
-    let box_col = ((cols as usize).saturating_sub(APP_MENU_WIDTH - 2) / 2).max(3);
-    let col = box_col.saturating_sub(2).max(1);
-    print!("\x1B[2J\x1B[{};{}H{}", row.max(1), col, clipped);
+    let (row, col) = popup_geometry(cols, rows, menu_box_width(cols), clip);
+    print!("\x1B[2J\x1B[{};{}H{}", row, col, clipped);
     stdout().flush().ok();
 }
 
-// ── interactive applet menu (ctrl+p / ctrl+m) ────────────────
+// ── interactive quick switcher (ctrl+p / ctrl+m) ─────────────
 
-/// Draw an interactive applet menu box. Pages: (name, desc, running, foreground).
-/// Returns (rendered_string, line_count). The box shrinks to fit narrow
-/// terminals and pads by cells, so kaomoji-laden applet names stay aligned.
-pub fn draw_applet_menu(pages: &[(String, String, bool, bool)], idx: usize, filter: &str) -> (String, usize) {
+/// One row of the quick switcher. Applets and models share the struct;
+/// fields a row's `kind` doesn't use are ignored.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MenuItem {
+    /// Applet name, or model id (e.g. "qwen2.5:7b").
+    pub name: String,
+    /// Applet description, or the model's provider/backend tag
+    /// (e.g. "ollama", "openrouter", "opencode").
+    pub desc: String,
+    pub kind: MenuItemKind,
+    /// Applets: true while the applet is running (●). Models: ignored.
+    pub running: bool,
+    /// Models: true for the current model (✓ marker). Applets: ignored.
+    pub active: bool,
+    /// Applets: in-window → "[window]", otherwise "[bg]". Models: ignored.
+    pub foreground: bool,
+    /// Models only: context-length label (e.g. "128k"), right-aligned.
+    pub ctx: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MenuItemKind {
+    Applet,
+    Model,
+}
+
+/// Render one quick-switcher row: a full-width hot-pink bar with black
+/// text when selected, otherwise a plain panel. `plain` is the ANSI-free
+/// text (the selection bar renders it so nothing overrides the black
+/// foreground); `colored` carries per-segment styling (active-marker
+/// pink, dim tags). Both are padded to `fw` cells so every line lands at
+/// the same width; overflow is clamped cell-aware with "..." before
+/// padding so a row can never break the box.
+fn menu_row_line(plain: &str, colored: &str, fw: usize, selected: bool, cb: Color) -> String {
+    let (plain, colored) = if visible_cells(plain) > fw {
+        let t = format!("{}...", truncate_cells(plain, fw.saturating_sub(3)));
+        let ct = theme::paint(Role::Text, &t).to_string();
+        (t, ct)
+    } else {
+        (plain.to_string(), colored.to_string())
+    };
+    if selected {
+        let bar = theme::bg(Role::Primary, format!("  {}", pad_cells(&plain, fw))).black();
+        format!("  {}{}{}\n",
+            theme::paint(Role::Primary, "│").on_color(cb),
+            bar,
+            theme::paint(Role::Primary, "│").on_color(cb))
+    } else {
+        format!("  {}\n", theme::bg_fill(Role::CodeBg, format!("{}{}{}",
+            theme::paint(Role::Text, "│"),
+            format!("  {}", pad_cells(&colored, fw)),
+            theme::paint(Role::Text, "│"))))
+    }
+}
+
+/// Draw the interactive quick switcher (ctrl+p): an "apps" section (real
+/// applets, engine pinned first by the caller) and a "models" section
+/// share one box, one selection bar and one type-to-filter. Rows render
+/// grouped by `kind` — applets, then models — so callers MUST pass
+/// `items` already in that order (engine first); `idx` indexes the
+/// filtered, grouped sequence. Returns
+/// (rendered_string, line_count) for draw_popup_centered.
+pub fn draw_launcher_menu(items: &[MenuItem], idx: usize, filter: &str) -> (String, usize) {
     let mut out = String::new();
     let inner_w = 64usize.min(terminal_cols().saturating_sub(8).max(24));
     let fw = inner_w.saturating_sub(2); // content field between the rails
-    let title = "applet launcher (ctrl+p)";
-    let dashes = inner_w - 1 - title.len();
+    let title = "quick switcher (ctrl+p)";
+    let dashes = inner_w.saturating_sub(1).saturating_sub(title.len());
     let cb = theme::get().color(Role::CodeBg);
     let pop_line = |fg: Role, s: String| -> String {
         theme::paint(fg, s).on_color(cb).to_string()
     };
-    // every line is a solid raised panel so the popup reads as a popout
+
+    // title rail + separator, same raised-panel vocabulary as the applet menu
     out.push_str(&format!("  {}\n",
         pop_line(Role::Primary, format!("┌─{}{}┐", title, "─".repeat(dashes)))));
     out.push_str(&format!("  {}\n",
         pop_line(Role::Dim, format!("│{}│", "─".repeat(inner_w)))));
-    // category header, opencode palette style
-    out.push_str(&format!("  {}\n",
-        pop_line(Role::Success, format!("│  {}│", pad_cells("applets", fw)))));
 
-    let filtered: Vec<(usize, &(String, String, bool, bool))> = pages
-        .iter()
-        .enumerate()
-        .filter(|(_, (name, desc, _, _))| {
-            if filter.is_empty() {
-                true
-            } else {
-                name.to_lowercase().contains(&filter.to_lowercase())
-                    || desc.to_lowercase().contains(&filter.to_lowercase())
-            }
-        })
+    // opencode-style section divider: Success label + dim dash run
+    let header = |label: &str| -> String {
+        let label = truncate_cells(label, inner_w.saturating_sub(3));
+        let n = inner_w.saturating_sub(3).saturating_sub(visible_cells(&label));
+        format!("  {}\n", theme::bg_fill(Role::CodeBg, format!("{}{}{}{}{}",
+            theme::paint(Role::Text, "│"),
+            theme::paint(Role::Success, format!("  {}", label)),
+            theme::paint(Role::Dim, " "),
+            theme::paint(Role::Dim, "─".repeat(n)),
+            theme::paint(Role::Text, "│"))))
+    };
+
+    let lower = filter.to_lowercase();
+    let filtered: Vec<&MenuItem> = items.iter()
+        .filter(|it| filter.is_empty()
+            || it.name.to_lowercase().contains(&lower)
+            || it.desc.to_lowercase().contains(&lower))
         .collect();
 
     let display_idx = idx.min(filtered.len().saturating_sub(1));
 
     if filtered.is_empty() {
+        let msg = format!("no matches for '{}'", filter);
         out.push_str(&format!("  {}\n",
-            pop_line(Role::Dim, format!("│  {}│", pad_cells(&format!("no matches for '{}'", filter), fw)))));
+            pop_line(Role::Dim, format!("│  {}│",
+                pad_cells(&truncate_cells(&msg, fw), fw)))));
     } else {
-        for (i, (_orig_i, (name, desc, running, foreground))) in filtered.iter().enumerate() {
-            let selected = i == display_idx;
-            let cursor = if selected { "►" } else { " " };
-            let status = if *running { "●" } else { "○" };
-            let mode_tag = if *foreground { "[window]" } else { "[bg]" };
-            let label = format!("{} {} {}{}{}",
-                cursor, status,
-                pad_cells(name, 11), pad_cells(desc, 24), pad_cells(mode_tag, 8));
-            // truncate label to fit the content field, cell-aware
-            let truncated = if visible_cells(&label) > fw {
-                let mut s = truncate_cells(&label, fw.saturating_sub(3));
-                s.push_str("...");
-                s
-            } else {
-                label
-            };
-            if selected {
-                // opencode-style hot-pink selection bar with black text,
-                // full width across the panel
-                let bar = theme::bg(Role::Primary, format!("  {}", pad_cells(&truncated, fw))).black();
-                out.push_str(&format!("  {}{}{}\n",
-                    pop_line(Role::Primary, "│".to_string()),
-                    bar,
-                    pop_line(Role::Primary, "│".to_string())));
-            } else {
-                out.push_str(&format!("  {}\n",
-                    pop_line(Role::Text, format!("│  {}│", pad_cells(&truncated, fw)))));
+        let apps: Vec<&MenuItem> = filtered.iter().copied()
+            .filter(|it| it.kind == MenuItemKind::Applet).collect();
+        let models: Vec<&MenuItem> = filtered.iter().copied()
+            .filter(|it| it.kind == MenuItemKind::Model).collect();
+
+        let mut row_idx = 0usize;
+
+        if !apps.is_empty() {
+            out.push_str(&header("apps"));
+            for it in &apps {
+                let selected = row_idx == display_idx;
+                let cursor = if selected { "►" } else { " " };
+                let status = if it.running { "●" } else { "○" };
+                let mode_tag = if it.foreground { "[window]" } else { "[bg]" };
+                let plain = format!("{} {} {}{}{}",
+                    cursor, status,
+                    pad_cells(&it.name, 11), pad_cells(&it.desc, 24), pad_cells(mode_tag, 8));
+                out.push_str(&menu_row_line(&plain, &plain, fw, selected, cb));
+                row_idx += 1;
+            }
+        }
+
+        if !models.is_empty() {
+            out.push_str(&header("models"));
+            for it in &models {
+                let selected = row_idx == display_idx;
+                let cursor = if selected { "►" } else { " " };
+                // active marker: ✓ (hot pink) — visually distinct from the
+                // plain ●/○ applet running dots; space when not current
+                let marker = if it.active { "✓" } else { " " };
+                // name-first truncation keeps the tag/ctx columns rigid
+                // even for monster ids like nvidia/nemotron-3-...-a12b:free
+                let name_shown = if visible_cells(&it.name) > 35 {
+                    format!("{}...", truncate_cells(&it.name, 32))
+                } else {
+                    it.name.clone()
+                };
+                let tag_shown = truncate_cells(&it.desc, 12);
+                let ctx_shown = it.ctx.as_deref()
+                    .map(|c| truncate_cells(c, 8)).unwrap_or_default();
+                let pad = " ".repeat(8 - visible_cells(&ctx_shown));
+                let plain = format!("{} {} {}{} {}{}{}",
+                    cursor, marker,
+                    pad_cells(&name_shown, 30), " ",
+                    pad_cells(&tag_shown, 12), pad, ctx_shown);
+                let colored = format!("{}{}{}{}{}{}{}{}",
+                    theme::paint(Role::Text, cursor),
+                    theme::paint(Role::Text, " "),
+                    theme::paint(if it.active { Role::Primary } else { Role::Text }, marker),
+                    theme::paint(Role::Text, " "),
+                    theme::paint(Role::Text, pad_cells(&name_shown, 30)),
+                    theme::paint(Role::Text, " "),
+                    theme::paint(Role::Dim, pad_cells(&tag_shown, 12)),
+                    theme::paint(Role::Dim, format!("{}{}", pad, ctx_shown)));
+                out.push_str(&menu_row_line(&plain, &colored, fw, selected, cb));
+                row_idx += 1;
             }
         }
     }
 
+    // footer: separator, filter line, hints, bottom rail
     out.push_str(&format!("  {}\n",
         pop_line(Role::Dim, format!("│{}│", "─".repeat(inner_w)))));
-    let filter_display = if filter.is_empty() { "type to filter...".to_string() } else { format!("filter: {}", filter) };
+    let filter_display = if filter.is_empty() {
+        "type to filter...".to_string()
+    } else {
+        format!("filter: {}", filter)
+    };
     out.push_str(&format!("  {}\n",
-        pop_line(Role::Dim, format!("│  {}│", pad_cells(&filter_display, fw)))));
+        pop_line(Role::Dim, format!("│  {}│",
+            pad_cells(&truncate_cells(&filter_display, fw), fw)))));
     out.push_str(&format!("  {}\n",
-        pop_line(Role::Dim, format!("│  {}│", pad_cells("● running  ○ stopped  ↑↓ nav  enter launch  x stop  esc back", fw)))));
+        pop_line(Role::Dim, format!("│  {}│",
+            pad_cells(&truncate_cells(
+                "↑↓ nav  enter open  x stop  esc back  ● running  ✓ current", fw), fw)))));
     out.push_str(&format!("  {}\n",
         pop_line(Role::Primary, format!("└{}┘", "─".repeat(inner_w)))));
 
@@ -1119,25 +1242,6 @@ pub fn draw_applet_menu(pages: &[(String, String, bool, bool)], idx: usize, filt
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn applet_menu_lines_are_aligned() {
-        let pages = vec![
-            ("engine".to_string(), "terminal persona host".to_string(), true, true),
-            ("flora-cli".to_string(), "scottish flora explorer".to_string(), false, true),
-            ("desktop-cat".to_string(), "desktop pet cat".to_string(), true, false),
-        ];
-        let (out, line_count) = draw_applet_menu(&pages, 0, "");
-        let lines: Vec<&str> = out.lines().collect();
-        assert!(!lines.is_empty());
-        assert_eq!(lines.len(), line_count);
-        let expected = strip_ansi(lines[0]).chars().count();
-        for line in &lines {
-            assert_eq!(strip_ansi(line).chars().count(), expected, "misaligned line: {}", line);
-        }
-        assert!(out.contains("►"));
-        assert!(out.contains("applet launcher"));
-    }
 
     fn strip_ansi(s: &str) -> String {
         let mut out = String::new();
@@ -1391,6 +1495,251 @@ mod tests {
         assert!(st.lines.len() >= 3, "120 cells at 40/row should wrap into 3 buffer rows");
         assert_eq!(st.lines[0], "short", "short lines must be untouched");
         assert!(visible_cells(&st.partial) <= 40, "partial row still stale");
+    }
+
+    // ── quick switcher (draw_launcher_menu) ────────────────
+
+    fn applet(name: &str, desc: &str, running: bool, foreground: bool) -> MenuItem {
+        MenuItem {
+            name: name.to_string(),
+            desc: desc.to_string(),
+            kind: MenuItemKind::Applet,
+            running,
+            active: false,
+            foreground,
+            ctx: None,
+        }
+    }
+
+    fn model(name: &str, tag: &str, active: bool, ctx: Option<&str>) -> MenuItem {
+        MenuItem {
+            name: name.to_string(),
+            desc: tag.to_string(),
+            kind: MenuItemKind::Model,
+            running: false,
+            active,
+            foreground: false,
+            ctx: ctx.map(|s| s.to_string()),
+        }
+    }
+
+    /// Assert every rendered line has the same visible cell count (the
+    /// box invariant the applet menu also enforces) and return that width.
+    fn assert_lines_aligned(out: &str) -> usize {
+        let lines: Vec<&str> = out.lines().collect();
+        assert!(!lines.is_empty(), "no lines rendered");
+        let widths: Vec<usize> = lines.iter().map(|l| visible_cells(l)).collect();
+        let first = widths[0];
+        for (line, w) in lines.iter().zip(widths.iter()) {
+            assert_eq!(*w, first, "misaligned line ({} cells, want {}): {}", w, first, line);
+        }
+        first
+    }
+
+    #[test]
+    fn launcher_lines_align_with_long_models_and_wide_chars() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            applet("flora-cli", "scottish flora explorer", false, true),
+            applet("hivebeat", "(๑•蔷•๑) music synth", true, false),
+            model("nvidia/nemotron-3-super-120b-a12b:free", "openrouter", false, Some("128k")),
+            model("✿kaomoji✿ name", "ollama", true, Some("32k")),
+            model("opencode/big-pickle", "opencode", false, None),
+        ];
+        let (out, line_count) = draw_launcher_menu(&items, 0, "");
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), line_count);
+        let w = assert_lines_aligned(&out);
+        assert!(w >= 28, "box below the documented floor: {w}");
+        // the long-model truncation and wide-char rows only fully render
+        // on a wide-enough box; alignment holds at every width
+        if w >= 60 {
+            assert!(out.contains("..."), "long model name should ellipsize");
+            assert!(strip_ansi(&out).contains("✿kaomoji✿ name"));
+        }
+    }
+
+    /// Distinct 38;2; foreground escapes in a raw line (order-independent,
+    /// race-free across the global theme — other test modules swap it).
+    fn fg_codes(line: &str) -> Vec<String> {
+        let mut codes = Vec::new();
+        let mut rest = line;
+        while let Some(i) = rest.find("\x1B[38;2;") {
+            let tail = &rest[i + 7..];
+            let end = tail.find('m').unwrap_or(tail.len());
+            codes.push(tail[..end].to_string());
+            rest = tail;
+        }
+        codes
+    }
+
+    #[test]
+    fn launcher_has_apps_and_models_headers() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            model("qwen2.5:7b", "ollama", true, Some("32k")),
+        ];
+        let (out, _) = draw_launcher_menu(&items, 0, "");
+        let lines: Vec<&str> = out.lines().collect();
+        let apps_header = lines.iter().find(|l| strip_ansi(l).contains("apps")).expect("apps header missing");
+        let models_header = lines.iter().find(|l| strip_ansi(l).contains("models")).expect("models header missing");
+        // a section divider carries Text rail + Success label + Dim dashes:
+        // at least 3 distinct fg codes, on the solid CodeBg fill
+        for header in [apps_header, models_header] {
+            let mut codes = fg_codes(header);
+            codes.sort();
+            codes.dedup();
+            assert!(codes.len() >= 3, "header not Success/dim-styled: {header}");
+            assert!(header.contains("48;2;"), "header must sit on the CodeBg fill");
+        }
+        assert_lines_aligned(&out);
+    }
+
+    #[test]
+    fn launcher_marks_active_model_and_selection_bar() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            applet("flora-cli", "scottish flora explorer", false, true),
+            model("qwen2.5:7b", "ollama", true, Some("32k")),
+            model("deepseek/deepseek-r1:free", "openrouter", false, Some("64k")),
+        ];
+        let (out, _) = draw_launcher_menu(&items, 3, ""); // select the last visible row
+        let plain = strip_ansi(&out);
+        assert!(plain.contains("►"), "selection cursor missing");
+        let qwen_line = plain.lines().find(|l| l.contains("qwen2.5:7b")).unwrap();
+        assert!(qwen_line.contains("✓"), "active model not marked: {qwen_line}");
+        let deepseek_line = plain.lines().find(|l| l.contains("deepseek")).unwrap();
+        assert!(deepseek_line.contains("►"), "selected row must carry the cursor");
+        assert!(!deepseek_line.contains("✓"), "non-active model must not be marked");
+        // the selection bar: black-on-Primary full-width fill (black fg
+        // + a solid 48;2; bg on the row that carries the cursor)
+        let raw_lines: Vec<&str> = out.lines().collect();
+        let bar_line = raw_lines.iter().find(|l| strip_ansi(l).contains("►")).unwrap();
+        // colored merges fg+bg into one SGR: the black fg rides as ";30m"
+        // on the bar's 48;2; fill
+        assert!(bar_line.contains(";30m"), "bar must be black text: {bar_line}");
+        assert!(bar_line.contains("48;2;"), "bar must be a solid fill: {bar_line}");
+
+        // no active model → no ✓ on any row (the footer legend still mentions it)
+        let items2 = vec![model("qwen2.5:7b", "ollama", false, None)];
+        let (out2, _) = draw_launcher_menu(&items2, 0, "");
+        let plain2 = strip_ansi(&out2);
+        let qwen2 = plain2.lines().find(|l| l.contains("qwen2.5:7b")).unwrap();
+        assert!(!qwen2.contains("✓"), "stray active marker on an inactive model");
+    }
+
+    #[test]
+    fn launcher_filter_matches_apps_and_models() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            applet("flora-cli", "scottish flora explorer", false, true),
+            model("qwen2.5:7b", "ollama", true, Some("32k")),
+            model("opencode/big-pickle", "opencode", false, Some("200k")),
+        ];
+        // name match in the apps section
+        let (out, _) = draw_launcher_menu(&items, 0, "flora");
+        let plain = strip_ansi(&out);
+        let w = assert_lines_aligned(&out);
+        assert!(plain.contains("flora-cli"));
+        assert!(!plain.contains("qwen2.5:7b"));
+        assert!(plain.contains("apps"), "apps header should remain");
+        assert!(!plain.contains("models"), "models header must hide when its section is empty");
+        // provider tag match in the models section
+        let (out, _) = draw_launcher_menu(&items, 0, "ollama");
+        let plain = strip_ansi(&out);
+        assert!(plain.contains("qwen2.5:7b"));
+        if w >= 60 {
+            assert!(plain.contains("ollama"), "tag column should show the provider");
+        }
+        assert!(!plain.contains("flora-cli"));
+        assert!(plain.contains("models"));
+        assert!(!plain.contains("apps"), "apps header must hide when its section is empty");
+        // model name match
+        let (out, _) = draw_launcher_menu(&items, 0, "big-pickle");
+        assert!(strip_ansi(&out).contains("opencode/big-pickle"));
+        assert_lines_aligned(&out);
+    }
+
+    #[test]
+    fn launcher_empty_filter_and_no_matches() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            model("qwen2.5:7b", "ollama", true, Some("32k")),
+        ];
+        let (out, _) = draw_launcher_menu(&items, 0, "");
+        let plain = strip_ansi(&out);
+        assert!(plain.contains("type to filter..."));
+        assert!(plain.contains("engine"));
+        assert!(plain.contains("qwen2.5:7b"));
+
+        let (out, _) = draw_launcher_menu(&items, 0, "zzz-nope");
+        let plain = strip_ansi(&out);
+        assert!(plain.contains("no matches for '"), "no-matches row missing");
+        assert!(!plain.contains("engine"));
+        assert!(!plain.contains("qwen2.5:7b"));
+        assert!(!plain.contains("apps") && !plain.contains("models"), "headers must hide with no rows");
+        assert_lines_aligned(&out);
+    }
+
+    #[test]
+    fn launcher_truncates_very_long_names_and_stays_aligned() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            model(&"x".repeat(80), "ollama", false, Some("128k")),
+            model("✿薔薇✿-flower", "opencode", true, None),
+        ];
+        let (out, _) = draw_launcher_menu(&items, 1, "");
+        let w = assert_lines_aligned(&out);
+        assert!(w >= 28, "box below the documented floor: {w}");
+        if w >= 60 {
+            let plain = strip_ansi(&out);
+            let long_line = plain.lines().find(|l| l.contains("ollama")).unwrap();
+            assert!(long_line.contains("..."), "long name must ellipsize: {long_line}");
+            assert!(long_line.contains("128k"), "right-aligned ctx column must survive: {long_line}");
+            assert!(plain.contains("✿薔薇✿-flower"), "wide-char name lost");
+        }
+    }
+
+    #[test]
+    fn launcher_skips_empty_sections() {
+        let items = vec![model("qwen2.5:7b", "ollama", true, Some("32k"))];
+        let (out, _) = draw_launcher_menu(&items, 0, "");
+        let plain = strip_ansi(&out);
+        assert!(plain.contains("models"));
+        assert!(!plain.contains("apps"), "empty apps section must not render a header");
+        assert_lines_aligned(&out);
+    }
+
+    #[test]
+    fn launcher_clamps_out_of_range_selection() {
+        let items = vec![
+            applet("engine", "terminal persona host", true, true),
+            model("qwen2.5:7b", "ollama", true, Some("32k")),
+        ];
+        let (out, _) = draw_launcher_menu(&items, 99, "");
+        let plain = strip_ansi(&out);
+        let selected = plain.lines().find(|l| l.contains("►")).unwrap();
+        assert!(selected.contains("qwen2.5:7b"), "selection should clamp to the last visible row");
+        assert_lines_aligned(&out);
+    }
+
+    #[test]
+    fn popup_geometry_centers_both_axes() {
+        // 68-cell box on 120 cols → col 27: box 27..94, terminal center 60.5
+        assert_eq!(popup_geometry(120, 30, 68, 10), (11, 27));
+        // 68-cell box on 80 cols → col 7, dead center
+        assert_eq!(popup_geometry(80, 24, 68, 12), (7, 7));
+        // narrow window: shrunk box (36) centers on its own width
+        assert_eq!(popup_geometry(40, 24, 36, 12), (7, 3));
+        // clip is capped to rows-2 so the box keeps a margin
+        assert_eq!(popup_geometry(80, 10, 68, 99), (2, 7));
+        // tiny terminal clamps instead of underflowing
+        assert_eq!(popup_geometry(20, 5, 28, 1), (3, 1));
+        // menu box width matches the menus' inner_w floor at every size
+        assert_eq!(menu_box_width(30), 28);
+        assert_eq!(menu_box_width(40), 36);
+        assert_eq!(menu_box_width(80), 68);
+        assert_eq!(menu_box_width(120), 68);
     }
 }
 

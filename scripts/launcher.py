@@ -2,7 +2,7 @@
 ayesha-os applet launcher — system tray companion
 ─────────────────────────────────────────────────
 launch/stop any applet from the tray menu.
-uses pystray (already a dependency via desktop-cat).
+uses pystray for the tray icon.
 
 run:  python scripts/launcher.py
 """

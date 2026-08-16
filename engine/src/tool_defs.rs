@@ -463,7 +463,7 @@ pub static TOOL_CATALOG: std::sync::LazyLock<Vec<ToolDef>> = std::sync::LazyLock
                         "type": "string",
                         "description": "Action to perform: list, status, launch, stop"
                     },
-                    "name": { "type": "string", "description": "Applet name for status/launch/stop (e.g. flora-cli, desktop-cat)" }
+                    "name": { "type": "string", "description": "Applet name for status/launch/stop (e.g. flora-cli, hivebeat)" }
                 },
                 "required": ["action"]
             }),

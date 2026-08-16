@@ -1304,6 +1304,7 @@ dr(0)
     //  Clipboard
     // ═══════════════════════════════════════════
 
+    #[cfg(not(target_os = "android"))]
     async fn read_clipboard(&self) -> Result<String> {
         let mut cb = arboard::Clipboard::new()
             .map_err(|e| anyhow::anyhow!("failed to open clipboard: {}", e))?;
@@ -1328,6 +1329,13 @@ dr(0)
             }
             Err(e) => Ok(format!("failed to read clipboard: {}", e)),
         }
+    }
+
+    /// On android/termux there is no clipboard backend (arboard is excluded
+    /// from the android build) — graceful no-op.
+    #[cfg(target_os = "android")]
+    async fn read_clipboard(&self) -> Result<String> {
+        Ok("clipboard unavailable on android/termux (no clipboard backend)".to_string())
     }
 
     // ═══════════════════════════════════════════

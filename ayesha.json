@@ -67,28 +67,9 @@
   },
   "projects": {
     "engine": { "path": "engine/", "lang": "rust", "desc": "terminal-native persona host with tool-calling" },
-    "core": { "path": "core/", "lang": "python", "desc": "hivemind orchestrator with gradio web ui", "run": "python app.py", "port": 7860 },
-    "desktop-cat": { "path": "applets/desktop-cat/", "lang": "python", "desc": "desktop pet cat that follows cursor", "run": "python desktopcat.py" },
     "flora-cli": { "path": "applets/flora-cli/", "lang": "typescript", "desc": "scottish flora phylogeny explorer", "run": "npx tsx cli.ts", "foreground": true },
-    "poopy-tui": { "path": "applets/poopy-tui/", "lang": "python", "desc": "discord client (in-window)", "run": "python main.py", "foreground": true },
     "hivebeat": { "path": "applets/hivebeat/", "lang": "python", "desc": "live-coding terminal music synth (numpy, sample-accurate)", "run": "python repl.py", "foreground": true },
     "models": { "path": "models/", "lang": "ollama", "desc": "ayesha personality modelfile" },
     "git-middleware": { "path": "git_middleware/", "lang": "python", "desc": "gitea webhook + LLM task runner", "run": "python main.py", "port": 9000 }
-  },
-  "desktopCat": {
-    "speed": 5.0,
-    "bubbleInterval": 120,
-    "phrases": [
-      "Purring...",
-      "Meow!",
-      "Found a bug!",
-      "Running on all cores...",
-      "Compiling dreams...",
-      "Dreaming of tuna...",
-      "Catnap time.",
-      "Paws and reflect.",
-      "Meowdel driven.",
-      "Purrrfect code."
-    ]
   }
 }
