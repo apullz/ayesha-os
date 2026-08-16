@@ -24,12 +24,19 @@ pub struct AppletEntry {
 struct AyeshaConfig {
     #[serde(default)]
     pub projects: HashMap<String, AppletEntry>,
+    /// Opt-in strict sandbox: `"sandbox": true` makes check_sensitive reject
+    /// sensitive paths and write_file respect the ReadOnly attribute.
+    /// Default false (permissive — legacy behavior).
+    #[serde(default)]
+    pub sandbox: bool,
 }
 
 pub struct AppletManager {
     pub entries: HashMap<String, AppletEntry>,
     pub processes: HashMap<String, Child>,
     pub root: String,
+    /// Value of the `sandbox` flag in ayesha.json (default false).
+    pub sandbox: bool,
 }
 
 impl AppletManager {
@@ -67,20 +74,21 @@ impl AppletManager {
         let root = root.to_string_lossy().to_string();
 
         let config_path = std::path::Path::new(&root).join("ayesha.json");
-        let entries = if config_path.exists() {
+        let (entries, sandbox) = if config_path.exists() {
             std::fs::read_to_string(&config_path)
                 .ok()
                 .and_then(|s| serde_json::from_str::<AyeshaConfig>(&s).ok())
-                .map(|c| c.projects)
+                .map(|c| (c.projects, c.sandbox))
                 .unwrap_or_default()
         } else {
-            HashMap::new()
+            (HashMap::new(), false)
         };
 
         AppletManager {
             entries,
             processes: HashMap::new(),
             root,
+            sandbox,
         }
     }
 

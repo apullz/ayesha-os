@@ -1,14 +1,31 @@
 use std::path::{Path, PathBuf};
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 #[derive(Clone)]
 pub struct Sandbox {
     root: PathBuf,
+    /// When true, `check_sensitive`/`check_sensitive_resolved` reject
+    /// sensitive paths and write_file respects the ReadOnly attribute.
+    /// Default false — permissive, byte-identical to legacy behavior.
+    /// Opt in via `"sandbox": true` in ayesha.json.
+    sandbox: bool,
 }
 
 impl Sandbox {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self { root: root.into(), sandbox: false }
+    }
+
+    /// Enable/disable sensitive-path + ReadOnly enforcement. `Sandbox::new`
+    /// and `default_workspace` start permissive; the runtime threads the
+    /// ayesha.json `sandbox` flag through this.
+    pub fn with_sandbox(mut self, enabled: bool) -> Self {
+        self.sandbox = enabled;
+        self
+    }
+
+    pub fn sandbox_enabled(&self) -> bool {
+        self.sandbox
     }
 
     pub fn default_workspace() -> Self {
@@ -106,12 +123,34 @@ impl Sandbox {
         Ok(full)
     }
 
-    pub fn check_sensitive(&self, _path: &str) -> Result<()> {
+    /// Reject paths that touch sensitive files/dirs (secrets, credentials).
+    /// Only enforced when the sandbox flag is on; otherwise permissive
+    /// (legacy behavior). Operates on the raw path string pre-resolution so
+    /// env-var / tilde forms are still caught by component inspection.
+    pub fn check_sensitive(&self, path: &str) -> Result<()> {
+        if !self.sandbox {
+            return Ok(());
+        }
+        for component in path.split(['/', '\\']) {
+            if is_sensitive_component(component) {
+                bail!("refusing to access sensitive path: {}", path);
+            }
+        }
         Ok(())
     }
 
     /// Check a resolved/canonical path for sensitive patterns (post-resolution).
-    pub fn check_sensitive_resolved(&self, _path: &std::path::Path) -> Result<()> {
+    pub fn check_sensitive_resolved(&self, path: &Path) -> Result<()> {
+        if !self.sandbox {
+            return Ok(());
+        }
+        for component in path.components() {
+            if let std::path::Component::Normal(c) = component {
+                if is_sensitive_component(&c.to_string_lossy()) {
+                    bail!("refusing to access sensitive path: {}", path.display());
+                }
+            }
+        }
         Ok(())
     }
 
@@ -119,6 +158,20 @@ impl Sandbox {
     pub fn root(&self) -> &Path {
         &self.root
     }
+}
+
+/// True for path components that hold secrets (case-insensitive).
+/// Matches the claims in the README once sandbox is enabled.
+fn is_sensitive_component(component: &str) -> bool {
+    let c = component.to_ascii_lowercase();
+    matches!(
+        c.as_str(),
+        ".env" | ".ssh" | ".gnupg" | ".aws"
+            | ".netrc" | "_netrc"
+            | "id_rsa" | "id_ed25519" | "id_dsa"
+            | ".git-credentials" | ".pgpass"
+            | ".password" | ".secret" | ".token"
+    ) || (c.starts_with(".env.") && !c.ends_with(".example"))
 }
 
 #[cfg(test)]
@@ -157,14 +210,17 @@ mod tests {
     }
 
     #[test]
-    fn test_check_sensitive_env() {
+    fn test_check_sensitive_env_permissive_by_default() {
+        // Legacy default: sandbox off, sensitive paths are allowed.
         let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive("C:\\project\\.env").is_ok());
+        let s = Sandbox::new("C:\\").with_sandbox(false);
         assert!(s.check_sensitive("C:\\project\\.env").is_ok());
     }
 
     #[test]
-    fn test_check_sensitive_ssh() {
-        let s = Sandbox::new("C:\\");
+    fn test_check_sensitive_ssh_permissive_by_default() {
+        let s = Sandbox::new("C:\\").with_sandbox(false);
         assert!(s.check_sensitive("C:\\Users\\me\\.ssh\\id_rsa").is_ok());
     }
 
@@ -183,20 +239,39 @@ mod tests {
     }
 
     #[test]
-    fn test_check_sensitive_resolved_blocks_ssh() {
-        let s = Sandbox::new("C:\\");
+    fn test_check_sensitive_resolved_blocks_ssh_permissive_by_default() {
+        let s = Sandbox::new("C:\\").with_sandbox(false);
         assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\.ssh\\id_rsa")).is_ok());
     }
 
     #[test]
-    fn test_check_sensitive_resolved_blocks_netrc() {
-        let s = Sandbox::new("C:\\");
+    fn test_check_sensitive_resolved_blocks_netrc_permissive_by_default() {
+        let s = Sandbox::new("C:\\").with_sandbox(false);
         assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\.netrc")).is_ok());
     }
 
     #[test]
     fn test_check_sensitive_resolved_allows_normal() {
         let s = Sandbox::new("C:\\");
+        assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\Documents\\file.txt")).is_ok());
+    }
+
+    #[test]
+    fn test_sandbox_true_blocks_env() {
+        let s = Sandbox::new("C:\\").with_sandbox(true);
+        assert!(s.check_sensitive("C:\\project\\.env").is_err());
+        assert!(s.check_sensitive("C:\\project\\.env.local").is_err());
+        // .env.example is documentation, not a secret
+        assert!(s.check_sensitive("C:\\project\\.env.example").is_ok());
+    }
+
+    #[test]
+    fn test_sandbox_true_blocks_ssh_and_netrc() {
+        let s = Sandbox::new("C:\\").with_sandbox(true);
+        assert!(s.check_sensitive("C:\\Users\\me\\.ssh\\id_rsa").is_err());
+        assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\.ssh\\id_rsa")).is_err());
+        assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\.netrc")).is_err());
+        assert!(s.check_sensitive("C:\\Users\\me\\Documents\\file.txt").is_ok());
         assert!(s.check_sensitive_resolved(std::path::Path::new("C:\\Users\\me\\Documents\\file.txt")).is_ok());
     }
 }

@@ -1,6 +1,7 @@
 mod ollama;
 mod cloud;
 mod tools;
+mod tool_defs;
 mod skills;
 mod sandbox;
 mod ui;
@@ -440,8 +441,8 @@ async fn main() -> anyhow::Result<()> {
     theme::load_from_config(None);
 
     let session_start = std::time::Instant::now();
-    let sandbox = Sandbox::default_workspace();
     let mut manager = AppletManager::new();
+    let sandbox = Sandbox::default_workspace().with_sandbox(manager.sandbox);
     let executor = ToolExecutor::new(sandbox);
     let mut current_model = "opencode/big-pickle".to_string();
     let fallback_model = "xiaomi/mimo-v2.5-pro";
@@ -476,16 +477,9 @@ async fn main() -> anyhow::Result<()> {
     let project_root = std::env::current_dir().unwrap_or_default();
     let analyzer = SelfAnalyzer::new(project_root.clone());
     let tool_ollama = OllamaClient::new("ayesha");
-    let evolver = ToolEvolver::new(vec![
-        "read_file".into(), "write_file".into(), "list_dir".into(),
-        "grep".into(), "glob".into(), "list_skills".into(), "read_skill".into(),
-        "generate_html".into(), "generate_sprite".into(), "generate_tileset".into(),
-        "generate_object".into(), "render_sprite".into(), "read_clipboard".into(),
-        "remember".into(), "list_memories".into(), "search_memories".into(),
-        "set_preference".into(), "analyze_self".into(), "list_source_files".into(),
-        "evolve_tools".into(), "refine_prompt".into(), "get_tool_stats".into(),
-        "coding_agent".into(), "manage_applet".into(),
-    ]);
+    let evolver = ToolEvolver::new(
+        tool_defs::known_tool_names().into_iter().map(|s| s.to_string()).collect()
+    );
 
     // Model registry
     let mut registry = ModelRegistry::new();
@@ -598,7 +592,8 @@ async fn main() -> anyhow::Result<()> {
     ui::print_banner();
     ui::show_system(&memory.summary());
 
-    let tools = OllamaClient::tool_definitions_core();
+    let tools = tool_defs::tool_definitions_core();
+    let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let mut vision_model = "llama3.2-vision".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
@@ -1609,7 +1604,7 @@ async fn main() -> anyhow::Result<()> {
 
         // Step 1: Call ayesha WITH tools — she's a real agent and can act directly
         let first_result = client
-            .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+            .chat_stream_visible(&messages, Some(tools), &steer_rx)
             .await;
 
         let first_result = match first_result {
@@ -1704,7 +1699,7 @@ async fn main() -> anyhow::Result<()> {
 
             // Get final ayesha response after tool execution
             let final_result = client
-                .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+                .chat_stream_visible(&messages, Some(tools), &steer_rx)
                 .await;
 
             if let Ok(r) = final_result {
@@ -1779,7 +1774,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }).collect();
             let qwen_result = tool_client
-                .chat_stream_collect(&tool_messages, Some(&tools), &steer_rx)
+                .chat_stream_collect(&tool_messages, Some(tools), &steer_rx)
                 .await;
 
             match qwen_result {
@@ -1911,7 +1906,7 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }).collect();
                         let next_result = tool_client
-                            .chat_stream_collect(&tool_messages2, Some(&tools), &steer_rx)
+                            .chat_stream_collect(&tool_messages2, Some(tools), &steer_rx)
                             .await;
 
                         match next_result {
@@ -1966,7 +1961,7 @@ async fn main() -> anyhow::Result<()> {
                     // Final response from ayesha
                     if !steer_happened {
                         let final_result = client
-                            .chat_stream_visible(&messages, Some(&tools), &steer_rx)
+                            .chat_stream_visible(&messages, Some(tools), &steer_rx)
                             .await;
 
                         if let Ok(r) = final_result {
@@ -2032,23 +2027,23 @@ async fn main() -> anyhow::Result<()> {
 /// Exit 0 if a tool was executed successfully, exit 1 otherwise.
 /// Called via `ayesha-os --headless "message"`.
 async fn run_headless(message: &str) -> anyhow::Result<()> {
-    let sandbox = Sandbox::default_workspace();
+    let mut manager = AppletManager::new();
+    let sandbox = Sandbox::default_workspace().with_sandbox(manager.sandbox);
     let executor = ToolExecutor::new(sandbox.clone());
     let client = OllamaClient::new("ayesha");
     let tool_client = OllamaClient::new("qwen2.5:7b");
-    let tools = OllamaClient::tool_definitions_core();
+    let tools = tool_defs::tool_definitions_core();
+    let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
     let mut memory = memory::MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
     let analyzer = SelfAnalyzer::new(std::env::current_dir().unwrap_or_default());
-    let evolver = ToolEvolver::new(vec![
-        "read_file".into(), "write_file".into(), "list_dir".into(),
-        "grep".into(), "glob".into(), "generate_html".into(),
-    ]);
+    let evolver = ToolEvolver::new(
+        tool_defs::known_tool_names().into_iter().map(|s| s.to_string()).collect()
+    );
     let project_root = std::env::current_dir().unwrap_or_default();
     let mut input_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let menu_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut manager = AppletManager::new();
 
     // Build the tool-friendly system prompt (same as main loop)
     let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
@@ -2081,7 +2076,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
     };
 
     // Step 1: try qwen directly with tools
-    let qwen_result = tool_client.chat_stream_collect(&messages, Some(&tools), &steer_rx).await;
+    let qwen_result = tool_client.chat_stream_collect(&messages, Some(tools), &steer_rx).await;
 
     let mut tools_executed = false;
     match qwen_result {
@@ -2181,7 +2176,8 @@ async fn selftest() -> anyhow::Result<()> {
     );
 
     // 4. Tool definitions parse
-    let tools = OllamaClient::tool_definitions();
+    let tools = tool_defs::tool_definitions();
+    let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let tools_ok = !tools.is_empty();
     check(&format!("{} tool definitions loaded", tools.len()), tools_ok, &mut checks);
 
@@ -2192,7 +2188,7 @@ async fn selftest() -> anyhow::Result<()> {
         tool_calls: None,
         tool_call_id: None,
     }];
-    let qwen_tool_resp = qwen.chat_stream_collect(&tool_msgs, Some(&tools), &rx).await;
+    let qwen_tool_resp = qwen.chat_stream_collect(&tool_msgs, Some(tools), &rx).await;
     let qwen_tool_ok = qwen_tool_resp.as_ref().map(|r| r.has_tool_calls()).unwrap_or(false);
     check(
         &format!("qwen2.5 emits tool_calls{}", if let Err(e) = &qwen_tool_resp {

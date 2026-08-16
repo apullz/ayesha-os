@@ -94,9 +94,52 @@ pub struct ToolExecutor {
     sandbox: Sandbox,
 }
 
+/// All tool names the executor can dispatch, grouped the same way the
+/// handler match in `execute()` is. `dispatch_for` resolves through this
+/// list; `every_catalog_tool_has_dispatch_arm` pins it to TOOL_CATALOG in
+/// both directions, so the catalog and dispatcher can never drift.
+const DISPATCHABLE_TOOLS: &[&str] = &[
+    // File ops
+    "read_file", "write_file", "list_dir", "grep", "glob",
+    // Skills
+    "list_skills", "read_skill",
+    // Network
+    "fetch_url", "download_image",
+    // Generation
+    "generate_html", "generate_sprite", "generate_tileset",
+    "generate_object", "render_sprite",
+    // Clipboard
+    "read_clipboard",
+    // Memory
+    "remember", "list_memories", "search_memories", "set_preference",
+    // Analysis
+    "analyze_self", "list_source_files",
+    // Evolution / prompt
+    "evolve_tools", "refine_prompt", "get_tool_stats",
+    // Coding agent / applets
+    "coding_agent", "manage_applet",
+];
+
 impl ToolExecutor {
     pub fn new(sandbox: Sandbox) -> Self {
         Self { sandbox }
+    }
+
+    /// Tool names the executor can dispatch. Every TOOL_CATALOG entry must
+    /// resolve here — `every_catalog_tool_has_dispatch_arm` iterates the
+    /// catalog and asserts it, so a tool added to the catalog without a
+    /// handler fails the build. The handler match in `execute()` mirrors
+    /// this list; its fallback arm distinguishes a catalog-known name with
+    /// no handler (internal bug) from a genuinely unknown tool.
+    pub fn dispatch_for(name: &str) -> Option<&'static str> {
+        DISPATCHABLE_TOOLS.iter().copied().find(|n| *n == name)
+    }
+
+    /// Every name the executor can dispatch — the catalog test checks this
+    /// list against TOOL_CATALOG in both directions so neither can drift.
+    #[allow(dead_code)] // consumed by every_catalog_tool_has_dispatch_arm
+    pub fn dispatched_tool_names() -> &'static [&'static str] {
+        DISPATCHABLE_TOOLS
     }
 
     pub async fn execute(&self, name: &str, args: &Value, ctx: &mut ToolContext<'_>) -> Result<String> {
@@ -149,6 +192,13 @@ impl ToolExecutor {
             // Applets
             "manage_applet" => self.manage_applet(args, ctx).await,
 
+            // A catalog-known tool that reaches this arm has a dispatch entry
+            // but no handler — a regression `every_catalog_tool_has_dispatch_arm`
+            // should have caught. Surface it as an internal error, not a
+            // generic "unknown tool" (which would mask the drift).
+            _ if Self::dispatch_for(name).is_some() => {
+                bail!("internal error: tool '{}' is catalog-known but has no dispatch arm", name)
+            }
             _ => bail!("unknown tool: {}", name),
         }
     }
@@ -254,14 +304,19 @@ impl ToolExecutor {
 
         self.sandbox.check_sensitive(path)?;
         let resolved = self.sandbox.resolve(path)?;
-        // Removed: self.sandbox.check_sensitive_resolved(&resolved)?;
+        self.sandbox.check_sensitive_resolved(&resolved)?;
 
         if let Some(parent) = resolved.parent() {
             fs::create_dir_all(parent)?;
         }
 
-        // Try to handle ReadOnly attribute if writing fails
+        // Try to handle ReadOnly attribute if writing fails. In strict
+        // sandbox mode the ReadOnly attribute is respected instead of being
+        // auto-cleared.
         if let Err(e) = fs::write(&resolved, content) {
+            if self.sandbox.sandbox_enabled() {
+                return Err(e.into());
+            }
             let metadata = fs::metadata(&resolved);
             if let Ok(m) = metadata {
                 if m.permissions().readonly() {
@@ -1381,6 +1436,35 @@ mod tests {
         }).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("unknown tool"));
+    }
+
+    /// Compile-time guard: the catalog (single source of truth) and the
+    /// executor dispatcher must never drift. Iterates TOOL_CATALOG and
+    /// asserts every entry resolves through `dispatch_for` — a catalog
+    /// addition without a handler fails the build here. Checks the reverse
+    /// too: every dispatchable name must exist in the catalog, so the model
+    /// is never offered a tool that has no definition.
+    #[test]
+    fn every_catalog_tool_has_dispatch_arm() {
+        for def in crate::tool_defs::TOOL_CATALOG.iter() {
+            assert!(
+                ToolExecutor::dispatch_for(def.name).is_some(),
+                "tool '{}' is in TOOL_CATALOG but has no dispatch arm — add a handler in execute() and a DISPATCHABLE_TOOLS entry",
+                def.name
+            );
+        }
+        for name in ToolExecutor::dispatched_tool_names() {
+            assert!(
+                crate::tool_defs::TOOL_CATALOG.iter().any(|d| d.name == *name),
+                "dispatch arm for '{}' has no TOOL_CATALOG entry",
+                name
+            );
+        }
+        assert_eq!(
+            ToolExecutor::dispatched_tool_names().len(),
+            crate::tool_defs::TOOL_CATALOG.len(),
+            "dispatcher and catalog must have the same number of tools"
+        );
     }
 
     #[tokio::test]

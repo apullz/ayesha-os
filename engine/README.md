@@ -58,16 +58,19 @@
     Ctrl+C to abort, Ctrl+M / Ctrl+P open interactive applet menu
     Shift+Up/Down to cycle applets
 
-  TOOL EXECUTION (18 tools)
-    file ops:    read_file, write_file, list_dir
+  TOOL EXECUTION (26 tools)
+    file ops:    read_file, write_file, list_dir, grep, glob
+    skills:      list_skills, read_skill
     generation:  generate_html, generate_sprite,
                  generate_tileset, generate_object, render_sprite
     memory:      remember, list_memories, search_memories,
                  set_preference
     analysis:    analyze_self, list_source_files, evolve_tools,
                  refine_prompt, get_tool_stats
+    network:     fetch_url, download_image
     clipboard:   read_clipboard
     coding:      coding_agent (read/write/edit/analyze/modify/suggest)
+    applets:     manage_applet
 
   PIXEL STRIKER (built-in sprite engine)
     7-color character palettes
@@ -83,8 +86,11 @@
     prompt refinement (analyzes success rates)
     error auto-memory (tool failures stored automatically)
 
-  SANDBOX SECURITY
-    blocks sensitive paths: .env, .ssh, .gnupg, .aws
+  SANDBOX SECURITY (opt-in)
+    strict enforcement is OFF by default (legacy permissive behavior);
+    enable it with "sandbox": true in ayesha.json
+    when enabled, blocks sensitive paths: .env, .ssh, .gnupg, .aws
+    when enabled, write_file respects the ReadOnly attribute
     path traversal prevention
     all file ops through Sandbox::resolve()
 

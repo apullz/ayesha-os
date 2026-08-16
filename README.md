@@ -323,11 +323,14 @@ the engine learns and evolves:
 - **tool evolution** — identifies missing tools and generates definitions + implementation skeletons
 - **prompt refinement** — tracks tool success rates and suggests system prompt changes
 - **error auto-memory** — tool failures automatically stored as memories
-- **111 unit tests** — `cargo test` with zero warnings; `ayesha-os --selftest` runs a headless E2E smoke test
+- **139 unit tests** — `cargo test` with zero warnings; `ayesha-os --selftest` runs a headless E2E smoke test
 
 ### sandbox security
 
+strict path blocking is **opt-in**: set `"sandbox": true` in `ayesha.json`. by default the sandbox is permissive (legacy behavior — it resolves paths but does not block sensitive files). with `"sandbox": true`:
+
 - blocks access to sensitive paths: `.env`, `.ssh`, `.gnupg`, `.aws`, `.password`, `.secret`, `.token`
+- `write_file` respects the ReadOnly attribute instead of auto-clearing it
 - path traversal prevention via canonicalization
 - all file operations go through `Sandbox::resolve()`
 

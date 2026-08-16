@@ -721,7 +721,8 @@ mod live_smoke_tests {
             let prompt = crate::ollama::OllamaClient::system_prompt("senpai", "C:\\ayesha-os\\engine");
             let client = CloudClient::new(FREE_MODEL, "openrouter")
                 .expect("openrouter key must resolve");
-            let tools = crate::ollama::OllamaClient::tool_definitions_core();
+            let tools = crate::tool_defs::tool_definitions_core();
+            let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
             let msgs = vec![
                 ChatMessage {
                     role: "system".to_string(),
@@ -736,7 +737,7 @@ mod live_smoke_tests {
                     tool_call_id: None,
                 },
             ];
-            client.chat_stream_collect(&msgs, Some(&tools), &rx).await
+            client.chat_stream_collect(&msgs, Some(tools), &rx).await
         });
         let r = result.expect("cloud stream should succeed");
         println!("--- cloud reply ---\n{}\n--- end ---", r.content);
