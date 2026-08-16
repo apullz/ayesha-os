@@ -1,4 +1,5 @@
 mod ollama;
+mod permissions;
 mod cloud;
 mod streaming;
 mod tools;
@@ -17,6 +18,7 @@ mod coding_agent;
 mod model_registry;
 mod applet_manager;
 mod applet_runner;
+mod plugins;
 mod agent;
 mod completion;
 mod theme;
@@ -38,6 +40,7 @@ use self_analysis::SelfAnalyzer;
 use tool_evolution::ToolEvolver;
 use model_registry::ModelRegistry;
 use applet_manager::AppletManager;
+use permissions::Verdict;
 
 
 /// Active backend — either local Ollama or cloud (OpenRouter/OpenCode)
@@ -46,12 +49,72 @@ enum ActiveBackend {
     Cloud(CloudClient),
 }
 
+/// Agent operation mode. `auto` lets the agent decide; `plan` is read-only
+/// research (mutating tools are denied); `build` is the full toolset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Plan,
+    Build,
+    Auto,
+}
+
+impl Mode {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Mode::Plan => "plan",
+            Mode::Build => "build",
+            Mode::Auto => "auto",
+        }
+    }
+
+    fn from_str(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "plan" => Some(Mode::Plan),
+            "build" => Some(Mode::Build),
+            "auto" => Some(Mode::Auto),
+            _ => None,
+        }
+    }
+}
+
 /// Build the system prompt for a user, appending the skills hint if any
 /// skills are installed in the project's skills/ folder.
 fn build_system_prompt(user_name: &str, project_root: &std::path::Path) -> String {
     let mut prompt = OllamaClient::system_prompt(user_name, &project_root.to_string_lossy());
     if let Some(hint) = skills::system_prompt_hint(project_root) {
         prompt.push_str(&hint);
+    }
+    prompt
+}
+
+/// Full system prompt: base + skills hint + mode directive + plugin snippets.
+fn build_system_prompt_full(
+    user_name: &str,
+    project_root: &std::path::Path,
+    mode: Mode,
+    plugin_suffix: &str,
+) -> String {
+    let mut prompt = build_system_prompt(user_name, project_root);
+    match mode {
+        Mode::Plan => {
+            prompt.push_str(
+                "\n\n### mode: plan\n\
+                 you are in PLAN MODE (read-only research). you must NOT modify any files, \
+                 create anything, remember things, or change settings — investigate, analyze, \
+                 and propose. the mutating tools are denied and will error if you attempt them. \
+                 present your plan/proposal as your final answer. switch with /mode build when \
+                 the user approves the plan.",
+            );
+        }
+        Mode::Build => {
+            prompt.push_str("\n\n### mode: build\nchanges are allowed — you have the full toolset.");
+        }
+        Mode::Auto => {
+            prompt.push_str("\n\n### mode: auto\nuse tools as you judge appropriate.");
+        }
+    }
+    if !plugin_suffix.is_empty() {
+        prompt.push_str(plugin_suffix);
     }
     prompt
 }
@@ -137,6 +200,84 @@ where
                 }
             }
             res = &mut fut => return ToolOutcome::Done(res),
+        }
+    }
+}
+
+/// Result of a permission prompt.
+enum AskResult {
+    /// Run the tool.
+    Allow,
+    /// Do not run — message to feed back to the model as the tool result.
+    Deny(String),
+    /// Stop executing the turn. Carries the raw abort input (`\0ctrl-c`, which
+    /// the outer loop turns into a graceful shutdown) or an empty string for
+    /// soft aborts (menu-esc / closed channel).
+    Abort(String),
+}
+
+/// Ask the user to allow/deny a sensitive tool call, reading the answer from
+/// the steer channel (the same channel hotkeys and steering arrive on). Typed
+/// lines arrive WITHOUT the `\0` prefix, so plain "y"/"a"/"n"/"d" answers can
+/// never collide with control codes. "always" / "deny-forever" choices are
+/// persisted into config.json so the prompt isn't repeated.
+fn ask_permission(
+    name: &str,
+    args_str: &str,
+    steer_rx: &std::sync::mpsc::Receiver<String>,
+    config: &mut serde_json::Value,
+    config_path: &std::path::Path,
+) -> AskResult {
+    let preview = if args_str.chars().count() > 80 {
+        format!("{}...", crate::util::truncate_chars(args_str, 79))
+    } else {
+        args_str.to_string()
+    };
+    ui::show_system(&format!("permission needed — `{}` ({})", name, preview));
+    ui::show_system("  [y] allow once · [a] always allow · [n] deny once · [d] deny forever · [ctrl+c] abort");
+    ui::dock_redraw_bottom();
+
+    loop {
+        let input = match steer_rx.recv() {
+            Ok(i) => i,
+            Err(_) => return AskResult::Abort(String::new()), // channel closed
+        };
+        // Control codes can't be permission answers; ctrl+c aborts the turn.
+        if let Some(code) = input.strip_prefix('\0') {
+            match code {
+                "ctrl-c" => return AskResult::Abort(input),
+                "menu-esc" => return AskResult::Abort(String::new()),
+                _ => continue, // other hotkeys don't answer permission prompts
+            }
+        }
+        match input.trim().to_lowercase().as_str() {
+            "y" | "yes" | "allow" | "allow once" => return AskResult::Allow,
+            "a" | "always" | "always allow" => {
+                permissions::set_override(config, name, "always");
+                if let Ok(content) = serde_json::to_string_pretty(&config) {
+                    let _ = std::fs::write(&config_path, content);
+                }
+                ui::show_system(&format!("`{}` will always be allowed (remove the override in config.json to undo)", name));
+                return AskResult::Allow;
+            }
+            "n" | "no" | "deny" | "deny once" => {
+                return AskResult::Deny("error: tool call denied by user".to_string());
+            }
+            "d" | "never" | "deny forever" => {
+                permissions::set_override(config, name, "never");
+                if let Ok(content) = serde_json::to_string_pretty(&config) {
+                    let _ = std::fs::write(&config_path, content);
+                }
+                return AskResult::Deny(format!(
+                    "error: tool call to `{}` blocked by user (deny-forever)",
+                    name
+                ));
+            }
+            "" => continue,
+            other => {
+                ui::show_error(&format!("'{}' isn't a permission answer — y / a / n / d", other));
+                ui::dock_redraw_bottom();
+            }
         }
     }
 }
@@ -480,7 +621,12 @@ async fn main() -> anyhow::Result<()> {
     let session_start = std::time::Instant::now();
     let mut manager = AppletManager::new();
     let sandbox = Sandbox::default_workspace().with_sandbox(manager.sandbox);
-    let executor = ToolExecutor::new(sandbox);
+    // Agent mode (plan/build/auto) + declarative plugins from ayesha.json —
+    // both loaded once at startup and applied to every payload/system prompt.
+    let mut current_mode = Mode::from_str(&manager.mode).unwrap_or(Mode::Auto);
+    let plugin_registry = plugins::PluginRegistry::from_config(&manager.plugins);
+    let plugin_suffix = plugins::snippet_from_configs(&manager.plugins);
+    let executor = ToolExecutor::new(sandbox).with_plugins(plugin_registry.clone());
     let mut current_model = "opencode/big-pickle".to_string();
     let fallback_model = "xiaomi/mimo-v2.5-pro";
     let mut client = match CloudClient::new("opencode/big-pickle", "opencode") {
@@ -571,7 +717,7 @@ async fn main() -> anyhow::Result<()> {
     let mut messages: Vec<ChatMessage> = vec![
         ChatMessage {
             role: "system".to_string(),
-            content: build_system_prompt(&user_name, &project_root),
+            content: build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix),
             tool_calls: None,
             tool_call_id: None,
         },
@@ -630,7 +776,16 @@ async fn main() -> anyhow::Result<()> {
     ui::show_system(&memory.summary());
 
     let tools = tool_defs::tool_definitions_core();
-    let tools = streaming::tool_payload_slice(&tools);
+    // Merge in the delegate tool (synthetic, kept out of the static catalog)
+    // and any config-driven plugin tools, then slice for the payload.
+    let mut tools_arr = match tools {
+        serde_json::Value::Array(arr) => arr,
+        _ => Vec::new(),
+    };
+    tools_arr.push(tools::delegate_tool_definition());
+    tools_arr.extend(plugin_registry.tool_definitions());
+    let tools_payload = serde_json::Value::Array(tools_arr);
+    let tools = streaming::tool_payload_slice(&tools_payload);
     let mut vision_model = "llama3.2-vision".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
@@ -926,7 +1081,7 @@ async fn main() -> anyhow::Result<()> {
                 messages = vec![
                     ChatMessage {
                         role: "system".to_string(),
-                        content: build_system_prompt(&user_name, &project_root),
+                        content: build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix),
                         tool_calls: None,
                         tool_call_id: None,
                     },
@@ -944,6 +1099,27 @@ async fn main() -> anyhow::Result<()> {
                 let enabled = !lower.contains("off") && !lower.contains("disable");
                 registry.set_auto_route(enabled);
                 ui::show_system(if enabled { "auto-routing enabled" } else { "auto-routing disabled" });
+                continue;
+            }
+            _ if lower == "mode" || lower.starts_with("mode ") => {
+                let arg = input.trim_start_matches("mode").trim();
+                if arg.is_empty() {
+                    ui::show_system(&format!(
+                        "mode: {} (plan = read-only research | build = full toolset | auto = agent decides)",
+                        current_mode.as_str()
+                    ));
+                    continue;
+                }
+                match Mode::from_str(arg) {
+                    Some(m) => {
+                        current_mode = m;
+                        manager.set_mode(m.as_str());
+                        messages[0].content =
+                            build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix);
+                        ui::show_system(&format!("mode set to {}", m.as_str()));
+                    }
+                    None => ui::show_error(&format!("unknown mode '{}' (plan | build | auto)", arg)),
+                }
                 continue;
             }
             "sync" => {
@@ -1150,7 +1326,7 @@ async fn main() -> anyhow::Result<()> {
                         let _ = std::fs::write(&config_path, content);
                     }
                     if !messages.is_empty() {
-                        messages[0].content = build_system_prompt(&name, &project_root);
+                        messages[0].content = build_system_prompt_full(&name, &project_root, current_mode, &plugin_suffix);
                     }
                     ui::show_system(&format!("okay, {} it is!", name));
                 }
@@ -1187,6 +1363,7 @@ async fn main() -> anyhow::Result<()> {
                 match executor.execute("get_tool_stats", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    backend: &client,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
                     menu_flag: &menu_flag,
@@ -1332,7 +1509,7 @@ async fn main() -> anyhow::Result<()> {
                         messages.clear();
                         messages.push(ChatMessage {
                             role: "system".to_string(),
-                            content: build_system_prompt(&user_name, &project_root),
+                            content: build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix),
                             tool_calls: None,
                             tool_call_id: None,
                         });
@@ -1469,6 +1646,7 @@ async fn main() -> anyhow::Result<()> {
                 match executor.execute("list_memories", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    backend: &client,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
                     menu_flag: &menu_flag,
@@ -1482,6 +1660,7 @@ async fn main() -> anyhow::Result<()> {
                 match executor.execute("list_skills", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    backend: &client,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
                     menu_flag: &menu_flag,
@@ -1495,6 +1674,7 @@ async fn main() -> anyhow::Result<()> {
                 match executor.execute("analyze_self", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    backend: &client,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
                     menu_flag: &menu_flag,
@@ -1508,6 +1688,7 @@ async fn main() -> anyhow::Result<()> {
                 match executor.execute("evolve_tools", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    backend: &client,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
                     menu_flag: &menu_flag,
@@ -1521,6 +1702,7 @@ async fn main() -> anyhow::Result<()> {
                 match executor.execute("refine_prompt", &serde_json::json!({}), &mut ToolContext {
                     memory: &mut memory, prompt_history: &mut prompt_history,
                     analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
+                    backend: &client,
                     project_root: &project_root, applet_manager: &mut manager,
                     steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
                     menu_flag: &menu_flag,
@@ -1685,14 +1867,88 @@ async fn main() -> anyhow::Result<()> {
 
                 ui::show_tool_call(name, &args_str);
 
+                // Plan-mode gate: mutating tools (and shell-backed plugin
+                // tools) are denied outright — plan mode is read-only.
+                if current_mode == Mode::Plan
+                    && (crate::tools::is_mutating(name) || plugin_registry.has_tool(name))
+                {
+                    let deny = crate::tools::plan_mode_deny_message(name).unwrap_or_else(|| {
+                        format!(
+                            "error: plan mode: plugin tool '{}' is denied (plan mode is read-only research)",
+                            name
+                        )
+                    });
+                    ui::show_tool_err(name, &deny);
+                    prompt_history.record_usage(name, false, Some(deny.clone()), &args_str);
+                    let _ = prompt_history.save();
+                    messages.push(ChatMessage {
+                        role: "tool".to_string(),
+                        content: deny,
+                        tool_calls: None,
+                        tool_call_id: Some(tool_call.id.clone()),
+                    });
+                    continue;
+                }
+
+                // Permission gate: sensitive tools need the user's ok.
+                match permissions::decide(name, &config) {
+                    Verdict::Allow => {}
+                    Verdict::Denied(msg) => {
+                        ui::show_tool_err(name, &msg);
+                        prompt_history.record_usage(name, false, Some(msg.clone()), &args_str);
+                        let _ = prompt_history.save();
+                        memory.add_memory(
+                            "error",
+                            &format!("tool '{}' blocked by user permission: {}", name, msg),
+                            vec![name.to_string(), "error".to_string()],
+                            3,
+                        );
+                        messages.push(ChatMessage {
+                            role: "tool".to_string(),
+                            content: msg,
+                            tool_calls: None,
+                            tool_call_id: Some(tool_call.id.clone()),
+                        });
+                        continue;
+                    }
+                    Verdict::Prompt => {
+                        match ask_permission(name, &args_str, &steer_rx, &mut config, &config_path) {
+                            AskResult::Allow => {}
+                            AskResult::Deny(msg) => {
+                                ui::show_tool_err(name, &msg);
+                                prompt_history.record_usage(name, false, Some(msg.clone()), &args_str);
+                                let _ = prompt_history.save();
+                                messages.push(ChatMessage {
+                                    role: "tool".to_string(),
+                                    content: msg,
+                                    tool_calls: None,
+                                    tool_call_id: Some(tool_call.id.clone()),
+                                });
+                                continue;
+                            }
+                            AskResult::Abort(input) => {
+                                ui::show_interrupted();
+                                if !input.is_empty() {
+                                    pending_input = Some(input);
+                                } else {
+                                    ui::show_system("tool call cancelled");
+                                }
+                                steer_happened = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 let tool_outcome = run_tool_with_steer(
                     executor.execute(name, args, &mut ToolContext {
                         memory: &mut memory,
                         prompt_history: &mut prompt_history,
                         analyzer: &analyzer,
                         evolver: &evolver,
-                        ollama: &tool_ollama,
-                        project_root: &project_root,
+                    ollama: &tool_ollama,
+                    backend: &client,
+                    project_root: &project_root,
                         applet_manager: &mut manager,
                         steer_tx: &steer_tx,
                         steer_rx: &steer_rx,
@@ -1752,7 +2008,14 @@ async fn main() -> anyhow::Result<()> {
                     .await;
 
                 if let Ok(r) = final_result {
-                    if !r.content.is_empty() {
+                    if r.was_steered() {
+                        // The FINAL stream was steered — route the steer back
+                        // as the next user input and drop the partial content
+                        // (the truncation guard below resets messages).
+                        ui::show_interrupted();
+                        pending_input = r.steering;
+                        steer_happened = true;
+                    } else if !r.content.is_empty() {
                         messages.push(ChatMessage {
                             role: "assistant".to_string(),
                             content: r.content,
@@ -1878,14 +2141,89 @@ async fn main() -> anyhow::Result<()> {
 
                             ui::show_tool_call(name, &args_str);
 
+                            // Plan-mode gate: mutating tools (and shell-backed
+                            // plugin tools) are denied outright — plan mode is
+                            // read-only.
+                            if current_mode == Mode::Plan
+                                && (crate::tools::is_mutating(name) || plugin_registry.has_tool(name))
+                            {
+                                let deny = crate::tools::plan_mode_deny_message(name).unwrap_or_else(|| {
+                                    format!(
+                                        "error: plan mode: plugin tool '{}' is denied (plan mode is read-only research)",
+                                        name
+                                    )
+                                });
+                                ui::show_tool_err(name, &deny);
+                                prompt_history.record_usage(name, false, Some(deny.clone()), &args_str);
+                                let _ = prompt_history.save();
+                                messages.push(ChatMessage {
+                                    role: "tool".to_string(),
+                                    content: deny,
+                                    tool_calls: None,
+                                    tool_call_id: Some(tool_call.id.clone()),
+                                });
+                                continue;
+                            }
+
+                            // Permission gate: sensitive tools need the user's ok.
+                            match permissions::decide(name, &config) {
+                                Verdict::Allow => {}
+                                Verdict::Denied(msg) => {
+                                    ui::show_tool_err(name, &msg);
+                                    prompt_history.record_usage(name, false, Some(msg.clone()), &args_str);
+                                    let _ = prompt_history.save();
+                                    memory.add_memory(
+                                        "error",
+                                        &format!("tool '{}' blocked by user permission: {}", name, msg),
+                                        vec![name.to_string(), "error".to_string()],
+                                        3,
+                                    );
+                                    messages.push(ChatMessage {
+                                        role: "tool".to_string(),
+                                        content: msg,
+                                        tool_calls: None,
+                                        tool_call_id: Some(tool_call.id.clone()),
+                                    });
+                                    continue;
+                                }
+                                Verdict::Prompt => {
+                                    match ask_permission(name, &args_str, &steer_rx, &mut config, &config_path) {
+                                        AskResult::Allow => {}
+                                        AskResult::Deny(msg) => {
+                                            ui::show_tool_err(name, &msg);
+                                            prompt_history.record_usage(name, false, Some(msg.clone()), &args_str);
+                                            let _ = prompt_history.save();
+                                            messages.push(ChatMessage {
+                                                role: "tool".to_string(),
+                                                content: msg,
+                                                tool_calls: None,
+                                                tool_call_id: Some(tool_call.id.clone()),
+                                            });
+                                            continue;
+                                        }
+                                        AskResult::Abort(input) => {
+                                            ui::show_interrupted();
+                                            if !input.is_empty() {
+                                                pending_input = Some(input);
+                                            } else {
+                                                ui::show_system("tool call cancelled");
+                                            }
+                                            steer_happened = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
                             let tool_outcome = run_tool_with_steer(
                                 executor.execute(name, args, &mut ToolContext {
                                     memory: &mut memory,
                                     prompt_history: &mut prompt_history,
                                     analyzer: &analyzer,
                                     evolver: &evolver,
-                                    ollama: &tool_ollama,
-                                    project_root: &project_root,
+                        ollama: &tool_ollama,
+                        backend: &client,
+                        project_root: &project_root,
                                     applet_manager: &mut manager,
                                     steer_tx: &steer_tx,
                                     steer_rx: &steer_rx,
@@ -2032,7 +2370,14 @@ async fn main() -> anyhow::Result<()> {
                             .await;
 
                         if let Ok(r) = final_result {
-                            if !r.content.is_empty() {
+                            if r.was_steered() {
+                                // N2: the FINAL stream was steered — route the
+                                // steer back and drop partial content (the
+                                // truncation guard resets messages).
+                                ui::show_interrupted();
+                                pending_input = r.steering;
+                                steer_happened = true;
+                            } else if !r.content.is_empty() {
                                 messages.push(ChatMessage {
                                     role: "assistant".to_string(),
                                     content: r.content,
@@ -2099,6 +2444,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
     let executor = ToolExecutor::new(sandbox.clone());
     let client = OllamaClient::new("ayesha");
     let tool_client = OllamaClient::new("qwen2.5:7b");
+    let backend = ActiveBackend::Ollama(client.clone());
     let tools = tool_defs::tool_definitions_core();
     let tools = streaming::tool_payload_slice(&tools);
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
@@ -2134,6 +2480,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
         analyzer: &analyzer,
         evolver: &evolver,
         ollama: &client,
+        backend: &backend,
         project_root: &project_root,
         applet_manager: &mut manager,
         steer_tx: &steer_tx,
@@ -2353,6 +2700,32 @@ mod tests {
     fn strip_pseudo_tool_leaves_plain_text() {
         let input = "just a normal chat reply, nothing to see here";
         assert_eq!(strip_pseudo_tool_syntax(input), input);
+    }
+
+    #[test]
+    fn mode_parses_and_roundtrips() {
+        assert_eq!(Mode::from_str("plan"), Some(Mode::Plan));
+        assert_eq!(Mode::from_str("build"), Some(Mode::Build));
+        assert_eq!(Mode::from_str("auto"), Some(Mode::Auto));
+        assert_eq!(Mode::from_str("PLAN"), Some(Mode::Plan));
+        assert_eq!(Mode::from_str("banana"), None);
+        assert_eq!(Mode::from_str(""), None);
+        assert_eq!(Mode::Plan.as_str(), "plan");
+        assert_eq!(Mode::Build.as_str(), "build");
+        assert_eq!(Mode::Auto.as_str(), "auto");
+    }
+
+    #[test]
+    fn system_prompt_includes_mode_directive() {
+        let root = std::path::Path::new(".");
+        let plan_prompt = build_system_prompt_full("tester", root, Mode::Plan, "");
+        assert!(plan_prompt.contains("PLAN MODE"));
+        let build_prompt = build_system_prompt_full("tester", root, Mode::Build, "");
+        assert!(build_prompt.contains("### mode: build"));
+        let auto_prompt = build_system_prompt_full("tester", root, Mode::Auto, "");
+        assert!(auto_prompt.contains("### mode: auto"));
+        let with_plugins = build_system_prompt_full("tester", root, Mode::Auto, "\n### plugins\nuse plugin x");
+        assert!(with_plugins.contains("use plugin x"));
     }
 
     #[test]

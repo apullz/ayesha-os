@@ -29,6 +29,13 @@ struct AyeshaConfig {
     /// Default false (permissive — legacy behavior).
     #[serde(default)]
     pub sandbox: bool,
+    /// Last agent mode ("plan" | "build" | "auto"), persisted across restarts.
+    /// Default "auto".
+    #[serde(default)]
+    pub mode: String,
+    /// Declarative plugins (see crate::plugins). Default: none.
+    #[serde(default)]
+    pub plugins: Vec<crate::plugins::PluginConfig>,
 }
 
 pub struct AppletManager {
@@ -37,6 +44,10 @@ pub struct AppletManager {
     pub root: String,
     /// Value of the `sandbox` flag in ayesha.json (default false).
     pub sandbox: bool,
+    /// Last agent mode ("plan" | "build" | "auto"), loaded from ayesha.json.
+    pub mode: String,
+    /// Declarative plugin configs loaded from ayesha.json.
+    pub plugins: Vec<crate::plugins::PluginConfig>,
 }
 
 impl AppletManager {
@@ -74,21 +85,38 @@ impl AppletManager {
         let root = root.to_string_lossy().to_string();
 
         let config_path = std::path::Path::new(&root).join("ayesha.json");
-        let (entries, sandbox) = if config_path.exists() {
+        let (entries, sandbox, mode, plugins) = if config_path.exists() {
             std::fs::read_to_string(&config_path)
                 .ok()
                 .and_then(|s| serde_json::from_str::<AyeshaConfig>(&s).ok())
-                .map(|c| (c.projects, c.sandbox))
+                .map(|c| (c.projects, c.sandbox, c.mode, c.plugins))
                 .unwrap_or_default()
         } else {
-            (HashMap::new(), false)
+            (HashMap::new(), false, String::new(), Vec::new())
         };
+        let mode = if mode.is_empty() { "auto".to_string() } else { mode };
 
         AppletManager {
             entries,
             processes: HashMap::new(),
             root,
             sandbox,
+            mode,
+            plugins,
+        }
+    }
+
+    /// Persist the agent mode to ayesha.json so it survives restart.
+    pub fn set_mode(&mut self, mode: &str) {
+        self.mode = mode.to_string();
+        let config_path = std::path::Path::new(&self.root).join("ayesha.json");
+        let mut cfg: serde_json::Value = std::fs::read_to_string(&config_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| serde_json::json!({}));
+        cfg["mode"] = serde_json::json!(mode);
+        if let Ok(content) = serde_json::to_string_pretty(&cfg) {
+            let _ = std::fs::write(&config_path, content);
         }
     }
 

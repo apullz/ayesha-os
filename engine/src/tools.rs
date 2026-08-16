@@ -12,6 +12,7 @@ use crate::self_analysis::SelfAnalyzer;
 use crate::tool_evolution::ToolEvolver;
 use crate::ollama::{OllamaClient, ChatMessage};
 use crate::applet_manager::AppletManager;
+use crate::plugins::{PluginRegistry, run_plugin_tool};
 
 const MAX_READ_SIZE: usize = 256 * 1024;
 const MAX_DOWNLOAD_SIZE: usize = 100 * 1024 * 1024; // 100 MB safety cap for network tools
@@ -82,6 +83,9 @@ pub struct ToolContext<'a> {
     pub analyzer: &'a SelfAnalyzer,
     pub evolver: &'a ToolEvolver,
     pub ollama: &'a OllamaClient,
+    /// The active backend (local Ollama or cloud) — used by `delegate` so the
+    /// sub-agent runs on the same model the user is talking to.
+    pub backend: &'a crate::ActiveBackend,
     pub project_root: &'a Path,
     pub applet_manager: &'a mut AppletManager,
     pub steer_tx: &'a mpsc::Sender<String>,
@@ -92,6 +96,7 @@ pub struct ToolContext<'a> {
 
 pub struct ToolExecutor {
     sandbox: Sandbox,
+    plugins: PluginRegistry,
 }
 
 /// All tool names the executor can dispatch, grouped the same way the
@@ -120,9 +125,113 @@ const DISPATCHABLE_TOOLS: &[&str] = &[
     "coding_agent", "manage_applet",
 ];
 
+/// Tools that modify state on disk, in memory/preferences, or the filesystem
+/// of the app. Plan mode denies these outright — it is a read-only research
+/// mode. Everything else (reads, greps, fetches, memory queries) stays
+/// available so the agent can investigate and propose.
+pub const MUTATING_TOOLS: &[&str] = &[
+    // File ops
+    "write_file",
+    // Network writes
+    "download_image",
+    // Generation (writes files into the project)
+    "generate_html", "generate_sprite", "generate_tileset",
+    "generate_object", "render_sprite",
+    // Memory / preferences
+    "remember", "set_preference",
+    // Evolution / prompt
+    "evolve_tools", "refine_prompt",
+    // Coding agent / applets
+    "coding_agent", "manage_applet",
+];
+
+/// True when the tool mutates state — used by plan mode to deny it.
+pub fn is_mutating(name: &str) -> bool {
+    MUTATING_TOOLS.contains(&name)
+}
+
+/// Plan-mode denial for a mutating tool, if any. `None` means the tool is
+/// read-only and allowed in plan mode.
+pub fn plan_mode_deny_message(name: &str) -> Option<String> {
+    if !is_mutating(name) {
+        return None;
+    }
+    Some(format!(
+        "error: plan mode: '{}' is denied (plan mode is read-only research — propose changes instead of making them; use /mode build to make changes)",
+        name
+    ))
+}
+
+/// Read-only tool subset the delegate sub-agent may call. `delegate` itself
+/// is NOT in this set, so sub-agents can never nest delegates — the agent
+/// tree is exactly two levels deep.
+const SUB_AGENT_TOOLS: &[&str] = &[
+    // File reads
+    "read_file", "list_dir", "grep", "glob",
+    // Skills (read-only)
+    "list_skills", "read_skill",
+    // Network read
+    "fetch_url", "read_clipboard",
+    // Memory reads
+    "list_memories", "search_memories",
+    // Analysis
+    "analyze_self", "list_source_files", "get_tool_stats",
+];
+
+/// Tool payload for the delegate sub-agent: the catalog filtered down to the
+/// read-only core tools, so the sub-agent can research but never modify
+/// anything (and can never delegate further).
+fn sub_agent_tool_payload() -> Value {
+    let full = crate::tool_defs::tool_definitions();
+    match full {
+        Value::Array(entries) => Value::Array(
+            entries
+                .into_iter()
+                .filter(|t| {
+                    t.get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|n| n.as_str())
+                        .map(|name| SUB_AGENT_TOOLS.contains(&name))
+                        .unwrap_or(false)
+                })
+                .collect(),
+        ),
+        _ => Value::Array(Vec::new()),
+    }
+}
+
+/// Synthetic payload entry for the `delegate` tool. Kept out of the static
+/// catalog (TOOL_CATALOG stays untouched) — main.rs merges this into the
+/// per-request tool payload so the model can hand off research tasks.
+pub fn delegate_tool_definition() -> Value {
+    json!({
+        "type": "function",
+        "function": {
+            "name": "delegate",
+            "description": "spawn a bounded research sub-agent (same model backend) for a large read-only sub-task: file reads, directory listings, greps, globs, skill reads, URL fetches. the sub-agent cannot modify anything and cannot delegate further. use it to parallelize or isolate heavy investigation while you keep working. returns a concise summary of findings.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sub_task": { "type": "string", "description": "the read-only research task to hand off to the sub-agent" },
+                    "max_steps": { "type": "integer", "description": "maximum sub-agent tool rounds before it must summarize (default 3, max 8)" }
+                },
+                "required": ["sub_task"]
+            }
+        }
+    })
+}
+
 impl ToolExecutor {
     pub fn new(sandbox: Sandbox) -> Self {
-        Self { sandbox }
+        Self { sandbox, plugins: PluginRegistry::default() }
+    }
+
+    /// Attach config-driven plugin tools (loaded from ayesha.json at startup).
+    /// Plugin tools are NOT part of the static catalog — they are dispatched
+    /// through the fallback arm of `execute()`.
+    pub fn with_plugins(mut self, plugins: PluginRegistry) -> Self {
+        self.plugins = plugins;
+        self
     }
 
     /// Tool names the executor can dispatch. Every TOOL_CATALOG entry must
@@ -192,6 +301,11 @@ impl ToolExecutor {
             // Applets
             "manage_applet" => self.manage_applet(args, ctx).await,
 
+            // Delegate (NOT in DISPATCHABLE_TOOLS / the static catalog — it
+            // is merged into the payload separately by main.rs, so the
+            // catalog↔dispatcher invariant test stays intact).
+            "delegate" => self.delegate(args, ctx).await,
+
             // A catalog-known tool that reaches this arm has a dispatch entry
             // but no handler — a regression `every_catalog_tool_has_dispatch_arm`
             // should have caught. Surface it as an internal error, not a
@@ -199,7 +313,14 @@ impl ToolExecutor {
             _ if Self::dispatch_for(name).is_some() => {
                 bail!("internal error: tool '{}' is catalog-known but has no dispatch arm", name)
             }
-            _ => bail!("unknown tool: {}", name),
+            _ => {
+                // Config-driven plugin tools live outside the static catalog;
+                // resolve them here by shelling out to their command template.
+                if let Some(ptool) = self.plugins.find_tool(name) {
+                    return run_plugin_tool(ptool, args, ctx.project_root).await;
+                }
+                bail!("unknown tool: {}", name)
+            }
         }
     }
 
@@ -263,6 +384,134 @@ impl ToolExecutor {
             }
             _ => bail!("unknown manage_applet action: {} (expected list/status/launch/stop)", action),
         }
+    }
+
+    // ═══════════════════════════════════════════
+    //  Delegate — bounded research sub-agent
+    // ═══════════════════════════════════════════
+
+    /// Dispatch a sub-agent tool call directly to its handler — NOT through
+    /// `execute()`, so the delegate loop stays non-recursive (async fns cannot
+    /// recurse without boxing). The sub-agent set is a fixed read-only subset
+    /// of the catalog, mirrored from [`SUB_AGENT_TOOLS`].
+    async fn execute_sub_agent_tool(
+        &self,
+        name: &str,
+        args: &Value,
+        ctx: &mut ToolContext<'_>,
+    ) -> Result<String> {
+        match name {
+            "read_file" => self.read_file(args).await,
+            "list_dir" => self.list_dir(args).await,
+            "grep" => self.grep(args).await,
+            "glob" => self.glob(args).await,
+            "list_skills" => self.list_skills(ctx.project_root),
+            "read_skill" => self.read_skill(args, ctx.project_root),
+            "fetch_url" => self.fetch_url(args).await,
+            "read_clipboard" => self.read_clipboard().await,
+            "list_memories" => self.list_memories(args, ctx.memory),
+            "search_memories" => self.search_memories(args, ctx.memory),
+            "analyze_self" => self.analyze_self(args, ctx.analyzer),
+            "list_source_files" => self.list_source_files(ctx.analyzer),
+            "get_tool_stats" => self.get_tool_stats(ctx.prompt_history),
+            other => bail!("sub-agent tool '{}' is not in the read-only set", other),
+        }
+    }
+
+    /// Hand a read-only research task to a bounded sub-agent running on the
+    /// SAME active backend (reuses `chat_stream_collect`, the invisible
+    /// streaming path both backends already share). The sub-agent:
+    ///
+    /// * is hard-restricted to [`SUB_AGENT_TOOLS`] (read-only core tools);
+    /// * cannot call `delegate` (it is not in that set) — no deep nesting;
+    /// * runs on a fresh, non-steerable channel, so the user's typed input
+    ///   keeps reaching the main agent mid-delegation;
+    /// * is bounded by `max_steps` tool rounds (default 3, capped at 8).
+    ///
+    /// Returns the sub-agent's final summary.
+    async fn delegate(&self, args: &Value, ctx: &mut ToolContext<'_>) -> Result<String> {
+        let sub_task = args
+            .get("sub_task")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim())
+            .unwrap_or("")
+            .to_string();
+        if sub_task.is_empty() {
+            bail!("delegate: 'sub_task' is required and must be non-empty");
+        }
+        let max_steps = args
+            .get("max_steps")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(3)
+            .clamp(1, 8) as usize;
+
+        // Fresh channel: the sub-agent runs invisibly while the enclosing
+        // run_tool_with_steer keeps the user's steering channel free.
+        let (steer_tx, steer_rx) = mpsc::channel::<String>();
+        drop(steer_tx);
+
+        let sub_tools = sub_agent_tool_payload();
+        let sub_tools_slice = crate::streaming::tool_payload_slice(&sub_tools);
+
+        let mut sub_messages = vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: "you are a focused research sub-agent. investigate the given sub-task using ONLY the read-only tools provided. you must NOT modify any files, spawn processes, or call mutating tools — you are read-only. you must NOT spawn further delegates. when you have gathered enough information, reply with a concise final summary of your findings (3-8 sentences, plain text, no tool call).".to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: sub_task,
+                tool_calls: None,
+                tool_call_id: None,
+            },
+        ];
+
+        for _ in 0..max_steps {
+            let result = ctx
+                .backend
+                .chat_stream_collect(&sub_messages, Some(sub_tools_slice), &steer_rx)
+                .await
+                .map_err(|e| anyhow::anyhow!("delegate: backend error: {}", e))?;
+
+            if result.tool_calls.is_empty() {
+                // The sub-agent answered with plain text — that's the summary.
+                return Ok(format!("delegate summary: {}", result.content.trim()));
+            }
+
+            let tool_calls = result.tool_calls.clone();
+            sub_messages.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: result.content,
+                tool_calls: Some(result.tool_calls),
+                tool_call_id: None,
+            });
+            for tc in &tool_calls {
+                let output = if SUB_AGENT_TOOLS.contains(&tc.function.name.as_str()) {
+                    match self
+                        .execute_sub_agent_tool(&tc.function.name, &tc.function.arguments, ctx)
+                        .await
+                    {
+                        Ok(out) => out,
+                        Err(e) => format!("error: {}", e),
+                    }
+                } else {
+                    format!("error: sub-agent tool '{}' is not in the read-only set", tc.function.name)
+                };
+                sub_messages.push(ChatMessage {
+                    role: "tool".to_string(),
+                    content: output,
+                    tool_calls: None,
+                    tool_call_id: Some(tc.id.clone()),
+                });
+            }
+        }
+
+        Ok(format!(
+            "delegate: sub-agent exhausted its {} tool-round budget without a final summary",
+            max_steps
+        ))
     }
 
     // ═══════════════════════════════════════════
@@ -1427,6 +1676,7 @@ mod tests {
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
             ollama: &OllamaClient::new("test"),
+            backend: &crate::ActiveBackend::Ollama(OllamaClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,
@@ -1436,6 +1686,95 @@ mod tests {
         }).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("unknown tool"));
+    }
+
+    #[test]
+    fn plan_mode_denies_mutating_tools_only() {
+        // everything mutating is denied...
+        for name in MUTATING_TOOLS {
+            assert!(
+                plan_mode_deny_message(name).is_some(),
+                "mutating tool '{}' must be denied in plan mode",
+                name
+            );
+        }
+        // ...and everything read-only stays allowed
+        for name in [
+            "read_file", "list_dir", "grep", "glob", "list_skills", "read_skill",
+            "fetch_url", "read_clipboard", "list_memories", "search_memories",
+            "analyze_self", "list_source_files", "get_tool_stats",
+        ] {
+            assert!(
+                plan_mode_deny_message(name).is_none(),
+                "read-only tool '{}' must be allowed in plan mode",
+                name
+            );
+        }
+        let msg = plan_mode_deny_message("write_file").unwrap();
+        assert!(msg.contains("plan mode"));
+        assert!(msg.contains("write_file"));
+    }
+
+    #[test]
+    fn delegate_requires_sub_task() {
+        // The delegate impl needs a live backend, so here we pin its contract:
+        // sub_task is required (checked before any backend call).
+        let executor = ToolExecutor::new(Sandbox::new("."));
+        let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
+        let mut input_flag = Arc::new(AtomicBool::new(true));
+        let mut manager = AppletManager::new();
+        let mut menu_flag = Arc::new(AtomicBool::new(false));
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(executor.execute("delegate", &json!({}), &mut ToolContext {
+            memory: &mut MemoryStore::default(),
+            prompt_history: &mut PromptHistory::default(),
+            analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
+            evolver: &ToolEvolver::new(vec![]),
+            ollama: &OllamaClient::new("test"),
+            backend: &crate::ActiveBackend::Ollama(OllamaClient::new("test")),
+            project_root: std::path::Path::new("."),
+            applet_manager: &mut manager,
+            steer_tx: &steer_tx,
+            steer_rx: &steer_rx,
+            input_flag: &mut input_flag,
+            menu_flag: &menu_flag,
+        }));
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("sub_task"), "expected missing sub_task error, got: {}", err);
+    }
+
+    #[test]
+    fn sub_agent_payload_is_read_only_only() {
+        let payload = sub_agent_tool_payload();
+        let entries = payload.as_array().expect("payload must be an array");
+        assert!(!entries.is_empty(), "read-only sub-agent payload must not be empty");
+        for entry in entries {
+            let name = entry["function"]["name"].as_str().unwrap_or("");
+            assert!(
+                SUB_AGENT_TOOLS.contains(&name),
+                "sub-agent tool '{}' must be in the read-only set",
+                name
+            );
+            assert!(
+                !MUTATING_TOOLS.contains(&name),
+                "sub-agent tool '{}' must not be mutating",
+                name
+            );
+        }
+        // delegate must never be offered to the sub-agent (no deep nesting)
+        assert!(!SUB_AGENT_TOOLS.contains(&"delegate"));
+        assert!(
+            !entries.iter().any(|e| e["function"]["name"] == "delegate"),
+            "delegate must not appear in the sub-agent payload"
+        );
+    }
+
+    #[test]
+    fn delegate_tool_definition_shape() {
+        let def = delegate_tool_definition();
+        assert_eq!(def["type"], "function");
+        assert_eq!(def["function"]["name"], "delegate");
+        assert_eq!(def["function"]["parameters"]["required"][0], "sub_task");
     }
 
     /// Compile-time guard: the catalog (single source of truth) and the
@@ -1886,6 +2225,7 @@ mod tests {
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
             ollama: &OllamaClient::new("test"),
+            backend: &crate::ActiveBackend::Ollama(OllamaClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,

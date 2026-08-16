@@ -195,15 +195,41 @@ impl SseDecoder {
             return Vec::new();
         }
 
-        let v: Value = match serde_json::from_str(&data) {
-            Ok(v) => v,
+        // Normal path: the whole accumulated `data:` payload is one JSON
+        // document (OpenAI-compatible multi-line events).
+        match serde_json::from_str::<Value>(&data) {
+            Ok(v) => Self::decode_value(&v),
             Err(e) => {
-                let preview = crate::util::truncate_chars(&data, 80);
-                eprintln!("cloud stream parse error: {} near: {}", e, preview);
-                return Vec::new();
+                // Fallback for line-per-event streams: some providers separate
+                // events with a bare `\n` instead of a blank line, so the
+                // whole accumulation never parses as one document. Re-decode
+                // each `data:` line individually so those streams still emit.
+                let mut events = Vec::new();
+                for line in &data_parts {
+                    if line == "[DONE]" {
+                        events.push(StreamEvent::Done);
+                        continue;
+                    }
+                    match serde_json::from_str::<Value>(line) {
+                        Ok(v) => events.extend(Self::decode_value(&v)),
+                        Err(e2) => {
+                            let preview = crate::util::truncate_chars(line, 80);
+                            eprintln!("cloud stream parse error: {} near: {}", e2, preview);
+                        }
+                    }
+                }
+                if events.is_empty() {
+                    let preview = crate::util::truncate_chars(&data, 80);
+                    eprintln!("cloud stream parse error: {} near: {}", e, preview);
+                }
+                events
             }
-        };
+        }
+    }
 
+    /// Decode a single OpenAI-compatible event JSON value into stream events
+    /// (content chunks + tool deltas).
+    fn decode_value(v: &Value) -> Vec<StreamEvent> {
         let mut events = Vec::new();
         if let Some(choices) = v.get("choices").and_then(|c| c.as_array()) {
             if let Some(choice) = choices.first() {
@@ -339,6 +365,26 @@ impl<'a> StreamPipeline<'a> {
             self.active.push(ActiveToolCall::default());
         }
         let active = &mut self.active[index];
+
+        // Gate B N3: a delta that carries a NEW id/name for a slot which
+        // already holds accumulated state means the provider re-emitted the
+        // call from scratch (some providers send the full call twice — once in
+        // a `done:false` chunk, once in `done:true`). Reset the slot so
+        // arguments can't double-append.
+        let new_id = delta.get("id").and_then(|i| i.as_str());
+        let new_name = delta
+            .get("function")
+            .and_then(|f| f.get("name"))
+            .and_then(|n| n.as_str());
+        let identity_changed = (new_id.is_some()
+            && !active.id.is_empty()
+            && new_id != Some(active.id.as_str()))
+            || (new_name.is_some()
+                && !active.name.is_empty()
+                && new_name != Some(active.name.as_str()));
+        if identity_changed {
+            *active = ActiveToolCall::default();
+        }
 
         if let Some(id) = delta.get("id").and_then(|i| i.as_str()) {
             active.id = id.to_string();
@@ -671,7 +717,103 @@ mod tests {
         assert!(d.finish().is_empty());
     }
 
+    #[test]
+    fn sse_decoder_bare_newline_separated_events_still_emit() {
+        // Gate B N1: some providers separate `data:` events with a bare `\n`
+        // instead of a blank line; decode_block must fall back to line-per-
+        // event parsing instead of dropping the whole block.
+        let block = "data: {\"choices\":[{\"delta\":{\"content\":\"one\"}}]}\ndata: {\"choices\":[{\"delta\":{\"content\":\"two\"}}]}\ndata: [DONE]\n";
+        let mut d = SseDecoder::new();
+        // no blank line -> nothing decodes during feed, everything flushes at
+        // finish() where the per-line fallback kicks in
+        assert!(d.feed(block.as_bytes()).is_empty());
+        let events = d.finish();
+        let chunks: Vec<String> = events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::Chunk(c) => Some(c.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(chunks, vec!["one".to_string(), "two".to_string()]);
+        assert!(events.contains(&StreamEvent::Done));
+    }
+
+    #[test]
+    fn sse_decoder_mixed_blank_and_bare_newlines_decode() {
+        // A stream where SOME events are blank-line terminated and the tail
+        // ends bare must still produce every chunk exactly once.
+        let block = "data: {\"choices\":[{\"delta\":{\"content\":\"a\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"b\"}}]}\ndata: {\"choices\":[{\"delta\":{\"content\":\"c\"}}]}\n";
+        let mut d = SseDecoder::new();
+        let mut events = d.feed(block.as_bytes());
+        events.extend(d.finish());
+        let chunks: Vec<String> = events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::Chunk(c) => Some(c.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(chunks, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    }
+
     // ── StreamPipeline ──
+
+    #[test]
+    fn tool_delta_new_id_resets_active_slot() {
+        // Gate B N3: a delta carrying a NEW id for a slot with accumulated
+        // arguments means the provider re-emitted the whole call — the slot
+        // must reset so arguments don't double-append.
+        let rx = channel();
+        let mut p = StreamPipeline::new(&rx);
+        // first call: partial arguments arrive over two deltas
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"path\": \"src/main" }
+        }))]);
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "function": { "arguments": ".rs\"}" }
+        }))]);
+        // provider re-emits the full call under a NEW id — must reset, not
+        // append to the accumulated arguments
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_2",
+            "type": "function",
+            "function": { "name": "grep", "arguments": "{\"pattern\":\"fn\"}" }
+        }))]);
+        let result = p.finish();
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_2");
+        assert_eq!(result.tool_calls[0].function.name, "grep");
+        assert_eq!(result.tool_calls[0].function.arguments, json!({"pattern": "fn"}));
+    }
+
+    #[test]
+    fn tool_delta_same_id_continues_accumulating() {
+        // The normal streaming case: same id/name across deltas keeps
+        // appending arguments until the call completes.
+        let rx = channel();
+        let mut p = StreamPipeline::new(&rx);
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"path\": \"" }
+        }))]);
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "function": { "arguments": "src/main.rs\"}" }
+        }))]);
+        let result = p.finish();
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_1");
+        assert_eq!(result.tool_calls[0].function.name, "read_file");
+        assert_eq!(result.tool_calls[0].function.arguments, json!({"path": "src/main.rs"}));
+    }
 
     #[test]
     fn pipeline_enforces_and_tracks_think() {
