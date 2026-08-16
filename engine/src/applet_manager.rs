@@ -306,7 +306,14 @@ impl AppletManager {
                 return Err(e);
             }
         };
-        let _ = child.wait();
+        // A foreground applet (hivebeat repl, poopy-tui) can run for minutes.
+        // A raw std `child.wait()` here would block a tokio worker and stall
+        // the executor, so hop into a blocking region: the input thread is
+        // already suspended (step 1), so the applet owns the terminal and no
+        // steering can fire while we wait regardless.
+        tokio::task::block_in_place(|| {
+            let _ = child.wait();
+        });
 
         // 5. hand the window back to the engine
         let _ = crossterm::terminal::enable_raw_mode();

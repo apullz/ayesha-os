@@ -4,7 +4,7 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use crate::completion::Completer;
-use crate::ui;
+use crate::ui::{self, char_cells, visible_cells};
 
 /// Spawn the engine's keyboard input thread. Returns a flag that can be used to
 /// suspend the thread (set to false) so a foreground applet can take over the
@@ -124,15 +124,10 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                             let prefix = input_buf.trim_start().to_string();
                             let (selected, show_all) = completer.complete(&prefix);
                             if let Some(completed) = selected {
-                                // Erase current line
-                                let erase_len = input_buf.len();
-                                for _ in 0..erase_len {
-                                    print!("\x08 \x08");
-                                }
-                                // Write new buffer
+                                // redraw the whole line instead of byte-count
+                                // backspaces — those strand wide kaomoji cells
                                 input_buf = completed;
-                                print!("{}", input_buf);
-                                let _ = std::io::stdout().flush();
+                                ui::redraw_prompt_with(&input_buf);
                                 // Show all matches on double-tab
                                 if !show_all.is_empty() {
                                     ui::dock_submit_goto();
@@ -142,9 +137,7 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                                     }
                                     println!();
                                     // Re-draw the (docked) prompt and re-echo buffer
-                                    ui::dock_prompt();
-                                    print!("{}", input_buf);
-                                    let _ = std::io::stdout().flush();
+                                    ui::redraw_prompt_with(&input_buf);
                                 }
                             }
                         }
@@ -168,6 +161,11 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                         }
                         (KeyCode::Char(c), _) if c as u8 >= 32 => {
                             if key.kind != KeyEventKind::Press { continue; }
+                            // cap at the input row width so a long line can't
+                            // wrap past the right edge and scroll the dock
+                            if visible_cells(&input_buf) + char_cells(c) > ui::input_capacity() {
+                                continue;
+                            }
                             input_buf.push(c);
                             completer.reset();
                             print!("{}", c);
@@ -175,9 +173,13 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                         }
                         (KeyCode::Backspace, _)
                             if !input_buf.is_empty() => {
-                                input_buf.pop();
+                                // erase by cell width so wide kaomoji don't
+                                // leave a leftover half-cell behind
+                                let w = input_buf.pop().map(char_cells).unwrap_or(1);
                                 completer.reset();
-                                print!("\x08 \x08");
+                                for _ in 0..w {
+                                    print!("\x08 \x08");
+                                }
                                 let _ = std::io::stdout().flush();
                             }
                         _ => {}
@@ -189,7 +191,12 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                         let _ = steer_tx.send(format!("\0paste-vision:{}", s));
                     } else {
                         for c in s.chars() {
-                            if c as u8 >= 32 { input_buf.push(c); print!("{}", c); }
+                            if c as u8 >= 32
+                                && visible_cells(&input_buf) + char_cells(c) <= ui::input_capacity()
+                            {
+                                input_buf.push(c);
+                                print!("{}", c);
+                            }
                         }
                         let _ = std::io::stdout().flush();
                     }

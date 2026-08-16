@@ -13,6 +13,7 @@
 
 use crate::theme::{self, Role, SyntaxRole};
 use crate::syntax;
+use crate::ui::{truncate_cells, visible_cells};
 
 #[derive(Default)]
 pub struct CodeStream {
@@ -117,42 +118,28 @@ impl CodeStream {
     }
 }
 
-/// Solid code-panel width for fenced blocks (opencode-style).
+/// Solid code-panel width for fenced blocks (opencode-style). Shrinks to
+/// fit narrow terminals — the designed 80 needs the gutter + indent too,
+/// which wrapped the panel on 80-col windows.
 const CODE_PANEL_WIDTH: usize = 80;
 
-fn strip_ansi(s: &str) -> String {
-    let mut out = String::new();
-    let mut chars = s.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            while let Some(n) = chars.next() {
-                if n == 'm' {
-                    break;
-                }
-            }
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
-
-fn visible_len(s: &str) -> usize {
-    strip_ansi(s).chars().count()
+fn panel_width() -> usize {
+    CODE_PANEL_WIDTH.min(crossterm::terminal::size().map(|(c, _)| c as usize).unwrap_or(80).saturating_sub(6).max(24))
 }
 
 /// Paint a single code line: dim gutter + syntax-highlighted text on a solid
 /// code-background panel.
 fn paint_code_line(line: &str) -> String {
-    let truncated: String = if line.chars().count() > CODE_PANEL_WIDTH {
-        let mut s: String = line.chars().take(CODE_PANEL_WIDTH - 3).collect();
+    let width = panel_width();
+    let truncated: String = if visible_cells(line) > width {
+        let mut s = truncate_cells(line, width.saturating_sub(3));
         s.push_str("...");
         s
     } else {
         line.to_string()
     };
     let highlighted = syntax::highlight_line(&truncated);
-    let pad = CODE_PANEL_WIDTH.saturating_sub(visible_len(&highlighted));
+    let pad = width.saturating_sub(visible_cells(&highlighted));
     let padded = format!("{highlighted}{}", " ".repeat(pad));
     let gutter = theme::paint(Role::Dim, "▐");
     format!("  {gutter} {}", theme::bg_fill(Role::CodeBg, padded))
@@ -161,8 +148,9 @@ fn paint_code_line(line: &str) -> String {
 /// opencode-style code block header: the language name on the panel, followed
 /// by a dim rule.
 fn paint_code_header(lang: &str) -> String {
+    let width = panel_width();
     let title = format!("{} ", theme::bold(Role::Secondary, lang));
-    let pad = CODE_PANEL_WIDTH.saturating_sub(lang.chars().count() + 1);
+    let pad = width.saturating_sub(visible_cells(&title));
     let dashes = theme::paint(Role::Dim, "─".repeat(pad));
     let gutter = theme::paint(Role::Dim, "▐");
     format!("  {gutter} {}", theme::bg_fill(Role::CodeBg, format!("{title}{dashes}")))
@@ -286,5 +274,19 @@ mod tests {
         s.feed("```py\nprint(1)");
         let out = s.finish();
         assert!(strip_ansi(&out).contains("print(1)"));
+    }
+
+    #[test]
+    fn code_line_never_exceeds_panel_width() {
+        set_monokai();
+        // "  ▐ " prefix + panel → panel_width + 4 cells max, even with
+        // wide kaomoji/CJK content and long lines
+        let out = paint_code_line("let s = \"(๑•蔷•๑)\"; // kaomoji comment");
+        assert!(visible_cells(&strip_ansi(&out)) <= panel_width() + 4);
+        let long = paint_code_line(&"蔷".repeat(200));
+        let plain = strip_ansi(&long);
+        assert!(visible_cells(&plain) <= panel_width() + 4, "panel overflowed: {}", plain.len());
+        assert!(plain.contains("..."), "long line should be ellipsized");
+        reset_color();
     }
 }

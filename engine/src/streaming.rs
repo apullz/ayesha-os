@@ -389,14 +389,28 @@ impl<'a> StreamPipeline<'a> {
         // Gate C N3 residual: some providers re-emit the full call under the
         // SAME id+name (a `done:false` chunk followed by a `done:true` chunk).
         // Gate B can't catch that (the identity didn't change), so without a
-        // guard the arguments would double-append and corrupt the JSON. If the
-        // slot's accumulated arguments already parse as complete JSON and this
-        // delta carries a call identity (id/name — the signature of a call
-        // start, not a continuation), the new emission replaces the old one.
+        // guard the arguments would double-append and corrupt the JSON. Reset
+        // only when the slot's accumulated arguments ALREADY parse as complete
+        // JSON AND the incoming delta carries a call identity (id/name — the
+        // signature of a call start) AND the incoming delta's own arguments
+        // parse as complete JSON too. That last check is what distinguishes a
+        // genuine re-emission (which always carries complete args) from a
+        // provider that merely echoes id/name on continuation deltas while the
+        // accumulated args happen to cross a parseable boundary mid-call — the
+        // echo case must keep appending, never reset.
         let carries_identity = new_id.is_some() || new_name.is_some();
+        let incoming_args_complete = match delta
+            .get("function")
+            .and_then(|f| f.get("arguments"))
+        {
+            Some(Value::String(s)) => serde_json::from_str::<Value>(s).is_ok(),
+            Some(other) => other.is_object() || other.is_array(),
+            None => false,
+        };
         if carries_identity
             && !active.args.is_empty()
             && serde_json::from_str::<Value>(&active.args).is_ok()
+            && incoming_args_complete
         {
             *active = ActiveToolCall::default();
         }
@@ -861,6 +875,42 @@ mod tests {
             json!({"path": "src/grep.rs"}),
             "re-emission must replace, not double-append, the arguments"
         );
+    }
+
+    #[test]
+    fn tool_delta_continuation_echoing_id_does_not_reset() {
+        // Gate C false-positive guard: a provider that echoes id/name on
+        // CONTINUATION deltas must not trigger the re-emission reset just
+        // because the accumulated arguments happened to cross a parseable
+        // boundary mid-call. Only a re-emission delta whose OWN arguments are
+        // complete JSON may reset the slot.
+        let rx = channel();
+        let mut p = StreamPipeline::new(&rx);
+        // first fragment happens to be complete JSON (parseable boundary)
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"a\": 1}" }
+        }))]);
+        // continuation delta echoes the same id+name but carries only a
+        // fragment — NOT complete JSON on its own — so it must NOT reset;
+        // the slot keeps concatenating
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": ",\"b\": 2}" }
+        }))]);
+        assert_eq!(
+            p.active[0].args,
+            "{\"a\": 1},\"b\": 2}",
+            "continuation echo must append, not reset, the accumulated args"
+        );
+        let result = p.finish();
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_1");
+        assert_eq!(result.tool_calls[0].function.name, "read_file");
     }
 
     #[test]

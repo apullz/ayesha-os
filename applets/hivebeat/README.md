@@ -253,7 +253,17 @@ python3 drift.py    # smoke test 2: realtime clock drift over 10s (expect <50ms)
 
 ## ayesha-os integration
 
-vendored into the ayesha-os monorepo as `applets/hivebeat/` (plain copy, no git history). registered in `ayesha.json` and launched by the engine's `manage_applet` runner with `python repl.py` (foreground — it takes over the terminal like a tui). live audio expects the termux pulseaudio path (`hivepipe` / `pacat`); on platforms without it the repl degrades to the realtime `null sink`. on windows specifically the repl needs the posix `readline` module (not shipped with cpython-win) — use offline rendering instead, which works anywhere with python + numpy:
+vendored into the ayesha-os monorepo as `applets/hivebeat/` (plain copy, no git history). registered in `ayesha.json` and launched by the engine's `manage_applet` runner with `python repl.py` (foreground — it takes over the terminal like a tui).
+
+platform notes:
+
+- the repl guards its `import readline` (not shipped with cpython on windows), so it boots everywhere — history is best-effort, live line editing just degrades gracefully where readline is missing.
+- the repl needs numpy: `pip install -r requirements.txt` (numpy>=1.21) before first run. the vendored copy skips `__pycache__`/`.venv` in the dist bundle, so install into the applet dir or a venv.
+- live audio expects the termux pulseaudio path (`hivepipe` / `pacat`); on platforms without it the repl degrades to the realtime `null` sink (synthesis runs, nothing audible).
+- windows has no pulseaudio — use offline rendering, which works anywhere with python + numpy:
+- termux (real termux shell, not proot): `bash setup_termux.sh` installs python + numpy + pulseaudio, starts the daemon and installs the `hivepipe` player into `$PREFIX/bin`.
+
+offline render:
 
 ```
 python render.py out.wav 8 'p1.square("c4 e4 g4 a4").dur(0.25)'

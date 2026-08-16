@@ -38,6 +38,10 @@ const SENSITIVE_TOOLS: &[&str] = &[
     // meta-tools that modify the agent itself
     "skill_tool",
     "coding_agent",
+    // "delegate" prompts (it spawns a sub-agent) but is INTENTIONALLY absent
+    // from tools::MUTATING_TOOLS, so plan mode allows it: the sub-agent is
+    // hard-restricted to read-only tools and cannot delegate further, so
+    // delegating research is itself read-only.
     "delegate",
     "evolve_tools",
     "refine_prompt",

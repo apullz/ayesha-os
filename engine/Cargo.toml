@@ -1,6 +1,8 @@
 [package]
 name = "ayesha-engine"
-version = "0.1.0"
+# Single-source of truth for the release version is ayesha.json ("version").
+# Keep this in sync — the dist build and STATUS.md reference 4.5.0.
+version = "4.5.0"
 edition = "2021"
 description = "terminal-native persona host with tool-calling for ollama"
 

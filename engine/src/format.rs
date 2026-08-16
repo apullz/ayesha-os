@@ -195,15 +195,29 @@ impl LowercaseStreamer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    // `disabled_enforce_passthrough` toggles the process-global ENFORCE flag;
+    // every other enforcement test reads it. Parallel test threads can observe
+    // the disabled window and fail nondeterministically (seen in phase-E
+    // verification as a random `flag_regional_symbols_stripped` failure), so
+    // all tests that touch the global flag share this module-scoped lock.
+    static ENFORCE_GLOBAL_LOCK: Mutex<()> = Mutex::new(());
+
+    fn hold_enforce() -> MutexGuard<'static, ()> {
+        ENFORCE_GLOBAL_LOCK.lock().unwrap()
+    }
 
     #[test]
     fn lowercases_plain_text() {
+        let _g = hold_enforce();
         let s = enforce_lowercase("HELLO WORLD, FOX!");
         assert_eq!(s, "hello world, fox!");
     }
 
     #[test]
     fn preserves_code_fences() {
+        let _g = hold_enforce();
         let s = enforce_lowercase("here is the fn:\n```rust\nfn Main() {\n    println!(\"Hello\");\n}\n```\nDONE");
         assert!(s.contains("fn Main()"));
         assert!(s.contains("println!"));
@@ -213,6 +227,7 @@ mod tests {
 
     #[test]
     fn strips_real_emoji_but_keeps_kaomojis() {
+        let _g = hold_enforce();
         let s = enforce_lowercase("WOW 😀 :3 🙂 ok");
         assert!(!s.contains('😀'));
         assert!(!s.contains('🙂'));
@@ -222,6 +237,7 @@ mod tests {
 
     #[test]
     fn flag_regional_symbols_stripped() {
+        let _g = hold_enforce();
         let s = enforce_lowercase("JP 🇯🇵 flag");
         assert!(!s.contains('🇯'));
         assert!(s.contains("jp  flag"));
@@ -229,6 +245,7 @@ mod tests {
 
     #[test]
     fn streamer_tracks_fence_across_chunks() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let a = st.feed("here's code: ``");
         assert_eq!(a, "here's code: ");
@@ -247,6 +264,7 @@ mod tests {
 
     #[test]
     fn streamer_lowercases_visible_text() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         assert_eq!(st.feed("HI"), "hi");
         assert_eq!(st.feed(" THERE :3"), " there :3");
@@ -255,6 +273,7 @@ mod tests {
 
     #[test]
     fn strips_markdown_bold_markers() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let out = st.feed("**ayesha:** YO THERE **tuna**");
         assert_eq!(out, "ayesha: yo there tuna");
@@ -262,6 +281,7 @@ mod tests {
 
     #[test]
     fn keeps_bold_markers_inside_code_fences() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let out = st.feed("```rust\nlet s = \"**bold**\";\n```\n");
         assert_eq!(out, "```rust\nlet s = \"**bold**\";\n```\n");
@@ -269,6 +289,7 @@ mod tests {
 
     #[test]
     fn prose_wrapped_in_fence_is_still_enforced() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let out = st.feed("```\n🌙 Hello fox~ :3\n```\n");
         assert_eq!(out, "```\n hello fox~ :3\n```\n");
@@ -276,6 +297,7 @@ mod tests {
 
     #[test]
     fn declared_code_fence_preserved_verbatim() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let out = st.feed("```python\nprint(\"Hello\")\n```\n");
         assert_eq!(out, "```python\nprint(\"Hello\")\n```\n");
@@ -283,6 +305,7 @@ mod tests {
 
     #[test]
     fn split_code_lang_stays_preserved() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let a = st.feed("here:\n```r");
         assert_eq!(a, "here:\n```r");
@@ -292,6 +315,7 @@ mod tests {
 
     #[test]
     fn prose_fence_with_text_lang_is_still_enforced() {
+        let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
         let out = st.feed("```text\nWOW 😀 ok\n```\n");
         assert_eq!(out, "```text\nwow  ok\n```\n");
@@ -299,6 +323,7 @@ mod tests {
 
     #[test]
     fn enforce_lowercase_matches_streamer() {
+        let _g = hold_enforce();
         let text = "HI there\n```rust\nfn Main() {\n    let x = \"Hi\";\n}\n```\nBYE 😀";
         let whole = enforce_lowercase(text);
         let mut st = LowercaseStreamer::new();
@@ -308,6 +333,7 @@ mod tests {
 
     #[test]
     fn disabled_enforce_passthrough() {
+        let _g = hold_enforce();
         set_enabled(false);
         let s = enforce_lowercase("KEEP CASE");
         assert_eq!(s, "KEEP CASE");

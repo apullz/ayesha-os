@@ -1967,6 +1967,16 @@ async fn main() -> anyhow::Result<()> {
                             }
                             AskResult::Abort(input) => {
                                 ui::show_interrupted();
+                                // Don't leave the assistant message with an
+                                // orphaned tool call: push a synthetic result
+                                // so history stays valid whatever path the
+                                // truncation guard takes next turn.
+                                messages.push(ChatMessage {
+                                    role: "tool".to_string(),
+                                    content: "tool call cancelled".to_string(),
+                                    tool_calls: None,
+                                    tool_call_id: Some(tool_call.id.clone()),
+                                });
                                 if !input.is_empty() {
                                     pending_input = Some(input);
                                 } else {
@@ -2007,6 +2017,14 @@ async fn main() -> anyhow::Result<()> {
                     }
                     ToolOutcome::Interrupted(input) => {
                         ui::show_interrupted();
+                        // Synthetic tool result keeps the history valid — the
+                        // assistant message holds this tool_call_id.
+                        messages.push(ChatMessage {
+                            role: "tool".to_string(),
+                            content: "tool call cancelled".to_string(),
+                            tool_calls: None,
+                            tool_call_id: Some(tool_call.id.clone()),
+                        });
                         pending_input = Some(input);
                         steer_happened = true;
                         break;
@@ -2246,6 +2264,16 @@ async fn main() -> anyhow::Result<()> {
                                         }
                                         AskResult::Abort(input) => {
                                             ui::show_interrupted();
+                                            // Don't leave the assistant
+                                            // message with an orphaned tool
+                                            // call: synthetic result keeps
+                                            // history valid.
+                                            messages.push(ChatMessage {
+                                                role: "tool".to_string(),
+                                                content: "tool call cancelled".to_string(),
+                                                tool_calls: None,
+                                                tool_call_id: Some(tool_call.id.clone()),
+                                            });
                                             if !input.is_empty() {
                                                 pending_input = Some(input);
                                             } else {
@@ -2286,6 +2314,15 @@ async fn main() -> anyhow::Result<()> {
                                 }
                                 ToolOutcome::Interrupted(input) => {
                                     ui::show_interrupted();
+                                    // Synthetic tool result keeps the history
+                                    // valid — the assistant message holds this
+                                    // tool_call_id.
+                                    messages.push(ChatMessage {
+                                        role: "tool".to_string(),
+                                        content: "tool call cancelled".to_string(),
+                                        tool_calls: None,
+                                        tool_call_id: Some(tool_call.id.clone()),
+                                    });
                                     pending_input = Some(input);
                                     steer_happened = true;
                                     break;
