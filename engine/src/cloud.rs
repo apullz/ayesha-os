@@ -5,8 +5,7 @@ use std::time::Duration;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::ollama::{ChatMessage, StreamResult, ToolCall, ToolFunction, ChatResponse, ChatResponseMessage};
-use crate::theme::{self, Role};
+use crate::ollama::{ChatMessage, StreamResult, ToolCall, ChatResponse, ChatResponseMessage};
 
 #[derive(Debug)]
 pub struct CloudClient {
@@ -249,6 +248,26 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         Ok(ChatResponse { message: chat_msg })
     }
 
+    /// Build a streaming /chat/completions request for this client.
+    fn stream_chat_request(
+        &self,
+        body: Value,
+    ) -> Result<reqwest::RequestBuilder> {
+        let mut req = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json");
+
+        if self.provider == "openrouter" {
+            req = req
+                .header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
+                .header("X-Title", "ayesha-os");
+        }
+
+        Ok(req.json(&body))
+    }
+
     /// Streaming chat with visible output (same pattern as OllamaClient::chat_stream_visible)
     pub async fn chat_stream_visible(
         &self,
@@ -256,7 +275,6 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         tools: Option<&[Value]>,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-
         let req_body = json!({
             "model": self.model,
             "messages": messages,
@@ -264,191 +282,13 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
             "stream": true,
         });
 
-        let mut req = self.client.post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json");
-
-        if self.provider == "openrouter" {
-            req = req.header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
-                     .header("X-Title", "ayesha-os");
-        }
-
-        let mut resp = req.json(&req_body).send().await?;
-
+        let mut resp = self.stream_chat_request(req_body)?.send().await?;
         if let Err(e) = resp.error_for_status_ref() {
             anyhow::bail!("cloud http error: {}", e);
         }
 
-        let mut buf = String::new();
-        let mut full_content = String::new();
-        let mut in_think = false;
-        let mut formatter = crate::format::LowercaseStreamer::new();
-        let mut code = crate::render::CodeStream::new();
-
-        let mut recent = String::new();
-        const RECENT_MAX: usize = 20;
-
-        #[derive(Default)]
-        struct ActiveToolCall {
-            id: String,
-            call_type: String,
-            name: String,
-            args: String,
-        }
-        let mut active_tool_calls: Vec<ActiveToolCall> = Vec::new();
-        let mut done = false;
-
-        while let Some(chunk) = resp.chunk().await? {
-            buf.push_str(&String::from_utf8_lossy(&chunk));
-
-            while let Some(nl) = buf.find('\n') {
-                let line = buf[..nl].to_string();
-                buf = buf[nl + 1..].to_string();
-
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if trimmed == "data: [DONE]" {
-                    done = true;
-                    break;
-                }
-                
-                if let Some(data_str) = trimmed.strip_prefix("data: ") {
-                    match serde_json::from_str::<Value>(data_str) {
-                        Ok(json_obj) => {
-                            if let Some(choices) = json_obj.get("choices").and_then(|c| c.as_array()) {
-                                if let Some(choice) = choices.first() {
-                                    if let Some(delta) = choice.get("delta") {
-                                        // Handle content
-                                        if let Some(c) = delta.get("content").and_then(|c| c.as_str()) {
-                                            if !c.is_empty() {
-                                                let enforced = formatter.feed(c);
-                                                full_content.push_str(&enforced);
-                                                recent.push_str(&enforced);
-                                                let n = recent.chars().count();
-                                                if n > RECENT_MAX {
-                                                    let skip = n - RECENT_MAX;
-                                                    recent = recent.chars().skip(skip).collect();
-                                                }
-
-                                                let no_think = !recent.contains("<think>") && !recent.contains("[think]");
-                                                let think_ended = recent.contains("</think>") || recent.contains("[/think]");
-
-                                                if !in_think && !no_think {
-                                                    in_think = true;
-                                                }
-                                                if in_think && think_ended {
-                                                    in_think = false;
-                                                }
-
-                                                if in_think {
-                                                    crate::ui::convo_write(&theme::paint(Role::Dim, &enforced));
-                                                } else {
-                                                    crate::ui::convo_write(&code.feed(&enforced));
-                                                }
-                                            }
-                                        }
-
-                                        // Handle tool calls
-                                        if let Some(tcs) = delta.get("tool_calls").and_then(|t| t.as_array()) {
-                                            for tc in tcs {
-                                                if let Some(index) = tc.get("index").and_then(|i| i.as_u64()) {
-                                                    let idx = index as usize;
-                                                    while active_tool_calls.len() <= idx {
-                                                        active_tool_calls.push(ActiveToolCall::default());
-                                                    }
-                                                    let active = &mut active_tool_calls[idx];
-
-                                                    if let Some(id) = tc.get("id").and_then(|i| i.as_str()) {
-                                                        active.id = id.to_string();
-                                                    }
-                                                    if let Some(t) = tc.get("type").and_then(|t| t.as_str()) {
-                                                        active.call_type = t.to_string();
-                                                    }
-                                                    if let Some(f) = tc.get("function") {
-                                                        if let Some(name) = f.get("name").and_then(|n| n.as_str()) {
-                                                            active.name = name.to_string();
-                                                        }
-                                                        if let Some(args) = f.get("arguments").and_then(|a| a.as_str()) {
-                                                            active.args.push_str(args);
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            let preview = crate::util::truncate_chars(data_str, 80);
-                            eprintln!("stream parse error: {} near: {}", e, preview);
-                        }
-                    }
-                }
-            }
-            if done { break; }
-
-            // Check for steering between chunks
-            if let Ok(input) = steer_rx.try_recv() {
-                crate::ui::convo_write("\n");
-                
-                let mut final_tcs = Vec::new();
-                for a in &active_tool_calls {
-                    let args_val = if a.args.is_empty() {
-                        json!({})
-                    } else {
-                        serde_json::from_str(&a.args).unwrap_or(json!({}))
-                    };
-                    final_tcs.push(ToolCall {
-                        id: a.id.clone(),
-                        call_type: if a.call_type.is_empty() { "function".to_string() } else { a.call_type.clone() },
-                        function: ToolFunction {
-                            name: a.name.clone(),
-                            arguments: args_val,
-                        }
-                    });
-                }
-                
-                let tail = formatter.finish();
-                if !tail.is_empty() {
-                    full_content.push_str(&tail);
-                    crate::ui::convo_write(&code.feed(&tail));
-                }
-                crate::ui::convo_write(&code.finish());
-
-                return Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: Some(input) });
-            }
-        }
-
-        crate::ui::convo_write("\n");
-
-        let mut final_tcs = Vec::new();
-        for a in active_tool_calls {
-            let args_val = if a.args.is_empty() {
-                json!({})
-            } else {
-                serde_json::from_str(&a.args).unwrap_or(json!({}))
-            };
-            final_tcs.push(ToolCall {
-                id: a.id,
-                call_type: if a.call_type.is_empty() { "function".to_string() } else { a.call_type },
-                function: ToolFunction {
-                    name: a.name,
-                    arguments: args_val,
-                }
-            });
-        }
-
-        let tail = formatter.finish();
-        if !tail.is_empty() {
-            full_content.push_str(&tail);
-            crate::ui::convo_write(&code.feed(&tail));
-        }
-        crate::ui::convo_write(&code.finish());
-
-        Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })
+        let mut decoder = crate::streaming::SseDecoder::new();
+        crate::streaming::stream_to_result(&mut resp, steer_rx, true, &mut decoder).await
     }
 
     /// Streaming chat that collects without printing — used by the tool model
@@ -466,137 +306,13 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
             "stream": true,
         });
 
-        let mut req = self.client.post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json");
-
-        if self.provider == "openrouter" {
-            req = req.header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
-                     .header("X-Title", "ayesha-os");
-        }
-
-        let mut resp = req.json(&req_body).send().await?;
-
+        let mut resp = self.stream_chat_request(req_body)?.send().await?;
         if let Err(e) = resp.error_for_status_ref() {
             anyhow::bail!("cloud http error: {}", e);
         }
 
-        let mut buf = String::new();
-        let mut full_content = String::new();
-        let mut formatter = crate::format::LowercaseStreamer::new();
-
-        #[derive(Default)]
-        struct ActiveToolCall {
-            id: String,
-            call_type: String,
-            name: String,
-            args: String,
-        }
-        let mut active_tool_calls: Vec<ActiveToolCall> = Vec::new();
-        let mut done = false;
-
-        while let Some(chunk) = resp.chunk().await? {
-            buf.push_str(&String::from_utf8_lossy(&chunk));
-
-            while let Some(nl) = buf.find('\n') {
-                let line = buf[..nl].to_string();
-                buf = buf[nl + 1..].to_string();
-
-                let trimmed = line.trim();
-                if trimmed.is_empty() || trimmed == "data: [DONE]" {
-                    if trimmed == "data: [DONE]" { done = true; break; }
-                    continue;
-                }
-
-                if let Some(data_str) = trimmed.strip_prefix("data: ") {
-                    if let Ok(json_obj) = serde_json::from_str::<Value>(data_str) {
-                        if let Some(choices) = json_obj.get("choices").and_then(|c| c.as_array()) {
-                            if let Some(choice) = choices.first() {
-                                if let Some(delta) = choice.get("delta") {
-                                    if let Some(c) = delta.get("content").and_then(|c| c.as_str()) {
-                                        full_content.push_str(&formatter.feed(c));
-                                    }
-                                    if let Some(tcs) = delta.get("tool_calls").and_then(|t| t.as_array()) {
-                                        for tc in tcs {
-                                            if let Some(index) = tc.get("index").and_then(|i| i.as_u64()) {
-                                                let idx = index as usize;
-                                                while active_tool_calls.len() <= idx {
-                                                    active_tool_calls.push(ActiveToolCall::default());
-                                                }
-                                                let active = &mut active_tool_calls[idx];
-                                                if let Some(id) = tc.get("id").and_then(|i| i.as_str()) {
-                                                    active.id = id.to_string();
-                                                }
-                                                if let Some(t) = tc.get("type").and_then(|t| t.as_str()) {
-                                                    active.call_type = t.to_string();
-                                                }
-                                                if let Some(f) = tc.get("function") {
-                                                    if let Some(name) = f.get("name").and_then(|n| n.as_str()) {
-                                                        active.name = name.to_string();
-                                                    }
-                                                    if let Some(args) = f.get("arguments").and_then(|a| a.as_str()) {
-                                                        active.args.push_str(args);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if done { break; }
-
-            if let Ok(input) = steer_rx.try_recv() {
-                let mut final_tcs = Vec::new();
-                for a in &active_tool_calls {
-                    let args_val = if a.args.is_empty() {
-                        json!({})
-                    } else {
-                        serde_json::from_str(&a.args).unwrap_or(json!({}))
-                    };
-                    final_tcs.push(ToolCall {
-                        id: a.id.clone(),
-                        call_type: if a.call_type.is_empty() { "function".to_string() } else { a.call_type.clone() },
-                        function: ToolFunction {
-                            name: a.name.clone(),
-                            arguments: args_val,
-                        }
-                    });
-                }
-                let tail = formatter.finish();
-                if !tail.is_empty() {
-                    full_content.push_str(&tail);
-                }
-                return Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: Some(input) });
-            }
-        }
-
-        let mut final_tcs = Vec::new();
-        for a in active_tool_calls {
-            let args_val = if a.args.is_empty() {
-                json!({})
-            } else {
-                serde_json::from_str(&a.args).unwrap_or(json!({}))
-            };
-            final_tcs.push(ToolCall {
-                id: a.id,
-                call_type: if a.call_type.is_empty() { "function".to_string() } else { a.call_type },
-                function: ToolFunction {
-                    name: a.name,
-                    arguments: args_val,
-                }
-            });
-        }
-
-        let tail = formatter.finish();
-        if !tail.is_empty() {
-            full_content.push_str(&tail);
-        }
-
-        Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })
+        let mut decoder = crate::streaming::SseDecoder::new();
+        crate::streaming::stream_to_result(&mut resp, steer_rx, false, &mut decoder).await
     }
 
     /// Stream a vision description of an image (OpenAI-compatible multimodal).
@@ -608,7 +324,6 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         data_uri: &str,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-
         let req_body = json!({
             "model": self.model,
             "messages": [{
@@ -621,73 +336,13 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
             "stream": true,
         });
 
-        let mut req = self.client.post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json");
-
-        if self.provider == "openrouter" {
-            req = req.header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
-                     .header("X-Title", "ayesha-os");
-        }
-
-        let mut resp = req.json(&req_body).send().await?;
-
+        let mut resp = self.stream_chat_request(req_body)?.send().await?;
         if let Err(e) = resp.error_for_status_ref() {
             anyhow::bail!("cloud vision http error: {}", e);
         }
 
-        let mut buf = String::new();
-        let mut full_content = String::new();
-        let mut in_think = false;
-        let mut code = crate::render::CodeStream::new();
-
-        while let Some(chunk) = resp.chunk().await? {
-            buf.push_str(&String::from_utf8_lossy(&chunk));
-            while let Some(nl) = buf.find('\n') {
-                let line = buf[..nl].to_string();
-                buf = buf[nl + 1..].to_string();
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if let Some(data) = trimmed.strip_prefix("data:") {
-                    if data.trim() == "[DONE]" {
-                        crate::ui::convo_write(&code.finish());
-                        if !full_content.is_empty() {
-                            crate::ui::convo_write("\n");
-                        }
-                        return Ok(StreamResult { content: full_content, tool_calls: vec![], steering: None });
-                    }
-                    if let Ok(v) = serde_json::from_str::<Value>(data) {
-                        let text = v["choices"][0]["delta"]["content"].as_str().unwrap_or("");
-                        if text.is_empty() {
-                            continue;
-                        }
-                        full_content.push_str(text);
-                        if text.contains("<think>") {
-                            in_think = true;
-                        }
-                        if in_think {
-                            crate::ui::convo_write(&theme::paint(Role::Dim, text));
-                        } else {
-                            crate::ui::convo_write(&code.feed(text));
-                        }
-                        if text.contains("</think>") {
-                            in_think = false;
-                        }
-                    }
-                }
-            }
-            if let Ok(input) = steer_rx.try_recv() {
-                crate::ui::convo_write(&code.finish());
-                crate::ui::convo_write("\n");
-                return Ok(StreamResult { content: full_content, tool_calls: vec![], steering: Some(input) });
-            }
-        }
-
-        crate::ui::convo_write(&code.finish());
-        crate::ui::convo_write("\n");
-        Ok(StreamResult { content: full_content, tool_calls: vec![], steering: None })
+        let mut decoder = crate::streaming::SseDecoder::new();
+        crate::streaming::stream_to_result(&mut resp, steer_rx, true, &mut decoder).await
     }
 }
 
@@ -722,7 +377,7 @@ mod live_smoke_tests {
             let client = CloudClient::new(FREE_MODEL, "openrouter")
                 .expect("openrouter key must resolve");
             let tools = crate::tool_defs::tool_definitions_core();
-            let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+            let tools = crate::streaming::tool_payload_slice(&tools);
             let msgs = vec![
                 ChatMessage {
                     role: "system".to_string(),

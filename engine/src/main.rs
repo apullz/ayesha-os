@@ -1,5 +1,6 @@
 mod ollama;
 mod cloud;
+mod streaming;
 mod tools;
 mod tool_defs;
 mod skills;
@@ -28,6 +29,7 @@ use std::io::Write;
 use theme::Role;
 use ollama::{OllamaClient, ChatMessage, StreamResult};
 use cloud::CloudClient;
+use streaming::StreamDecoder;
 use tools::{ToolExecutor, ToolContext};
 use sandbox::Sandbox;
 use prompt_refinement::PromptHistory;
@@ -102,6 +104,41 @@ async fn run_vision(
 /// Truncate tool results to prevent context overflow
 fn truncate_tool_result(result: &str, max_chars: usize) -> String {
     agent::truncate_tool_result(result, max_chars)
+}
+
+/// Result of running a tool while live-steering is armed.
+enum ToolOutcome<T> {
+    /// tool future completed normally (Ok result or Err to handle as usual)
+    Done(anyhow::Result<T>),
+    /// user typed while the tool was running — redirect immediately
+    Interrupted(String),
+}
+
+/// Run a tool future while polling the steering channel on a 50ms interval.
+/// std mpsc has no async recv, so the execute future and the steer poll are
+/// raced with tokio::select!. If the user types while the tool is running we
+/// return the input so the caller can redirect; the dropped future cancels
+/// cleanly. During foreground applets the input thread is suspended and
+/// run_in_window blocks on child.wait(), so no steer can fire there.
+async fn run_tool_with_steer<F, T>(
+    fut: F,
+    steer_rx: &std::sync::mpsc::Receiver<String>,
+) -> ToolOutcome<T>
+where
+    F: std::future::Future<Output = anyhow::Result<T>>,
+{
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
+    tokio::pin!(fut);
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                if let Ok(input) = steer_rx.try_recv() {
+                    return ToolOutcome::Interrupted(input);
+                }
+            }
+            res = &mut fut => return ToolOutcome::Done(res),
+        }
+    }
 }
 
 /// Strip pseudo-tool-call syntax out of ayesha's text so that when she slips
@@ -593,7 +630,7 @@ async fn main() -> anyhow::Result<()> {
     ui::show_system(&memory.summary());
 
     let tools = tool_defs::tool_definitions_core();
-    let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+    let tools = streaming::tool_payload_slice(&tools);
     let mut vision_model = "llama3.2-vision".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
@@ -1648,25 +1685,36 @@ async fn main() -> anyhow::Result<()> {
 
                 ui::show_tool_call(name, &args_str);
 
-                            let tool_result = match executor.execute(name, args, &mut ToolContext {
-                                memory: &mut memory,
-                                prompt_history: &mut prompt_history,
-                                analyzer: &analyzer,
-                                evolver: &evolver,
-                                ollama: &tool_ollama,
-                                project_root: &project_root,
-                                applet_manager: &mut manager,
-                                steer_tx: &steer_tx,
-                                steer_rx: &steer_rx,
-                                input_flag: &mut input_flag,
-                                menu_flag: &menu_flag,
-                            }).await {
-                    Ok(r) => r,
-                    Err(e) => {
+                let tool_outcome = run_tool_with_steer(
+                    executor.execute(name, args, &mut ToolContext {
+                        memory: &mut memory,
+                        prompt_history: &mut prompt_history,
+                        analyzer: &analyzer,
+                        evolver: &evolver,
+                        ollama: &tool_ollama,
+                        project_root: &project_root,
+                        applet_manager: &mut manager,
+                        steer_tx: &steer_tx,
+                        steer_rx: &steer_rx,
+                        input_flag: &mut input_flag,
+                        menu_flag: &menu_flag,
+                    }),
+                    &steer_rx,
+                ).await;
+
+                let tool_result = match tool_outcome {
+                    ToolOutcome::Done(Ok(r)) => r,
+                    ToolOutcome::Done(Err(e)) => {
                         let err_msg = format!("error: {}", e);
                         prompt_history.record_usage(name, false, Some(err_msg.clone()), &args_str);
                         let _ = prompt_history.save();
                         err_msg
+                    }
+                    ToolOutcome::Interrupted(input) => {
+                        ui::show_interrupted();
+                        pending_input = Some(input);
+                        steer_happened = true;
+                        break;
                     }
                 };
 
@@ -1698,18 +1746,20 @@ async fn main() -> anyhow::Result<()> {
             }
 
             // Get final ayesha response after tool execution
-            let final_result = client
-                .chat_stream_visible(&messages, Some(tools), &steer_rx)
-                .await;
+            if !steer_happened {
+                let final_result = client
+                    .chat_stream_visible(&messages, Some(tools), &steer_rx)
+                    .await;
 
-            if let Ok(r) = final_result {
-                if !r.content.is_empty() {
-                    messages.push(ChatMessage {
-                        role: "assistant".to_string(),
-                        content: r.content,
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
+                if let Ok(r) = final_result {
+                    if !r.content.is_empty() {
+                        messages.push(ChatMessage {
+                            role: "assistant".to_string(),
+                            content: r.content,
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    }
                 }
             }
         } else {
@@ -1828,25 +1878,36 @@ async fn main() -> anyhow::Result<()> {
 
                             ui::show_tool_call(name, &args_str);
 
-                let tool_result = match executor.execute(name, args, &mut ToolContext {
-                                memory: &mut memory,
-                                prompt_history: &mut prompt_history,
-                                analyzer: &analyzer,
-                                evolver: &evolver,
-                                ollama: &tool_ollama,
-                                project_root: &project_root,
-                                applet_manager: &mut manager,
-                                steer_tx: &steer_tx,
-                                steer_rx: &steer_rx,
-                                input_flag: &mut input_flag,
-                                menu_flag: &menu_flag,
-                            }).await {
-                                Ok(r) => r,
-                                Err(e) => {
+                            let tool_outcome = run_tool_with_steer(
+                                executor.execute(name, args, &mut ToolContext {
+                                    memory: &mut memory,
+                                    prompt_history: &mut prompt_history,
+                                    analyzer: &analyzer,
+                                    evolver: &evolver,
+                                    ollama: &tool_ollama,
+                                    project_root: &project_root,
+                                    applet_manager: &mut manager,
+                                    steer_tx: &steer_tx,
+                                    steer_rx: &steer_rx,
+                                    input_flag: &mut input_flag,
+                                    menu_flag: &menu_flag,
+                                }),
+                                &steer_rx,
+                            ).await;
+
+                            let tool_result = match tool_outcome {
+                                ToolOutcome::Done(Ok(r)) => r,
+                                ToolOutcome::Done(Err(e)) => {
                                     let err_msg = format!("error: {}", e);
                                     prompt_history.record_usage(name, false, Some(err_msg.clone()), &args_str);
                                     let _ = prompt_history.save();
                                     err_msg
+                                }
+                                ToolOutcome::Interrupted(input) => {
+                                    ui::show_interrupted();
+                                    pending_input = Some(input);
+                                    steer_happened = true;
+                                    break;
                                 }
                             };
 
@@ -1889,6 +1950,12 @@ async fn main() -> anyhow::Result<()> {
 
                         // If a file was written, we're done — skip re-prompting qwen
                         if wrote_file {
+                            break;
+                        }
+
+                        // Interrupted mid-tool — skip the re-prompt, the
+                        // steer_happened guard below redirects the whole turn.
+                        if steer_happened {
                             break;
                         }
 
@@ -2033,7 +2100,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
     let client = OllamaClient::new("ayesha");
     let tool_client = OllamaClient::new("qwen2.5:7b");
     let tools = tool_defs::tool_definitions_core();
-    let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+    let tools = streaming::tool_payload_slice(&tools);
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
     let mut memory = memory::MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
@@ -2177,7 +2244,7 @@ async fn selftest() -> anyhow::Result<()> {
 
     // 4. Tool definitions parse
     let tools = tool_defs::tool_definitions();
-    let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+    let tools = streaming::tool_payload_slice(&tools);
     let tools_ok = !tools.is_empty();
     check(&format!("{} tool definitions loaded", tools.len()), tools_ok, &mut checks);
 
@@ -2202,13 +2269,24 @@ async fn selftest() -> anyhow::Result<()> {
     let trunc_ok = util::truncate_chars("hello world", 5) == "hello";
     check("truncate_chars works", trunc_ok, &mut checks);
 
-    // 7. StreamParser works
-    let mut parser = ollama::StreamParser::new();
-    parser.feed_line(r#"{"message":{"content":"test"},"done":false}"#);
-    parser.feed_line(r#"{"message":{"content":" ok"},"done":false}"#);
-    parser.feed_line(r#"{"message":{"content":""},"done":true}"#);
-    let parser_ok = parser.content == "test ok" && parser.done;
-    check("StreamParser accumulates content", parser_ok, &mut checks);
+    // 7. Shared stream decoders work
+    let mut decoder = streaming::OllamaDecoder::new();
+    let events = decoder.feed(
+        br#"{"message":{"content":"test"},"done":false}
+{"message":{"content":" ok"},"done":false}
+{"message":{"content":""},"done":true}
+"#,
+    );
+    let content: String = events
+        .iter()
+        .filter_map(|e| match e {
+            streaming::StreamEvent::Chunk(c) => Some(c.as_str()),
+            _ => None,
+        })
+        .collect();
+    let done_seen = events.iter().any(|e| matches!(e, streaming::StreamEvent::Done));
+    let parser_ok = content == "test ok" && done_seen;
+    check("stream decoders accumulate content", parser_ok, &mut checks);
 
     // 8. needs_tools heuristic
     let needs_tools_ok = agent::needs_tools("read main.rs") && !agent::needs_tools("hi");

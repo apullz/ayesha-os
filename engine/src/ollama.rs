@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use anyhow::Result;
 use std::time::Duration;
-use crate::theme::{self, Role};
 
 const OLLAMA_BASE: &str = "http://localhost:11434";
 
@@ -113,130 +112,6 @@ pub struct OllamaClient {
     num_ctx: u32,
 }
 
-/// Pure NDJSON stream parser for ollama's /api/chat streaming format.
-/// No I/O — feed it trimmed lines, it accumulates content + tool calls and
-/// tracks think-block state. Unit-testable and shared by the visible and
-/// collect streaming paths so they can never drift apart.
-///
-/// Content deltas are passed through the format enforcer (lowercase + emoji
-/// strip, code-fence aware) so the ayesha format rules hold even when the
-/// model slips — the same defense-in-depth the opencode lowercase-proxy
-/// provided at the API layer.
-pub struct StreamParser {
-    pub content: String,
-    pub tool_calls: Vec<ToolCall>,
-    pub done: bool,
-    in_think: bool,
-    recent: String,
-    formatter: crate::format::LowercaseStreamer,
-}
-
-#[derive(Debug)]
-pub enum StreamLine {
-    /// (text delta, is_inside_think_block)
-    Content(String, bool),
-    /// final chunk with done=true
-    Done,
-    /// not a content/done line (empty, malformed, etc.)
-    Skip,
-}
-
-impl StreamParser {
-    const RECENT_MAX: usize = 20;
-
-    pub fn new() -> Self {
-        Self {
-            content: String::new(),
-            tool_calls: Vec::new(),
-            done: false,
-            in_think: false,
-            recent: String::new(),
-            formatter: crate::format::LowercaseStreamer::new(),
-        }
-    }
-
-    /// Feed one NDJSON line. Returns what should be displayed (if anything).
-    pub fn feed_line(&mut self, line: &str) -> StreamLine {
-        let line = line.trim();
-        if line.is_empty() {
-            return StreamLine::Skip;
-        }
-
-        let json: Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(e) => {
-                let preview: String = line.chars().take(80).collect();
-                eprintln!("stream parse error: {} near: {}", e, preview);
-                return StreamLine::Skip;
-            }
-        };
-
-        // Accumulate content deltas
-        if let Some(c) = json["message"]["content"].as_str() {
-            if !c.is_empty() {
-                let enforced = self.formatter.feed(c);
-                self.content.push_str(&enforced);
-                self.recent.push_str(&enforced);
-                let n = self.recent.chars().count();
-                if n > Self::RECENT_MAX {
-                    let skip = n - Self::RECENT_MAX;
-                    self.recent = self.recent.chars().skip(skip).collect();
-                }
-
-                // Detect think-block transitions on the recent tail so tag
-                // splits across chunk boundaries (<th / ink>) still register,
-                // but already-closed blocks never re-trigger on full content.
-                let was_in_think = self.in_think;
-                let recent_has_open = self.recent.contains("<think>") || self.recent.contains("[think]");
-                let just_entered = !was_in_think && recent_has_open;
-
-                if !self.in_think && recent_has_open {
-                    self.in_think = true;
-                }
-                if self.in_think
-                    && (self.recent.contains("</think>") || self.recent.contains("[/think]"))
-                {
-                    self.in_think = false;
-                }
-                return StreamLine::Content(enforced.to_string(), was_in_think || just_entered);
-            }
-        }
-
-        // Accumulate tool calls (ollama sends them in the done chunk)
-        if let Some(tc) = json.get("message").and_then(|m| m.get("tool_calls")) {
-            if let Ok(parsed) = serde_json::from_value::<Vec<ToolCall>>(tc.clone()) {
-                if !parsed.is_empty() {
-                    self.tool_calls = parsed;
-                }
-            }
-        }
-
-        if json.get("done").and_then(|v| v.as_bool()) == Some(true) {
-            self.done = true;
-            return StreamLine::Done;
-        }
-
-        StreamLine::Skip
-    }
-
-    pub fn finish(mut self) -> StreamResult {
-        let tail = self.formatter.finish();
-        if !tail.is_empty() {
-            self.content.push_str(&tail);
-        }
-        StreamResult { content: self.content, tool_calls: self.tool_calls, steering: None }
-    }
-
-    /// Flush any held-back enforcer tail into content (for early-exit paths
-    /// like steering that return `content` directly instead of `finish`).
-    pub fn flush_tail(&mut self) {
-        let tail = self.formatter.finish();
-        if !tail.is_empty() {
-            self.content.push_str(&tail);
-        }
-    }
-}
-
 /// Sane per-model context window for the /api/chat request.
 ///
 /// ollama's default window when a model has no num_ctx is 4096 — and the
@@ -318,12 +193,13 @@ impl OllamaClient {
         Ok(chat_resp)
     }
 
-    pub async fn chat_stream_collect(
+    /// Send a streaming /api/chat request; the response bytes are decoded by
+    /// the shared streaming module (chunk-boundary-safe NDJSON).
+    async fn stream_chat_request(
         &self,
         messages: &[ChatMessage],
         tools: Option<&[Value]>,
-        steer_rx: &std::sync::mpsc::Receiver<String>,
-    ) -> Result<StreamResult> {
+    ) -> Result<reqwest::Response> {
         let request = ChatRequest {
             model: self.model.clone(),
             messages: messages.to_vec(),
@@ -332,48 +208,27 @@ impl OllamaClient {
             think: false,
             options: self.options(),
         };
-
-        let mut resp = self
+        let resp = self
             .client
             .post(format!("{}/api/chat", self.base_url))
             .json(&request)
             .send()
             .await?;
-
         if let Err(e) = resp.error_for_status_ref() {
             anyhow::bail!("ollama http error: {}", e);
         }
+        Ok(resp)
+    }
 
-        let mut parser = StreamParser::new();
-        let mut buf = String::new();
-
-        while let Some(chunk) = resp.chunk().await? {
-            buf.push_str(&String::from_utf8_lossy(&chunk));
-
-            while let Some(nl) = buf.find('\n') {
-                let line = buf[..nl].to_string();
-                buf = buf[nl + 1..].to_string();
-
-                match parser.feed_line(&line) {
-                    StreamLine::Content(_, _) => {}
-                    StreamLine::Done => return Ok(parser.finish()),
-                    StreamLine::Skip => {}
-                }
-            }
-
-            // Check for steering between chunks
-            if let Ok(input) = steer_rx.try_recv() {
-                parser.flush_tail();
-                return Ok(StreamResult {
-                    content: parser.content,
-                    tool_calls: parser.tool_calls,
-                    steering: Some(input),
-                });
-            }
-        }
-
-        // Stream ended without done flag
-        Ok(parser.finish())
+    pub async fn chat_stream_collect(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<&[Value]>,
+        steer_rx: &std::sync::mpsc::Receiver<String>,
+    ) -> Result<StreamResult> {
+        let mut resp = self.stream_chat_request(messages, tools).await?;
+        let mut decoder = crate::streaming::OllamaDecoder::new();
+        crate::streaming::stream_to_result(&mut resp, steer_rx, false, &mut decoder).await
     }
 
     /// Stream response from ollama, printing tokens as they arrive (true streaming).
@@ -385,73 +240,9 @@ impl OllamaClient {
         tools: Option<&[Value]>,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-
-        let request = ChatRequest {
-            model: self.model.clone(),
-            messages: messages.to_vec(),
-            tools: tools.map(|t| t.to_vec()),
-            stream: true,
-            think: false,
-            options: self.options(),
-        };
-
-        let mut resp = self
-            .client
-            .post(format!("{}/api/chat", self.base_url))
-            .json(&request)
-            .send()
-            .await?;
-
-        if let Err(e) = resp.error_for_status_ref() {
-            anyhow::bail!("ollama http error: {}", e);
-        }
-
-        let mut parser = StreamParser::new();
-        let mut buf = String::new();
-        let mut code = crate::render::CodeStream::new();
-
-        while let Some(chunk) = resp.chunk().await? {
-            buf.push_str(&String::from_utf8_lossy(&chunk));
-
-            while let Some(nl) = buf.find('\n') {
-                let line = buf[..nl].to_string();
-                buf = buf[nl + 1..].to_string();
-
-                match parser.feed_line(&line) {
-                    StreamLine::Content(text, thinking) => {
-                        if thinking {
-                            crate::ui::convo_write(&theme::paint(Role::Dim, &text));
-                        } else {
-                            crate::ui::convo_write(&code.feed(&text));
-                        }
-                    }
-                    StreamLine::Done => {
-                        crate::ui::convo_write(&code.finish());
-                        if !parser.content.is_empty() {
-                            crate::ui::convo_write("\n");
-                        }
-                        return Ok(parser.finish());
-                    }
-                    StreamLine::Skip => {}
-                }
-            }
-
-            // Check for steering between chunks
-            if let Ok(input) = steer_rx.try_recv() {
-                parser.flush_tail();
-                crate::ui::convo_write(&code.finish());
-                crate::ui::convo_write("\n");
-                return Ok(StreamResult {
-                    content: parser.content,
-                    tool_calls: parser.tool_calls,
-                    steering: Some(input),
-                });
-            }
-        }
-
-        crate::ui::convo_write(&code.finish());
-        crate::ui::convo_write("\n");
-        Ok(parser.finish())
+        let mut resp = self.stream_chat_request(messages, tools).await?;
+        let mut decoder = crate::streaming::OllamaDecoder::new();
+        crate::streaming::stream_to_result(&mut resp, steer_rx, true, &mut decoder).await
     }
 
     /// Stream a vision description of an image (local multimodal model).
@@ -491,48 +282,8 @@ impl OllamaClient {
             anyhow::bail!("ollama vision http error: {}", e);
         }
 
-        let mut parser = StreamParser::new();
-        let mut buf = String::new();
-        let mut code = crate::render::CodeStream::new();
-
-        while let Some(chunk) = resp.chunk().await? {
-            buf.push_str(&String::from_utf8_lossy(&chunk));
-            while let Some(nl) = buf.find('\n') {
-                let line = buf[..nl].to_string();
-                buf = buf[nl + 1..].to_string();
-                match parser.feed_line(&line) {
-                    StreamLine::Content(text, thinking) => {
-                        if thinking {
-                            crate::ui::convo_write(&crate::theme::paint(crate::theme::Role::Dim, &text));
-                        } else {
-                            crate::ui::convo_write(&code.feed(&text));
-                        }
-                    }
-                    StreamLine::Done => {
-                        crate::ui::convo_write(&code.finish());
-                        if !parser.content.is_empty() {
-                            crate::ui::convo_write("\n");
-                        }
-                        return Ok(parser.finish());
-                    }
-                    StreamLine::Skip => {}
-                }
-            }
-            if let Ok(input) = steer_rx.try_recv() {
-                parser.flush_tail();
-                crate::ui::convo_write(&code.finish());
-                crate::ui::convo_write("\n");
-                return Ok(StreamResult {
-                    content: parser.content,
-                    tool_calls: parser.tool_calls,
-                    steering: Some(input),
-                });
-            }
-        }
-
-        crate::ui::convo_write(&code.finish());
-        crate::ui::convo_write("\n");
-        Ok(parser.finish())
+        let mut decoder = crate::streaming::OllamaDecoder::new();
+        crate::streaming::stream_to_result(&mut resp, steer_rx, true, &mut decoder).await
     }
 
     pub async fn list_models() -> Result<Vec<String>> {
@@ -613,129 +364,6 @@ always stay in character, but never at the cost of being useful. now go be cute 
 }
 
 #[cfg(test)]
-mod stream_parser_tests {
-    use super::*;
-
-    fn feed(parser: &mut StreamParser, lines: &[&str]) {
-        for l in lines {
-            parser.feed_line(l);
-        }
-    }
-
-    #[test]
-    fn accumulates_partial_content_chunks() {
-        let mut p = StreamParser::new();
-        feed(&mut p, &[
-            r#"{"model":"ayesha","message":{"role":"assistant","content":"hi "},"done":false}"#,
-            r#"{"model":"ayesha","message":{"role":"assistant","content":"there"},"done":false}"#,
-            r#"{"model":"ayesha","message":{"role":"assistant","content":"!"},"done":false}"#,
-            r#"{"model":"ayesha","message":{"role":"assistant","content":""},"done":true,"total_duration":1}"#,
-        ]);
-        assert!(p.done);
-        assert_eq!(p.content, "hi there!");
-        assert!(p.tool_calls.is_empty());
-    }
-
-    #[test]
-    fn empty_content_streams_do_not_panic_and_yield_empty() {
-        // This was the original "nothing works" bug class: streams where every
-        // chunk had empty content. Must not panic, must produce empty result.
-        let mut p = StreamParser::new();
-        let mut saw_content = false;
-        for i in 0..200 {
-            let line = format!(
-                r#"{{"message":{{"role":"assistant","content":""}},"done":false,"sample":{}}}"#,
-                i
-            );
-            if let StreamLine::Content(_, _) = p.feed_line(&line) {
-                saw_content = true;
-            }
-        }
-        assert!(!saw_content);
-        assert_eq!(p.feed_line(r#"{"message":{"content":""},"done":true}"#).is_done(), true);
-        let r = p.finish();
-        assert!(r.content.is_empty());
-        assert!(r.tool_calls.is_empty());
-    }
-
-    #[test]
-    fn think_tags_are_flagged() {
-        let mut p = StreamParser::new();
-        // open tag
-        match p.feed_line(r#"{"message":{"content":"ok, let me think "},"done":false}"#) {
-            StreamLine::Content(_, thinking) => assert!(!thinking),
-            _ => panic!("expected content"),
-        }
-        match p.feed_line(r#"{"message":{"content":"<think>"},"done":false}"#) {
-            StreamLine::Content(_, thinking) => assert!(thinking, "after <think> should be thinking"),
-            other => panic!("expected content, got {:?}", other),
-        }
-        match p.feed_line(r#"{"message":{"content":"hmm, the user "},"done":false}"#) {
-            StreamLine::Content(_, thinking) => assert!(thinking),
-            _ => panic!("expected content"),
-        }
-        match p.feed_line(r#"{"message":{"content":"wants tools</think>"},"done":false}"#) {
-            StreamLine::Content(_, thinking) => assert!(thinking, "closing tag processed in same chunk still counts"),
-            _ => panic!("expected content"),
-        }
-        match p.feed_line(r#"{"message":{"content":"here you go"},"done":true}"#) {
-            StreamLine::Content(_, thinking) => assert!(!thinking, "after </think> should not be thinking"),
-            _ => panic!("expected content"),
-        }
-        assert_eq!(p.content, "ok, let me think <think>hmm, the user wants tools</think>here you go");
-    }
-
-    #[test]
-    fn tool_calls_parsed_from_done_chunk() {
-        let mut p = StreamParser::new();
-        p.feed_line(r#"{"message":{"content":"calling tool"},"done":false}"#);
-        let line = r#"{"message":{"content":"","tool_calls":[{"function":{"name":"write_file","arguments":{"path":"C:/x/y.txt","content":"hello"}}}],"role":"assistant"},"done":true}"#;
-        match p.feed_line(line) {
-            StreamLine::Done => {}
-            _ => panic!("expected done"),
-        }
-        assert!(p.done);
-        assert_eq!(p.tool_calls.len(), 1);
-        assert_eq!(p.tool_calls[0].function.name, "write_file");
-        assert_eq!(p.tool_calls[0].function.arguments["path"], "C:/x/y.txt");
-    }
-
-    #[test]
-    fn malformed_line_is_skipped_without_panic() {
-        let mut p = StreamParser::new();
-        match p.feed_line("this is not json at all") {
-            StreamLine::Skip => {}
-            _ => panic!("expected skip"),
-        }
-        assert!(!p.done);
-        assert!(p.content.is_empty());
-    }
-
-    #[test]
-    fn think_detection_across_chunk_boundaries() {
-        // the "<th" arrives in one chunk, "ink>" in the next
-        let mut p = StreamParser::new();
-        match p.feed_line(r#"{"message":{"content":"a <th"},"done":false}"#) {
-            StreamLine::Content(_, t) => assert!(!t),
-            _ => panic!(),
-        }
-        match p.feed_line(r#"{"message":{"content":"ink>b"},"done":false}"#) {
-            StreamLine::Content(_, t) => assert!(t, "should detect think block after boundary split"),
-            _ => panic!(),
-        }
-    }
-
-    trait DoneExt {
-        fn is_done(&self) -> bool;
-    }
-    impl DoneExt for StreamLine {
-        fn is_done(&self) -> bool {
-            matches!(self, StreamLine::Done)
-        }
-    }
-}
-
-#[cfg(test)]
 mod prompt_tests {
     use super::*;
 
@@ -792,7 +420,7 @@ mod live_smoke_tests {
             let prompt = OllamaClient::system_prompt("fox", "C:\\ayesha-os\\engine");
             let client = OllamaClient::new("ayesha:latest");
             let tools = crate::tool_defs::tool_definitions_core();
-            let tools = tools.as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+            let tools = crate::streaming::tool_payload_slice(&tools);
             let msgs = vec![
                 ChatMessage {
                     role: "system".to_string(),
