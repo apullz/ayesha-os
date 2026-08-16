@@ -68,7 +68,7 @@ pub fn banner_lines() -> Vec<String> {
 
 pub fn print_banner() {
     for line in banner_lines() {
-        println!("{}", line);
+        print!("{}\r\n", line);
     }
 }
 
@@ -639,7 +639,7 @@ pub fn dock_draw_banner() {
     let cols = terminal_cols();
     print!("\x1B[1;1H");
     for line in banner_lines() {
-        print!("\x1B[2K{}\n", truncate_visible(&line, cols));
+        print!("\x1B[2K{}\r\n", truncate_visible(&line, cols));
     }
     stdout().flush().ok();
 }
@@ -817,7 +817,8 @@ pub fn convo_write(text: &str) {
     absorb(&mut st, &wrapped);
     if st.offset == 0 {
         drop(st);
-        print!("{}", wrapped);
+        let normalized = wrapped.replace("\r\n", "\n").replace("\n", "\r\n");
+        print!("{}", normalized);
         stdout().flush().ok();
     }
 }
