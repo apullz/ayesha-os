@@ -26,14 +26,14 @@
                          self-improvement loop, command palette,
                          opencode-style compact UI,
                          autocomplete (Tab cycling for commands
-                         and applets), 85 unit tests, zero warnings.
-                         └ 25 slash commands:
+                         and applets), 191 unit tests, 1 dead-code warning.
+                         └ 30 slash commands:
                             help, clear, models, auto, sync, apps,
                             run, stop, model, toolmodel, pull, route,
                             name, exit, stats, history, compact,
                             save, load, system, export, ping,
                             joke, time, uptime, config,
-                            memory, analyze, evolve, refine
+                            memory, analyze, evolve, refine, mode
                          └ model: ayesha (qwen2.5-coder:14b base)
                          └ --selftest for headless E2E verification
 

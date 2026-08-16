@@ -23,12 +23,9 @@ const SENSITIVE_TOOLS: &[&str] = &[
     "generate_object",
     "generate_sprite",
     "generate_tileset",
-    "generate_test",
     "render_sprite",
     // process / applet control
     "manage_applet",
-    // OS-level effects
-    "send_hotkey",
     // network
     "fetch_url",
     "download_image",
@@ -36,7 +33,6 @@ const SENSITIVE_TOOLS: &[&str] = &[
     "remember",
     "set_preference",
     // meta-tools that modify the agent itself
-    "skill_tool",
     "coding_agent",
     // "delegate" prompts (it spawns a sub-agent) but is INTENTIONALLY absent
     // from tools::MUTATING_TOOLS, so plan mode allows it: the sub-agent is
@@ -120,7 +116,7 @@ mod tests {
         let config = serde_json::json!({});
         for tool in [
             "read_file", "grep", "glob", "list_dir", "list_memories",
-            "read_memories", "search_memories", "analyze_self", "get_tool_stats",
+            "search_memories", "analyze_self", "get_tool_stats",
         ] {
             assert_eq!(decide_with(tool, &config, |_| false), Verdict::Allow, "{} should be auto-allowed", tool);
         }
@@ -130,7 +126,7 @@ mod tests {
     fn sensitive_tools_prompt_by_default() {
         let config = serde_json::json!({});
         for tool in [
-            "write_file", "send_hotkey", "manage_applet", "fetch_url",
+            "write_file", "manage_applet", "fetch_url",
             "download_image", "evolve_tools", "refine_prompt", "remember",
             "generate_html",
         ] {
@@ -159,7 +155,7 @@ mod tests {
     fn permission_mode_off_auto_allows_everything() {
         let config = serde_json::json!({ "permission_mode": "off" });
         assert_eq!(decide_with("write_file", &config, |_| false), Verdict::Allow);
-        assert_eq!(decide_with("send_hotkey", &config, |_| false), Verdict::Allow);
+        assert_eq!(decide_with("manage_applet", &config, |_| false), Verdict::Allow);
     }
 
     #[test]

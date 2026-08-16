@@ -12,7 +12,8 @@ ayesha-os/
 ├── applets/
 │   ├── desktop-cat/     python — desktop pet cat
 │   ├── flora-cli/       typescript — scottish flora phylogeny explorer
-│   └── poopy-tui/       python — discord terminal client (textual)
+│   ├── poopy-tui/       python — discord terminal client (textual)
+│   └── hivebeat/        python — live-coding terminal music synth (numpy)
 ├── ayesha.json          central config (personality, projects, ollama models)
 └── ayesha.bat           dev shortcut — NOT for delivery (see "delivery" below)
 ```
@@ -93,9 +94,9 @@ ollama create ayesha -f models/Modelfile
 
 ## gotchas
 
-- no test suites in any project (engine has `cargo test` — 69 passing)
+- no test suites in any project (engine has `cargo test` — 191 passing)
 - `applets/desktop-cat/desktopcat.py` uses `oneko_sprite.png` (NOT `cat.png` — that's unused)
 - python projects have no pyproject.toml — deps in requirements.txt only
 - typescript projects need `npm install` before first run
-- engine build requires `C:\msys64\mingw64\bin` in PATH for dlltool (gnu toolchain)
+- engine exe build uses MSVC toolchain (rc.exe via Windows Kits scan fallback) — no mingw/dlltool needed; run `scripts\build-exe.ps1`
 - applets with `"foreground": true` in ayesha.json (flora-cli, poopy-tui) run in the current terminal window; ctrl+p opens the interactive applet menu (arrow-key navigate, type to filter, enter to launch, x to stop). engine/src/applet_runner.rs owns the poll-based input thread; applet_manager::run_in_window suspends it, hands the console to the applet, and respawns it on return.

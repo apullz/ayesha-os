@@ -3,8 +3,8 @@
 1 ICON "ayesha.ico"
 
 1 VERSIONINFO
-FILEVERSION    1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION    4,5,0,0
+PRODUCTVERSION 4,5,0,0
 FILEFLAGSMASK  0x3fL
 FILEFLAGS      0x0L
 FILEOS         0x40004L
@@ -17,11 +17,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "ayesha-os"
             VALUE "FileDescription",  "ayesha-os terminal persona host"
-            VALUE "FileVersion",      "1.0.0"
+            VALUE "FileVersion",      "4.5.0"
             VALUE "InternalName",     "ayesha-os"
             VALUE "OriginalFilename", "ayesha-os.exe"
             VALUE "ProductName",      "Ayesha-OS"
-            VALUE "ProductVersion",   "1.0.0"
+            VALUE "ProductVersion",   "4.5.0"
         END
     END
     BLOCK "VarFileInfo"

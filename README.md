@@ -162,7 +162,7 @@ fox> auto                            # back to auto-routing
 
 ```cmd
 .\dist\ayesha-os.exe --selftest      # headless end-to-end smoke test (exit 0 = ok)
-cd engine && cargo test              # 111 unit tests, zero warnings
+cd engine && cargo test              # 191 unit tests, 1 warning (dead code)
 ```
 
 then just start chatting, fox: `fox> write me a haiku` (￣▽￣)
@@ -198,7 +198,7 @@ the model can autonomously call tools to complete tasks (26 tools):
 
 | tool | description |
 |------|-------------|
-| `read_file` | read any file on disk (sandboxed) |
+| `read_file` | read any file on disk (path sandbox is opt-in, see below) |
 | `write_file` | create or overwrite files |
 | `list_dir` | browse directories |
 | `grep` | recursive text search (case-insensitive substring, `path:line:` results) |
@@ -324,7 +324,7 @@ the engine learns and evolves:
 - **tool evolution** — identifies missing tools and generates definitions + implementation skeletons
 - **prompt refinement** — tracks tool success rates and suggests system prompt changes
 - **error auto-memory** — tool failures automatically stored as memories
-- **139 unit tests** — `cargo test` with zero warnings; `ayesha-os --selftest` runs a headless E2E smoke test
+- **191 unit tests** — `cargo test` (1 dead-code warning); `ayesha-os --selftest` runs a headless E2E smoke test
 
 ### sandbox security
 
