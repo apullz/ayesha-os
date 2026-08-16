@@ -102,6 +102,23 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                             if key.kind == KeyEventKind::Press
                                 && steer_tx.send("\0shift-down".to_string()).is_err() { break; }
                         }
+                        // Scroll the conversation scrollback
+                        (KeyCode::PageUp, _) => {
+                            if key.kind == KeyEventKind::Press { ui::convo_page_up(); }
+                            continue;
+                        }
+                        (KeyCode::PageDown, _) => {
+                            if key.kind == KeyEventKind::Press { ui::convo_page_down(); }
+                            continue;
+                        }
+                        (KeyCode::Home, _) => {
+                            if key.kind == KeyEventKind::Press { ui::convo_scroll_top(); }
+                            continue;
+                        }
+                        (KeyCode::End, _) => {
+                            if key.kind == KeyEventKind::Press { ui::convo_to_bottom(); }
+                            continue;
+                        }
                         (KeyCode::Tab, _) => {
                             if key.kind != KeyEventKind::Press { continue; }
                             let prefix = input_buf.trim_start().to_string();

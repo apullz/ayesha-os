@@ -27,13 +27,16 @@ if (!(Test-Path $vcvars)) {
 if (Test-Path $vcvars) {
     Write-Host "  Initializing MSVC environment..." -ForegroundColor Cyan
     $sdkBin = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
-    $cmd = "`"$vcvars`" >nul 2>&1 && set PATH=%PATH%;$sdkBin && cargo build --release"
+    # Pin the MSVC toolchain explicitly: the GNU toolchain (used for the
+    # termux/linux port) triggers fresh build-script compiles that Smart App
+    # Control blocks, and produces GNU binaries that need extra DLLs on Windows.
+    $cmd = "`"$vcvars`" >nul 2>&1 && set PATH=%PATH%;$sdkBin && rustup run stable-x86_64-pc-windows-msvc cargo build --release"
     cmd.exe /c $cmd
 } else {
     if ($Release) {
-        cargo build --release
+        rustup run stable-x86_64-pc-windows-msvc cargo build --release
     } else {
-        cargo build
+        rustup run stable-x86_64-pc-windows-msvc cargo build
     }
 }
 

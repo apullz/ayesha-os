@@ -11,8 +11,6 @@
 // display-only — the plain content is still collected by the caller for
 // message history.
 
-use std::io::Write;
-
 use crate::theme::{self, Role, SyntaxRole};
 use crate::syntax;
 
@@ -202,8 +200,7 @@ fn color_inline(line: &str) -> String {
 pub fn print_rendered(text: &str) {
     let mut stream = CodeStream::new();
     let out = format!("{}{}", stream.feed(text), stream.finish());
-    print!("{out}");
-    let _ = std::io::stdout().flush();
+    crate::ui::convo_write(&out);
 }
 
 #[cfg(test)]

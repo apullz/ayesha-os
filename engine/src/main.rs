@@ -444,7 +444,7 @@ async fn main() -> anyhow::Result<()> {
     let mut manager = AppletManager::new();
     let executor = ToolExecutor::new(sandbox);
     let mut current_model = "opencode/big-pickle".to_string();
-    let fallback_model = "nvidia/nemotron-3-super-120b-a12b:free";
+    let fallback_model = "xiaomi/mimo-v2.5-pro";
     let mut client = match CloudClient::new("opencode/big-pickle", "opencode") {
         Ok(cc) => ActiveBackend::Cloud(cc),
         Err(_) => match CloudClient::new(fallback_model, "openrouter") {

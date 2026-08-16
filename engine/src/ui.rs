@@ -80,10 +80,10 @@ pub fn show_tool_call(name: &str, args: &str) {
     } else {
         args.to_string()
     };
-    println!("  {} {} {}",
+    convo_line(&format!("  {} {} {}",
         theme::bold(Role::Primary, "▪"),
         theme::bold(Role::Text, name),
-        theme::paint(Role::Dim, truncated));
+        theme::paint(Role::Dim, truncated)));
 }
 
 const TOOL_BOX_WIDTH: usize = 78;
@@ -109,6 +109,37 @@ fn visible_len(s: &str) -> usize {
     strip_ansi(s).chars().count()
 }
 
+/// Truncate a styled line to `width` visible characters for region redraws, so
+/// a long line can't wrap onto the next physical row and desync the layout.
+/// ANSI sequences after the cut-off are still emitted so colours reset.
+fn truncate_visible(s: &str, width: usize) -> String {
+    let mut out = String::new();
+    let mut count = 0usize;
+    let mut in_ansi = false;
+    let mut ansi = String::new();
+    for c in s.chars() {
+        if c == '\x1B' {
+            in_ansi = true;
+            ansi.push(c);
+            continue;
+        }
+        if in_ansi {
+            ansi.push(c);
+            if c == 'm' {
+                out.push_str(&ansi);
+                ansi.clear();
+                in_ansi = false;
+            }
+            continue;
+        }
+        if count < width {
+            out.push(c);
+        }
+        count += 1;
+    }
+    out
+}
+
 fn tool_box_line(content: &str, color: Role) -> String {
     let t = crate::util::truncate_chars(content, TOOL_BOX_WIDTH);
     // opencode renders tool/file content in syntax colors, not flat dim
@@ -124,49 +155,48 @@ fn tool_box_line(content: &str, color: Role) -> String {
 pub fn show_tool_ok(name: &str, msg: &str) {
     let title = format!(" {} ", name);
     let dashes = TOOL_BOX_WIDTH.saturating_sub(title.chars().count());
-    println!("  {}",
-        theme::paint(Role::Dim, format!("┌{}{}┐", title, "─".repeat(dashes))));
+    convo_line(&format!("  {}",
+        theme::paint(Role::Dim, format!("┌{}{}┐", title, "─".repeat(dashes)))));
     let content: Vec<&str> = msg.lines().collect();
     let shown = content.len().min(8);
     for line in content.iter().take(shown) {
-        println!("{}", tool_box_line(line, Role::Dim));
+        convo_line(&tool_box_line(line, Role::Dim));
     }
     if content.len() > shown {
-        println!("{}", tool_box_line(&format!("… +{} more lines", content.len() - shown), Role::Dim));
+        convo_line(&tool_box_line(&format!("… +{} more lines", content.len() - shown), Role::Dim));
     }
-    println!("  {}",
-        theme::paint(Role::Dim, format!("└{}┘", "─".repeat(TOOL_BOX_WIDTH))));
+    convo_line(&format!("  {}",
+        theme::paint(Role::Dim, format!("└{}┘", "─".repeat(TOOL_BOX_WIDTH)))));
 }
 
 pub fn show_tool_err(name: &str, msg: &str) {
     let title = format!(" {} ", name);
     let dashes = TOOL_BOX_WIDTH.saturating_sub(title.chars().count());
-    println!("  {}",
-        theme::paint(Role::Error, format!("┌{}{}┐", title, "─".repeat(dashes))));
-    println!("{}", tool_box_line(msg, Role::Error));
-    println!("  {}",
-        theme::paint(Role::Error, format!("└{}┘", "─".repeat(TOOL_BOX_WIDTH))));
+    convo_line(&format!("  {}",
+        theme::paint(Role::Error, format!("┌{}{}┐", title, "─".repeat(dashes)))));
+    convo_line(&tool_box_line(msg, Role::Error));
+    convo_line(&format!("  {}",
+        theme::paint(Role::Error, format!("└{}┘", "─".repeat(TOOL_BOX_WIDTH)))));
 }
 
 // ── system messages ───────────────────────────────────────
 
 pub fn show_system(msg: &str) {
-    println!("  {} {}",
+    convo_line(&format!("  {} {}",
         theme::paint(Role::Accent, "◆"),
-        theme::paint(Role::Accent, msg));
+        theme::paint(Role::Accent, msg)));
 }
 
 pub fn show_error(msg: &str) {
-    println!("  {} {}",
+    convo_line(&format!("  {} {}",
         theme::paint(Role::Error, "✖"),
-        theme::paint(Role::Error, msg));
+        theme::paint(Role::Error, msg)));
 }
 
 /// Echo the user's message opencode-style: a solid pink accent bar, then the
 /// message text on a raised panel, wrapped at a readable width.
 pub fn show_user_msg(msg: &str) {
-    print!("{}", format_user_msg(msg));
-    stdout().flush().ok();
+    convo_write(&format_user_msg(msg));
 }
 
 const USER_CARD_WIDTH: usize = 84;
@@ -213,8 +243,8 @@ fn format_user_msg(msg: &str) -> String {
 
 /// Thin dim separator between turns, opencode-style.
 pub fn show_turn_separator() {
-    println!("  {}",
-        theme::paint(Role::Primary, "─".repeat(38)));
+    convo_line(&format!("  {}",
+        theme::paint(Role::Primary, "─".repeat(38))));
 }
 
 #[allow(dead_code)]
@@ -234,14 +264,14 @@ pub fn hide_processing() {
 }
 
 pub fn show_routing(model: &str) {
-    println!("  {} {}",
+    convo_line(&format!("  {} {}",
         theme::bold(Role::Primary, "▪"),
-        theme::bold(Role::Text, model));
+        theme::bold(Role::Text, model)));
 }
 
 pub fn show_interrupted() {
-    println!("  {}",
-        theme::bold(Role::Warning, "⏹  interrupted"));
+    convo_line(&format!("  {}",
+        theme::bold(Role::Warning, "⏹  interrupted")));
 }
 
 // ── prompt ─────────────────────────────────────────────────
@@ -345,6 +375,7 @@ pub fn dock_redraw_bottom() {
     print!("\x1B[{};1H\x1B[2K{}", status_row, render_status(&dock_status_str()));
     print!("\x1B[{};1H\x1B[2K{}", input_row, prompt_chars());
     stdout().flush().ok();
+    convo_sync();
 }
 
 /// True when the dock is active (terminal big enough). Lets the input thread
@@ -365,9 +396,11 @@ pub fn dock_prompt() {
 
 /// Move the cursor to the bottom of the conversation region so the echoed
 /// input and everything printed this turn renders inside the dock, scrolling
-/// older content up. No-op when not docked.
+/// older content up. Also returns any scrolled-up view to the live bottom.
+/// No-op when not docked.
 pub fn dock_submit_goto() {
     let Some((_, region_bottom, _, _)) = dock_geometry() else { return; };
+    convo_to_bottom();
     print!("\x1B[{};1H", region_bottom);
     stdout().flush().ok();
 }
@@ -375,6 +408,227 @@ pub fn dock_submit_goto() {
 /// Re-establish the dock after the terminal was resized or the screen cleared.
 pub fn dock_refresh() {
     dock_redraw_bottom();
+    convo_sync();
+}
+
+// ── conversation scrollback + scrollbar ────────────────────
+// Every line written into the conversation region is captured here (ANSI text,
+// newest last) so the user can scroll back with PgUp/PgDn/End even though the
+// terminal's own scrollback is frozen by the DECSTBM region. When scrolled up,
+// output is buffered and suppressed; returning to the bottom repaints the
+// region from the buffer.
+
+const SCROLL_CAP: usize = 5000;
+
+static SCROLL_STATE: std::sync::OnceLock<std::sync::Mutex<ScrollState>> =
+    std::sync::OnceLock::new();
+
+#[derive(Default)]
+struct ScrollState {
+    lines: Vec<String>, // complete lines, newest last
+    partial: String,    // current unfinished line (mid-stream)
+    offset: usize,      // 0 = live (bottom); N = scrolled up N lines
+}
+
+impl ScrollState {
+    fn total(&self) -> usize {
+        self.lines.len() + usize::from(!self.partial.is_empty())
+    }
+
+    /// The i-th display line (0 = oldest), where the partial line is last.
+    fn display(&self, i: usize) -> &str {
+        if i < self.lines.len() {
+            &self.lines[i]
+        } else {
+            &self.partial
+        }
+    }
+}
+
+fn scroll_state() -> std::sync::MutexGuard<'static, ScrollState> {
+    SCROLL_STATE
+        .get_or_init(|| std::sync::Mutex::new(ScrollState::default()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+}
+
+/// Pure buffer absorb: split `text` on newlines into complete lines, keeping
+/// the tail in `partial`. Separated from the stdout path so it's testable.
+fn absorb(st: &mut ScrollState, text: &str) {
+    for c in text.chars() {
+        if c == '\n' {
+            st.lines.push(std::mem::take(&mut st.partial));
+        } else {
+            st.partial.push(c);
+        }
+    }
+    if st.lines.len() > SCROLL_CAP {
+        let drop = st.lines.len() - SCROLL_CAP;
+        st.lines.drain(0..drop);
+    }
+}
+
+/// How far the viewport can scroll up (total lines minus region height).
+fn scroll_clamp(offset: usize, total: usize, visible: usize) -> usize {
+    offset.min(total.saturating_sub(visible))
+}
+
+fn thumb_height(total: usize, visible: usize) -> usize {
+    (visible.saturating_mul(visible) / total.max(1)).clamp(1, visible.max(1))
+}
+
+fn thumb_top(offset: usize, total: usize, visible: usize) -> usize {
+    let max_off = total.saturating_sub(visible);
+    if max_off == 0 {
+        return 0;
+    }
+    let th = thumb_height(total, visible);
+    (((visible - th) as f64 * offset as f64 / max_off as f64).round() as usize)
+        .min(visible.saturating_sub(th))
+}
+
+/// Write display text (ANSI strings with embedded newlines) into the
+/// conversation region. This is the single funnel every conversation line goes
+/// through: it captures scrollback and prints straight through while live.
+pub fn convo_write(text: &str) {
+    let mut st = scroll_state();
+    absorb(&mut st, text);
+    if st.offset == 0 {
+        drop(st);
+        print!("{}", text);
+        stdout().flush().ok();
+    }
+}
+
+/// Write one full line into the conversation region (drop-in for println!).
+pub fn convo_line(line: &str) {
+    convo_write(&format!("{}\n", line));
+}
+
+/// Page up / down: move the viewport by a sensible chunk of the region.
+pub fn convo_page_up() {
+    let Some((_, region_bottom, _, _)) = dock_geometry() else { return; };
+    let page = ((region_bottom as usize).max(1) / 2).max(1);
+    let mut st = scroll_state();
+    st.offset = st.offset.saturating_add(page);
+    drop(st);
+    convo_redraw();
+}
+
+pub fn convo_page_down() {
+    let Some((region_top, region_bottom, _, _)) = dock_geometry() else { return; };
+    let page = ((region_bottom as usize).max(1) / 2).max(1);
+    let mut st = scroll_state();
+    let visible = (region_bottom - region_top + 1) as usize;
+    st.offset = scroll_clamp(st.offset.saturating_sub(page), st.total(), visible);
+    drop(st);
+    convo_redraw();
+}
+
+pub fn convo_scroll_top() {
+    let Some((region_top, region_bottom, _, _)) = dock_geometry() else { return; };
+    let visible = (region_bottom - region_top + 1) as usize;
+    let mut st = scroll_state();
+    st.offset = scroll_clamp(usize::MAX, st.total(), visible);
+    drop(st);
+    convo_redraw();
+}
+
+/// Return to the live bottom (offset 0) and repaint from the buffer.
+pub fn convo_to_bottom() {
+    let mut st = scroll_state();
+    if st.offset == 0 {
+        return;
+    }
+    st.offset = 0;
+    drop(st);
+    convo_redraw();
+}
+
+/// Re-sync after resize / clear: clamp the offset and repaint whatever is on
+/// screen (region + scrollbar + status hint) so it matches the buffer.
+pub fn convo_sync() {
+    let Some((region_top, region_bottom, _, _)) = dock_geometry() else { return; };
+    let (cols, _) = crossterm::terminal::size().unwrap_or((80, 24));
+    let visible = (region_bottom - region_top + 1) as usize;
+    let mut st = scroll_state();
+    let total = st.total();
+    st.offset = scroll_clamp(st.offset, total, visible);
+    let offset = st.offset;
+    drop(st);
+
+    if offset == 0 {
+        if total > visible {
+            draw_scrollbar(region_top, region_bottom, total, 0, visible, cols);
+            stdout().flush().ok();
+        }
+        return;
+    }
+    convo_redraw();
+}
+
+/// Repaint the whole conversation region from the scrollback buffer. When
+/// offset == 0 the cursor ends at the bottom so live streaming can resume;
+/// when scrolled up the status bar shows a hint and the scrollbar is drawn.
+fn convo_redraw() {
+    let Some((region_top, region_bottom, status_row, _)) = dock_geometry() else { return; };
+    let (cols, _) = crossterm::terminal::size().unwrap_or((80, 24));
+    let visible = (region_bottom - region_top + 1) as usize;
+    let mut st = scroll_state();
+    let total = st.total();
+    st.offset = scroll_clamp(st.offset, total, visible);
+    let offset = st.offset;
+    let start = total.saturating_sub(offset.saturating_add(visible));
+
+    let mut rendered = String::new();
+    let mut row = region_top;
+    for _ in 0..visible {
+        let idx = start + (row - region_top) as usize;
+        let text = if idx < total { truncate_visible(st.display(idx), cols as usize) } else { String::new() };
+        rendered.push_str(&format!("\x1B[{};1H\x1B[2K{}", row, text));
+        row += 1;
+    }
+    drop(st);
+
+    if offset == 0 {
+        // live: cursor back at the region bottom so streaming appends,
+        // and the real status bar is restored
+        rendered.push_str(&format!("\x1B[{};1H", region_bottom));
+        rendered.push_str(&format!(
+            "\x1B[{};1H\x1B[2K{}", status_row, render_status(&dock_status_str())
+        ));
+    } else {
+        // scrolled: put a hint on the status bar
+        rendered.push_str(&format!(
+            "\x1B[{};1H\x1B[2K  {} {}",
+            status_row,
+            theme::bold(Role::Primary, "◆"),
+            theme::paint(Role::Dim, format!("scrolled up {} — pgup/pgdn/end to return", offset)),
+        ));
+    }
+    print!("{}", rendered);
+    draw_scrollbar(region_top, region_bottom, total, offset, visible, cols);
+    stdout().flush().ok();
+}
+
+/// Draw a scrollbar in the rightmost column of the region when the buffer
+/// overflows the viewport. Thumb = theme primary, track = dim vertical bar.
+fn draw_scrollbar(region_top: u16, region_bottom: u16, total: usize, offset: usize, visible: usize, cols: u16) {
+    if total <= visible || visible == 0 || cols == 0 {
+        return;
+    }
+    let th = thumb_height(total, visible);
+    let tt = thumb_top(offset, total, visible);
+    let mut rendered = String::new();
+    for i in 0..visible {
+        let ch = if i >= tt && i < tt + th {
+            theme::paint(Role::Primary, "█")
+        } else {
+            theme::paint(Role::Dim, "│")
+        };
+        rendered.push_str(&format!("\x1B[{};{}H{}", region_top + i as u16, cols, ch));
+    }
+    print!("{}", rendered);
 }
 
 // ── centered popup overlay ─────────────────────────────────
@@ -534,6 +788,62 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn absorb_splits_newlines_and_keeps_partial() {
+        let mut st = ScrollState::default();
+        absorb(&mut st, "hello\nworld");
+        assert_eq!(st.lines, vec!["hello".to_string()]);
+        assert_eq!(st.partial, "world");
+        absorb(&mut st, "\nend");
+        assert_eq!(st.lines, vec!["hello".to_string(), "world".to_string()]);
+        assert_eq!(st.partial, "end");
+        // a bare blank line is captured as an empty line
+        absorb(&mut st, "\n\n");
+        assert_eq!(st.lines, vec!["hello".to_string(), "world".to_string(), "end".to_string(), String::new()]);
+        assert_eq!(st.partial, String::new());
+    }
+
+    #[test]
+    fn absorb_caps_scrollback() {
+        let mut st = ScrollState::default();
+        for i in 0..(SCROLL_CAP + 50) {
+            absorb(&mut st, &format!("line{}\n", i));
+        }
+        assert_eq!(st.lines.len(), SCROLL_CAP);
+        assert_eq!(st.lines.first().unwrap(), "line50");
+    }
+
+    #[test]
+    fn scroll_clamp_never_exceeds_top() {
+        assert_eq!(scroll_clamp(0, 10, 5), 0);
+        assert_eq!(scroll_clamp(100, 10, 5), 5);
+        assert_eq!(scroll_clamp(3, 3, 5), 0);
+        assert_eq!(scroll_clamp(4, 10, 5), 4);
+    }
+
+    #[test]
+    fn thumb_tracks_offset_position() {
+        // 20 lines, 5 visible → thumb 1 tall; offset 0 → top 0, offset max → bottom
+        let th = thumb_height(20, 5);
+        assert_eq!(th, 1);
+        assert_eq!(thumb_top(0, 20, 5), 0);
+        assert_eq!(thumb_top(15, 20, 5), 4);
+        // exact-fit content: no scrolling possible
+        assert_eq!(thumb_top(0, 5, 5), 0);
+        assert_eq!(thumb_height(5, 5), 5);
+    }
+
+    #[test]
+    fn truncate_visible_caps_width_and_keeps_ansi() {
+        let styled = format!("{}", "abcdefghij".bright_red());
+        let t = truncate_visible(&styled, 4);
+        assert_eq!(strip_ansi(&t), "abcd");
+        assert!(t.contains("\x1B["), "ansi styling lost");
+        // ansi sequence after the cutoff is still emitted for resets
+        let t2 = truncate_visible(&format!("{}", "abcdef".bright_red()), 2);
+        assert!(t2.contains("\x1B[0m") || t2.contains("\x1B[39m") || t2.contains("\x1B[m"));
     }
 
     #[test]

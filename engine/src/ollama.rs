@@ -58,6 +58,8 @@ pub struct ChatRequest {
     pub stream: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub think: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,6 +110,7 @@ pub struct OllamaClient {
     client: Client,
     pub model: String,
     base_url: String,
+    num_ctx: u32,
 }
 
 /// Pure NDJSON stream parser for ollama's /api/chat streaming format.
@@ -234,6 +237,22 @@ impl StreamParser {
     }
 }
 
+/// Sane per-model context window for the /api/chat request.
+///
+/// ollama's default window when a model has no num_ctx is 4096 — and the
+/// engine's system prompt + 26 tool definitions already exceed that, so
+/// ollama silently truncates the prompt from the front and the model never
+/// sees prior turns. Always pin num_ctx explicitly so the conversation
+/// actually fits.
+fn default_num_ctx(model: &str) -> u32 {
+    let m = model.to_lowercase();
+    if m.contains("vision") || m.contains("0.5b") || m.contains("3b") {
+        8192
+    } else {
+        32768
+    }
+}
+
 impl OllamaClient {
     pub fn new(model: &str) -> Self {
         Self::new_with_base(model, OLLAMA_BASE)
@@ -247,7 +266,19 @@ impl OllamaClient {
                 .unwrap_or_default(),
             model: model.to_string(),
             base_url: base_url.to_string(),
+            num_ctx: default_num_ctx(model),
         }
+    }
+
+    /// Override the request context window (used when the model registry
+    /// knows the model's true context length).
+    pub fn with_num_ctx(mut self, ctx: u32) -> Self {
+        self.num_ctx = ctx;
+        self
+    }
+
+    fn options(&self) -> Option<Value> {
+        Some(json!({ "num_ctx": self.num_ctx }))
     }
 
     #[allow(dead_code)]
@@ -266,6 +297,7 @@ impl OllamaClient {
             tools: tools.map(|t| t.to_vec()),
             stream: false,
             think: false,
+            options: self.options(),
         };
 
         let resp = self.client
@@ -298,6 +330,7 @@ impl OllamaClient {
             tools: tools.map(|t| t.to_vec()),
             stream: true,
             think: false,
+            options: self.options(),
         };
 
         let mut resp = self
@@ -352,7 +385,6 @@ impl OllamaClient {
         tools: Option<&[Value]>,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-        use std::io::Write;
 
         let request = ChatRequest {
             model: self.model.clone(),
@@ -360,6 +392,7 @@ impl OllamaClient {
             tools: tools.map(|t| t.to_vec()),
             stream: true,
             think: false,
+            options: self.options(),
         };
 
         let mut resp = self
@@ -387,16 +420,15 @@ impl OllamaClient {
                 match parser.feed_line(&line) {
                     StreamLine::Content(text, thinking) => {
                         if thinking {
-                            print!("{}", theme::paint(Role::Dim, &text));
+                            crate::ui::convo_write(&theme::paint(Role::Dim, &text));
                         } else {
-                            print!("{}", code.feed(&text));
+                            crate::ui::convo_write(&code.feed(&text));
                         }
-                        std::io::stdout().flush().ok();
                     }
                     StreamLine::Done => {
-                        print!("{}", code.finish());
+                        crate::ui::convo_write(&code.finish());
                         if !parser.content.is_empty() {
-                            println!();
+                            crate::ui::convo_write("\n");
                         }
                         return Ok(parser.finish());
                     }
@@ -407,8 +439,8 @@ impl OllamaClient {
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
                 parser.flush_tail();
-                print!("{}", code.finish());
-                println!();
+                crate::ui::convo_write(&code.finish());
+                crate::ui::convo_write("\n");
                 return Ok(StreamResult {
                     content: parser.content,
                     tool_calls: parser.tool_calls,
@@ -417,8 +449,8 @@ impl OllamaClient {
             }
         }
 
-        print!("{}", code.finish());
-        println!();
+        crate::ui::convo_write(&code.finish());
+        crate::ui::convo_write("\n");
         Ok(parser.finish())
     }
 
@@ -431,7 +463,6 @@ impl OllamaClient {
         data_uri: &str,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-        use std::io::Write;
 
         let b64 = match data_uri.split_once(";base64,") {
             Some((_, rest)) => rest,
@@ -446,6 +477,7 @@ impl OllamaClient {
             }],
             "stream": true,
             "think": false,
+            "options": self.options(),
         });
 
         let mut resp = self
@@ -471,16 +503,15 @@ impl OllamaClient {
                 match parser.feed_line(&line) {
                     StreamLine::Content(text, thinking) => {
                         if thinking {
-                            print!("{}", crate::theme::paint(crate::theme::Role::Dim, &text));
+                            crate::ui::convo_write(&crate::theme::paint(crate::theme::Role::Dim, &text));
                         } else {
-                            print!("{}", code.feed(&text));
+                            crate::ui::convo_write(&code.feed(&text));
                         }
-                        std::io::stdout().flush().ok();
                     }
                     StreamLine::Done => {
-                        print!("{}", code.finish());
+                        crate::ui::convo_write(&code.finish());
                         if !parser.content.is_empty() {
-                            println!();
+                            crate::ui::convo_write("\n");
                         }
                         return Ok(parser.finish());
                     }
@@ -489,8 +520,8 @@ impl OllamaClient {
             }
             if let Ok(input) = steer_rx.try_recv() {
                 parser.flush_tail();
-                print!("{}", code.finish());
-                println!();
+                crate::ui::convo_write(&code.finish());
+                crate::ui::convo_write("\n");
                 return Ok(StreamResult {
                     content: parser.content,
                     tool_calls: parser.tool_calls,
@@ -499,8 +530,8 @@ impl OllamaClient {
             }
         }
 
-        print!("{}", code.finish());
-        println!();
+        crate::ui::convo_write(&code.finish());
+        crate::ui::convo_write("\n");
         Ok(parser.finish())
     }
 

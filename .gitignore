@@ -77,3 +77,6 @@ applets/poopy-tui/
 
 # Local archive of removed/dead files (kept for easy restore)
 _archive/
+
+# Deepwork session state (local progress files)
+.slim/deepwork/

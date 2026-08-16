@@ -256,7 +256,6 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         tools: Option<&[Value]>,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-        use std::io::Write;
 
         let req_body = json!({
             "model": self.model,
@@ -344,11 +343,10 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
                                                 }
 
                                                 if in_think {
-                                                    print!("{}", theme::paint(Role::Dim, &enforced));
+                                                    crate::ui::convo_write(&theme::paint(Role::Dim, &enforced));
                                                 } else {
-                                                    print!("{}", code.feed(&enforced));
+                                                    crate::ui::convo_write(&code.feed(&enforced));
                                                 }
-                                                std::io::stdout().flush().ok();
                                             }
                                         }
 
@@ -394,7 +392,7 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
 
             // Check for steering between chunks
             if let Ok(input) = steer_rx.try_recv() {
-                println!();
+                crate::ui::convo_write("\n");
                 
                 let mut final_tcs = Vec::new();
                 for a in &active_tool_calls {
@@ -416,16 +414,15 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
                 let tail = formatter.finish();
                 if !tail.is_empty() {
                     full_content.push_str(&tail);
-                    print!("{}", code.feed(&tail));
-                    std::io::stdout().flush().ok();
+                    crate::ui::convo_write(&code.feed(&tail));
                 }
-                print!("{}", code.finish());
+                crate::ui::convo_write(&code.finish());
 
                 return Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: Some(input) });
             }
         }
 
-        println!();
+        crate::ui::convo_write("\n");
 
         let mut final_tcs = Vec::new();
         for a in active_tool_calls {
@@ -447,10 +444,9 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         let tail = formatter.finish();
         if !tail.is_empty() {
             full_content.push_str(&tail);
-            print!("{}", code.feed(&tail));
-            std::io::stdout().flush().ok();
+            crate::ui::convo_write(&code.feed(&tail));
         }
-        print!("{}", code.finish());
+        crate::ui::convo_write(&code.finish());
 
         Ok(StreamResult { content: full_content, tool_calls: final_tcs, steering: None })
     }
@@ -612,7 +608,6 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         data_uri: &str,
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
-        use std::io::Write;
 
         let req_body = json!({
             "model": self.model,
@@ -657,9 +652,9 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
                 }
                 if let Some(data) = trimmed.strip_prefix("data:") {
                     if data.trim() == "[DONE]" {
-                        print!("{}", code.finish());
+                        crate::ui::convo_write(&code.finish());
                         if !full_content.is_empty() {
-                            println!();
+                            crate::ui::convo_write("\n");
                         }
                         return Ok(StreamResult { content: full_content, tool_calls: vec![], steering: None });
                     }
@@ -673,11 +668,10 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
                             in_think = true;
                         }
                         if in_think {
-                            print!("{}", theme::paint(Role::Dim, text));
+                            crate::ui::convo_write(&theme::paint(Role::Dim, text));
                         } else {
-                            print!("{}", code.feed(text));
+                            crate::ui::convo_write(&code.feed(text));
                         }
-                        std::io::stdout().flush().ok();
                         if text.contains("</think>") {
                             in_think = false;
                         }
@@ -685,14 +679,14 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
                 }
             }
             if let Ok(input) = steer_rx.try_recv() {
-                print!("{}", code.finish());
-                println!();
+                crate::ui::convo_write(&code.finish());
+                crate::ui::convo_write("\n");
                 return Ok(StreamResult { content: full_content, tool_calls: vec![], steering: Some(input) });
             }
         }
 
-        print!("{}", code.finish());
-        println!();
+        crate::ui::convo_write(&code.finish());
+        crate::ui::convo_write("\n");
         Ok(StreamResult { content: full_content, tool_calls: vec![], steering: None })
     }
 }

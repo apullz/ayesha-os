@@ -1,6 +1,11 @@
 # ayesha hivemind modelfile
 FROM mistral-nemo:12b
 
+# context window — without this ollama defaults to 4096 and the engine's
+# system prompt + tool definitions eat it all, silently dropping the
+# conversation history from the front
+PARAMETER num_ctx 32768
+
 # give the model more creativity for complex structures
 
 system """
