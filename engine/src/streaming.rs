@@ -386,6 +386,21 @@ impl<'a> StreamPipeline<'a> {
             *active = ActiveToolCall::default();
         }
 
+        // Gate C N3 residual: some providers re-emit the full call under the
+        // SAME id+name (a `done:false` chunk followed by a `done:true` chunk).
+        // Gate B can't catch that (the identity didn't change), so without a
+        // guard the arguments would double-append and corrupt the JSON. If the
+        // slot's accumulated arguments already parse as complete JSON and this
+        // delta carries a call identity (id/name — the signature of a call
+        // start, not a continuation), the new emission replaces the old one.
+        let carries_identity = new_id.is_some() || new_name.is_some();
+        if carries_identity
+            && !active.args.is_empty()
+            && serde_json::from_str::<Value>(&active.args).is_ok()
+        {
+            *active = ActiveToolCall::default();
+        }
+
         if let Some(id) = delta.get("id").and_then(|i| i.as_str()) {
             active.id = id.to_string();
         }
@@ -813,6 +828,69 @@ mod tests {
         assert_eq!(result.tool_calls[0].id, "call_1");
         assert_eq!(result.tool_calls[0].function.name, "read_file");
         assert_eq!(result.tool_calls[0].function.arguments, json!({"path": "src/main.rs"}));
+    }
+
+    #[test]
+    fn tool_delta_same_id_full_reemission_replaces_not_appends() {
+        // Gate C N3 residual: a provider may re-emit the SAME id+name call in
+        // full (a `done:false` chunk followed by a `done:true` chunk). The
+        // identity doesn't change, so gate B alone can't catch it — the
+        // arguments must replace the previous emission instead of
+        // double-appending and corrupting the JSON.
+        let rx = channel();
+        let mut p = StreamPipeline::new(&rx);
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"path\": \"src/main.rs\"}" }
+        }))]);
+        // full re-emission under the identical id+name
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"path\": \"src/grep.rs\"}" }
+        }))]);
+        let result = p.finish();
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(result.tool_calls[0].id, "call_1");
+        assert_eq!(result.tool_calls[0].function.name, "read_file");
+        assert_eq!(
+            result.tool_calls[0].function.arguments,
+            json!({"path": "src/grep.rs"}),
+            "re-emission must replace, not double-append, the arguments"
+        );
+    }
+
+    #[test]
+    fn tool_delta_unparseable_args_fall_back_to_empty_object() {
+        // Document the safe-fallback in finalize(): if accumulated arguments
+        // are malformed (a continuation can't be reconstructed into JSON),
+        // the call still goes through with `{}` rather than panicking — the
+        // tool layer then reports a missing-argument error instead of
+        // crashing the turn.
+        let rx = channel();
+        let mut p = StreamPipeline::new(&rx);
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"path\": \"a\"}" }
+        }))]);
+        // continuation WITHOUT identity: gate C intentionally doesn't reset
+        // here (no call start), so the fragments concatenate into garbage
+        p.feed_events(vec![StreamEvent::ToolDelta(json!({
+            "index": 0,
+            "function": { "arguments": "{\"path\": \"b\"}" }
+        }))]);
+        let result = p.finish();
+        assert_eq!(result.tool_calls.len(), 1);
+        assert_eq!(
+            result.tool_calls[0].function.arguments,
+            json!({}),
+            "malformed accumulated args must fall back to {{}}"
+        );
     }
 
     #[test]

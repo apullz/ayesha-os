@@ -132,8 +132,8 @@ const DISPATCHABLE_TOOLS: &[&str] = &[
 pub const MUTATING_TOOLS: &[&str] = &[
     // File ops
     "write_file",
-    // Network writes
-    "download_image",
+    // Network (writes fetched/downloaded content to disk)
+    "fetch_url", "download_image",
     // Generation (writes files into the project)
     "generate_html", "generate_sprite", "generate_tileset",
     "generate_object", "render_sprite",
@@ -170,8 +170,8 @@ const SUB_AGENT_TOOLS: &[&str] = &[
     "read_file", "list_dir", "grep", "glob",
     // Skills (read-only)
     "list_skills", "read_skill",
-    // Network read
-    "fetch_url", "read_clipboard",
+    // Clipboard read
+    "read_clipboard",
     // Memory reads
     "list_memories", "search_memories",
     // Analysis
@@ -208,7 +208,7 @@ pub fn delegate_tool_definition() -> Value {
         "type": "function",
         "function": {
             "name": "delegate",
-            "description": "spawn a bounded research sub-agent (same model backend) for a large read-only sub-task: file reads, directory listings, greps, globs, skill reads, URL fetches. the sub-agent cannot modify anything and cannot delegate further. use it to parallelize or isolate heavy investigation while you keep working. returns a concise summary of findings.",
+            "description": "spawn a bounded research sub-agent (same model backend) for a large read-only sub-task: file reads, directory listings, greps, globs, skill reads. the sub-agent cannot modify anything and cannot delegate further. use it to parallelize or isolate heavy investigation while you keep working. returns a concise summary of findings.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -407,7 +407,6 @@ impl ToolExecutor {
             "glob" => self.glob(args).await,
             "list_skills" => self.list_skills(ctx.project_root),
             "read_skill" => self.read_skill(args, ctx.project_root),
-            "fetch_url" => self.fetch_url(args).await,
             "read_clipboard" => self.read_clipboard().await,
             "list_memories" => self.list_memories(args, ctx.memory),
             "search_memories" => self.search_memories(args, ctx.memory),
@@ -1701,7 +1700,7 @@ mod tests {
         // ...and everything read-only stays allowed
         for name in [
             "read_file", "list_dir", "grep", "glob", "list_skills", "read_skill",
-            "fetch_url", "read_clipboard", "list_memories", "search_memories",
+            "read_clipboard", "list_memories", "search_memories",
             "analyze_self", "list_source_files", "get_tool_stats",
         ] {
             assert!(

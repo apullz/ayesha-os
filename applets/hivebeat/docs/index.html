@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hivebeat — sabre_demo</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --line:#1e2a38;
+    --green:#3dff88; --pink:#ff3dd0; --cyan:#43e6ff;
+    --dim:#5c6b7d; --txt:#d7e3ee;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #14202e 0%, var(--bg) 60%);
+    color:var(--txt);
+    font-family:"Courier New", ui-monospace, monospace;
+    min-height:100vh;
+    display:flex; justify-content:center;
+    padding:40px 16px;
+  }
+  .scanlines{
+    position:fixed; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg,
+      rgba(0,0,0,0.22) 0 1px, transparent 1px 3px);
+    mix-blend-mode:multiply; z-index:9;
+  }
+  .wrap{max-width:760px; width:100%;}
+  .banner{
+    color:var(--green); font-size:13px; line-height:1.15;
+    text-shadow:0 0 12px rgba(61,255,136,.35);
+    white-space:pre; margin-bottom:6px;
+  }
+  .tagline{color:var(--dim); font-size:12px; margin-bottom:26px;}
+  .tagline b{color:var(--cyan);}
+
+  .deck{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:20px 20px 16px;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 10px 40px rgba(0,0,0,.5);
+  }
+  .deck h2{
+    font-size:11px; letter-spacing:.25em; color:var(--pink);
+    text-transform:uppercase; margin-bottom:14px;
+  }
+  audio{
+    width:100%; height:44px; display:block;
+  }
+  .meta{
+    display:flex; justify-content:space-between; gap:12px;
+    flex-wrap:wrap; margin-top:14px;
+    font-size:11px; color:var(--dim);
+  }
+  .meta b{color:var(--txt); font-weight:normal;}
+
+  .timeline{margin-top:18px; display:flex; height:14px; border-radius:7px; overflow:hidden;}
+  .seg{flex:1; cursor:pointer; transition:filter .12s;}
+  .seg span{display:none;}
+  .seg.active{filter:brightness(1.8);}
+  #t-intro{background:#3a4a5e;}
+  #t-build{background:#5a3a6e;}
+  #t-drop{background:#b03a4e;}
+  #t-breakdown{background:#3a5e7e;}
+  #t-final{background:#e8433f;}
+  #t-outro{background:#2a3a4e;}
+  .legend{display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:8px; font-size:10px; color:var(--dim);}
+  .legend i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:middle;}
+
+  .how{margin-top:26px;}
+  .how h3{
+    font-size:11px; letter-spacing:.25em; color:var(--cyan);
+    text-transform:uppercase; margin-bottom:10px;
+  }
+  pre.patterns{
+    background:#0a0f14; border:1px solid var(--line); border-radius:8px;
+    padding:14px; font-size:11.5px; line-height:1.5; color:#a9f7c9;
+    overflow-x:auto; white-space:pre;
+  }
+  pre.patterns .c{color:var(--dim);}
+  .footer{margin-top:20px; font-size:11px; color:var(--dim); text-align:center;}
+  .footer a{color:var(--cyan);}
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="wrap">
+
+<pre class="banner">
+ _     _           _                _
+| |__ (_)_   _____| |__   ___  __ _| |_
+| '_ \| \ \ / / _ \ '_ \ / _ \/ _` | __|
+| | | | |\ V /  __/ |_) |  __/ (_| | |_
+|_| |_|_| \_/ \___|_.__/ \___/\__,_|\__|
+              ...the hive is humming
+</pre>
+<div class="tagline">
+  <b>sabre_demo</b> — a 170bpm 8-bit chiptune, rendered live by hivebeat's own
+  synth engine · no samples, just <b>square / saw / fm / kick / snare / hat</b>
+</div>
+
+<div class="deck">
+  <h2>&#9835; press play</h2>
+  <audio id="player" controls preload="none">
+    <source src="sabre_demo.mp3" type="audio/mpeg">
+    <source src="sabre_demo.ogg" type="audio/ogg">
+    <source src="sabre_demo.wav" type="audio/wav">
+    your browser doesn't support html5 audio — grab
+    <a href="sabre_demo.wav">sabre_demo.wav</a> instead.
+  </audio>
+  <div class="meta">
+    <span>bpm <b>170</b> · sample rate <b>22050</b> · mono</span>
+    <span>length <b>0:39</b> · mp3 <b>0.6 MB</b> · wav 1.7 MB</span>
+  </div>
+  <div class="timeline" id="timeline">
+    <div class="seg" id="t-intro" title="intro (0:00-0:03)"></div>
+    <div class="seg" id="t-build" title="build (0:03-0:06)"></div>
+    <div class="seg" id="t-drop" title="drop (0:06-0:17)"></div>
+    <div class="seg" id="t-breakdown" title="breakdown (0:17-0:23)"></div>
+    <div class="seg" id="t-final" title="final drop (0:23-0:34)"></div>
+    <div class="seg" id="t-outro" title="outro (0:34-0:40)"></div>
+  </div>
+  <div class="legend">
+    <span><i style="background:#3a4a5e"></i>intro</span>
+    <span><i style="background:#5a3a6e"></i>build</span>
+    <span><i style="background:#b03a4e"></i>drop</span>
+    <span><i style="background:#3a5e7e"></i>breakdown</span>
+    <span><i style="background:#e8433f"></i>final drop</span>
+    <span><i style="background:#2a3a4e"></i>outro</span>
+  </div>
+</div>
+
+<div class="how">
+  <h3>how it was made — hivebeat dsl</h3>
+  <pre class="patterns"><span class="c"># intro + build</span>
+hat.hat(euclid(4,16)).dur(0.03).step(0.25)
+kick.kick("x x x x").dur(0.3).step(1.0)
+snare.snare(". x . x").dur(0.2).step(1.0)
+
+<span class="c"># drop — the big one</span>
+kick.kick(euclid(12,16)).dur(0.08).step(0.25)
+bass.saw("c2 . c2 . g1 . g1 . a1 . a1 . f1 . f1 .").dur(0.25).step(0.5)
+lead.square("c5 e5 g5 e5 a5 c6 a5 g5 ...").dur(0.06).step(0.25)
+
+<span class="c"># breakdown</span>
+pad.pad("[c4 e4 g4] [g3 b3 d4] [a3 c4 e4] [f3 a3 c4]").dur(3.8).step(4.0)
+
+<span class="c"># and it all loops through the hive</span>
+python3 track.py   <span class="c"># -> tracks/sabre_demo.wav</span></pre>
+</div>
+
+<div class="footer">
+  generated with <a href="https://github.com/apullz/hivebeat">hivebeat</a> ·
+  a live-coding music synth that runs inside a phone terminal
+</div>
+
+</div>
+<script>
+  const player = document.getElementById('player');
+  const segs = {
+    't-intro':     [0.0, 2.82],
+    't-build':     [2.82, 5.65],
+    't-drop':      [5.65, 16.94],
+    't-breakdown': [16.94, 22.59],
+    't-final':     [22.59, 33.88],
+    't-outro':     [33.88, 1e9],
+  };
+  const els = Object.fromEntries(Object.keys(segs).map(k => [k, document.getElementById(k)]));
+  function update(){
+    const t = player.currentTime;
+    for (const k in segs){
+      const [a,b] = segs[k];
+      els[k].classList.toggle('active', t >= a && t < b);
+    }
+  }
+  player.addEventListener('timeupdate', update);
+  for (const k in segs){
+    els[k].addEventListener('click', () => {
+      player.currentTime = segs[k][0];
+      player.play();
+    });
+  }
+</script>
+</body>
+</html>

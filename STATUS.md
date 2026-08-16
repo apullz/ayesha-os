@@ -77,6 +77,14 @@
   models/          [✔]  Modelfile for ayesha personality.
                            └ FROM qwen2.5-coder:14b
 
+  hivebeat/        [!]  Live-coding terminal music synth (numpy).
+                           └ repl.py interactive loop (foreground applet)
+                           └ sample-accurate cycle scheduler + tanh limiter
+                           └ live audio: termux pulse (hivepipe/pacat) —
+                             falls back to null sink without it
+                           └ windows: cpython lacks readline, use
+                             render.py for offline wav (numpy-only)
+
   launcher/        [✔]  In-engine interactive applet switcher.
                           └ Ctrl+M / Ctrl+P open arrow-key menu
                           └ ↑/↓ navigate, type to filter, Enter launch

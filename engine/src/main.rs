@@ -205,6 +205,7 @@ where
 }
 
 /// Result of a permission prompt.
+#[derive(Debug)]
 enum AskResult {
     /// Run the tool.
     Allow,
@@ -221,12 +222,20 @@ enum AskResult {
 /// lines arrive WITHOUT the `\0` prefix, so plain "y"/"a"/"n"/"d" answers can
 /// never collide with control codes. "always" / "deny-forever" choices are
 /// persisted into config.json so the prompt isn't repeated.
+///
+/// Answer lines must match a keyword EXACTLY. Any other text is not consumed
+/// as an answer — it's steering, so the prompt is cancelled and the text is
+/// handed back (the caller routes it into `pending_input` like any other
+/// mid-generation steer) instead of being auto-answered or error-looped.
+/// If no answer arrives within `timeout`, the call is denied with a "timed
+/// out" tool error rather than hanging the turn forever.
 fn ask_permission(
     name: &str,
     args_str: &str,
     steer_rx: &std::sync::mpsc::Receiver<String>,
     config: &mut serde_json::Value,
     config_path: &std::path::Path,
+    timeout: std::time::Duration,
 ) -> AskResult {
     let preview = if args_str.chars().count() > 80 {
         format!("{}...", crate::util::truncate_chars(args_str, 79))
@@ -237,10 +246,30 @@ fn ask_permission(
     ui::show_system("  [y] allow once · [a] always allow · [n] deny once · [d] deny forever · [ctrl+c] abort");
     ui::dock_redraw_bottom();
 
+    // The steer channel is std::sync::mpsc, so the sync equivalent of
+    // tokio::time::timeout is a recv_timeout deadline.
+    let deadline = std::time::Instant::now() + timeout;
     loop {
-        let input = match steer_rx.recv() {
-            Ok(i) => i,
-            Err(_) => return AskResult::Abort(String::new()), // channel closed
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        let input = if remaining.is_zero() {
+            None
+        } else {
+            match steer_rx.recv_timeout(remaining) {
+                Ok(i) => Some(i),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => None,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    return AskResult::Abort(String::new()); // channel closed
+                }
+            }
+        };
+        let Some(input) = input else {
+            let msg = format!(
+                "error: permission prompt for `{}` timed out after {}s — tool call denied",
+                name,
+                timeout.as_secs()
+            );
+            ui::show_system(&format!("permission prompt for `{}` timed out — denied", name));
+            return AskResult::Deny(msg);
         };
         // Control codes can't be permission answers; ctrl+c aborts the turn.
         if let Some(code) = input.strip_prefix('\0') {
@@ -250,7 +279,8 @@ fn ask_permission(
                 _ => continue, // other hotkeys don't answer permission prompts
             }
         }
-        match input.trim().to_lowercase().as_str() {
+        let trimmed = input.trim();
+        match trimmed.to_lowercase().as_str() {
             "y" | "yes" | "allow" | "allow once" => return AskResult::Allow,
             "a" | "always" | "always allow" => {
                 permissions::set_override(config, name, "always");
@@ -273,10 +303,16 @@ fn ask_permission(
                     name
                 ));
             }
+            "abort" => return AskResult::Abort(String::new()),
             "" => continue,
-            other => {
-                ui::show_error(&format!("'{}' isn't a permission answer — y / a / n / d", other));
-                ui::dock_redraw_bottom();
+            _ => {
+                // Not a permission answer — the user is steering, not
+                // answering. Do NOT consume the text as an answer and do NOT
+                // error-loop: cancel the prompt and hand the text back so the
+                // caller routes it to pending_input like a mid-generation
+                // steer (the raw line, keeping its original casing).
+                ui::show_interrupted();
+                return AskResult::Abort(trimmed.to_string());
             }
         }
     }
@@ -1891,7 +1927,10 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 // Permission gate: sensitive tools need the user's ok.
-                match permissions::decide(name, &config) {
+                // Plugin tools count as sensitive too — they run arbitrary
+                // shell commands, so they must never skip the prompt in
+                // build/auto mode (unless the user set an override).
+                match permissions::decide_with(name, &config, |n| plugin_registry.has_tool(n)) {
                     Verdict::Allow => {}
                     Verdict::Denied(msg) => {
                         ui::show_tool_err(name, &msg);
@@ -1912,7 +1951,7 @@ async fn main() -> anyhow::Result<()> {
                         continue;
                     }
                     Verdict::Prompt => {
-                        match ask_permission(name, &args_str, &steer_rx, &mut config, &config_path) {
+                        match ask_permission(name, &args_str, &steer_rx, &mut config, &config_path, std::time::Duration::from_secs(120)) {
                             AskResult::Allow => {}
                             AskResult::Deny(msg) => {
                                 ui::show_tool_err(name, &msg);
@@ -2166,7 +2205,11 @@ async fn main() -> anyhow::Result<()> {
                             }
 
                             // Permission gate: sensitive tools need the user's ok.
-                            match permissions::decide(name, &config) {
+                            // Plugin tools count as sensitive too — they run
+                            // arbitrary shell commands, so they must never skip
+                            // the prompt in build/auto mode (unless the user
+                            // set an override).
+                            match permissions::decide_with(name, &config, |n| plugin_registry.has_tool(n)) {
                                 Verdict::Allow => {}
                                 Verdict::Denied(msg) => {
                                     ui::show_tool_err(name, &msg);
@@ -2187,7 +2230,7 @@ async fn main() -> anyhow::Result<()> {
                                     continue;
                                 }
                                 Verdict::Prompt => {
-                                    match ask_permission(name, &args_str, &steer_rx, &mut config, &config_path) {
+                                    match ask_permission(name, &args_str, &steer_rx, &mut config, &config_path, std::time::Duration::from_secs(120)) {
                                         AskResult::Allow => {}
                                         AskResult::Deny(msg) => {
                                             ui::show_tool_err(name, &msg);
@@ -2782,5 +2825,113 @@ mod tests {
         let result = parse_and_store_memories("hello [REMEMBER:] world", &mut mem);
         assert_eq!(result, "hello  world");
         assert_eq!(mem.memories.len(), 0);
+    }
+
+    // ── ask_permission (Gate C hardening) ──
+
+    fn permission_test_config_path(name: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("ask_permission_{}_{}.json", name, std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        path
+    }
+
+    #[test]
+    fn ask_permission_times_out_and_denies() {
+        // A live-but-silent steer channel with a short timeout must deny the
+        // tool call (with a "timed out" tool error), not hang forever.
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let mut config = serde_json::json!({});
+        let path = permission_test_config_path("timeout");
+        let result = ask_permission(
+            "write_file",
+            r#"{"path": "x"}"#,
+            &rx,
+            &mut config,
+            &path,
+            std::time::Duration::from_millis(80),
+        );
+        drop(tx);
+        let _ = std::fs::remove_file(&path);
+        match result {
+            AskResult::Deny(msg) => {
+                assert!(msg.contains("timed out"), "expected timed-out deny, got: {}", msg);
+                assert!(msg.contains("write_file"));
+            }
+            other => panic!("expected Deny on timeout, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn ask_permission_steering_text_returns_as_abort() {
+        // A line that isn't an exact keyword is steering, not an answer: the
+        // prompt must be cancelled and the raw text handed back so the caller
+        // routes it into pending_input (it must NOT be auto-answered).
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let mut config = serde_json::json!({});
+        let path = permission_test_config_path("steer");
+        tx.send("hold on, let me think about this first".to_string()).unwrap();
+        let result = ask_permission(
+            "write_file",
+            r#"{"path": "x"}"#,
+            &rx,
+            &mut config,
+            &path,
+            std::time::Duration::from_secs(10),
+        );
+        let _ = std::fs::remove_file(&path);
+        match result {
+            AskResult::Abort(text) => {
+                assert_eq!(text, "hold on, let me think about this first");
+            }
+            other => panic!("expected Abort carrying the steering text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn ask_permission_exact_keywords_only() {
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let mut config = serde_json::json!({});
+        let path = permission_test_config_path("keywords");
+
+        // exact "n" denies
+        tx.send("n".to_string()).unwrap();
+        let r1 = ask_permission("write_file", "{}", &rx, &mut config, &path, std::time::Duration::from_secs(10));
+        assert!(matches!(r1, AskResult::Deny(_)), "expected Deny for 'n', got {:?}", r1);
+
+        // "abort" soft-aborts
+        tx.send("abort".to_string()).unwrap();
+        let r2 = ask_permission("write_file", "{}", &rx, &mut config, &path, std::time::Duration::from_secs(10));
+        assert!(matches!(r2, AskResult::Abort(ref s) if s.is_empty()), "expected empty Abort for 'abort', got {:?}", r2);
+
+        // ctrl+c aborts carrying the raw control input
+        tx.send("\0ctrl-c".to_string()).unwrap();
+        let r3 = ask_permission("write_file", "{}", &rx, &mut config, &path, std::time::Duration::from_secs(10));
+        assert!(matches!(r3, AskResult::Abort(ref s) if s == "\0ctrl-c"), "expected raw Abort for ctrl-c, got {:?}", r3);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn ask_permission_always_persists_override() {
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let mut config = serde_json::json!({});
+        let path = permission_test_config_path("always");
+        tx.send("always".to_string()).unwrap();
+        let result = ask_permission(
+            "write_file",
+            r#"{"path": "x"}"#,
+            &rx,
+            &mut config,
+            &path,
+            std::time::Duration::from_secs(10),
+        );
+        assert!(matches!(result, AskResult::Allow), "expected Allow for 'always', got {:?}", result);
+        // the override is persisted in memory...
+        assert_eq!(config["permissions"]["write_file"], "always");
+        // ...and on disk, so the prompt isn't repeated next time
+        let on_disk = std::fs::read_to_string(&path).unwrap_or_default();
+        let _ = std::fs::remove_file(&path);
+        assert!(on_disk.contains("\"write_file\""), "config file must contain the override, got: {}", on_disk);
+        assert!(on_disk.contains("always"));
     }
 }

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# hivebeat — live-coding music synth
+# run in a real termux shell for sound. offline rendering always works.
+set -e
+cd "$(dirname "$0")"
+exec python3 repl.py "$@"

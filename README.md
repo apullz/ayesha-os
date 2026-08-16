@@ -61,6 +61,7 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
 | **desktop-cat/** | python | desktop pet cat that follows cursor, sleeps, scratches, shows hearts |
 | **flora-cli/** | typescript | interactive terminal for exploring scottish flora phylogeny |
 | **poopy-tui/** | python | full-featured discord terminal client with voice, QR login, TUI (separate private repo — not bundled) |
+| **hivebeat/** | python | live-coding terminal music synth (numpy, sample-accurate loop scheduler) — `python repl.py`; live audio via termux pulse, offline wav render anywhere |
 
 ## quick start
 
@@ -414,6 +415,17 @@ full-featured Discord terminal client built with Textual:
 - real-time event display
 
 > poopy-tui lives in a separate private repo (it needs a Discord token) and is not bundled with the monorepo.
+
+### hivebeat
+
+live-coding terminal music synth — type pattern lines, they loop forever, edits land on the next cycle boundary (sorensen & gardner "programming with time" scheduler, sample-accurate). pure python + numpy, square/saw/fm/pad melodies + euclidean drums:
+
+```
+python repl.py    # the live repl: p1.square("c4 e4 g4 a4").dur(0.25), bpm(140), stop
+python render.py out.wav 8 'p1.saw("c2 g2 [c3 e3 g3]").dur(1)'   # offline wav, works anywhere
+```
+
+live audio streams to a bundled pulse-simple player (`hivepipe`) on termux/proot; without a pulse path the repl falls back to a realtime silent clock. on windows, `readline` isn't in cpython, so use the `render.py` path (numpy-only).
 
 ## mobile app
 

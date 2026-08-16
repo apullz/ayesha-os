@@ -54,8 +54,13 @@ pub enum Verdict {
     Prompt,
 }
 
-/// Decide what to do with a tool call, consulting config overrides.
-pub fn decide(tool: &str, config: &Value) -> Verdict {
+/// Decide what to do with a tool call, consulting config overrides. The
+/// `is_sensitive` predicate covers tools whose names can't live in the static
+/// list — plugin tools execute arbitrary shell commands, so they must prompt
+/// exactly like the built-in sensitive set (unless the user picked a per-tool
+/// override or disabled permission mode). Pass `|_| false` when there are no
+/// dynamic tools.
+pub fn decide_with(tool: &str, config: &Value, is_sensitive: impl Fn(&str) -> bool) -> Verdict {
     // Global kill-switch: `"permission_mode": "off"` auto-allows everything.
     if config.get("permission_mode").and_then(|v| v.as_str()) == Some("off") {
         return Verdict::Allow;
@@ -77,7 +82,7 @@ pub fn decide(tool: &str, config: &Value) -> Verdict {
         };
     }
 
-    if SENSITIVE_TOOLS.contains(&tool) {
+    if SENSITIVE_TOOLS.contains(&tool) || is_sensitive(tool) {
         Verdict::Prompt
     } else {
         Verdict::Allow
@@ -113,7 +118,7 @@ mod tests {
             "read_file", "grep", "glob", "list_dir", "list_memories",
             "read_memories", "search_memories", "analyze_self", "get_tool_stats",
         ] {
-            assert_eq!(decide(tool, &config), Verdict::Allow, "{} should be auto-allowed", tool);
+            assert_eq!(decide_with(tool, &config, |_| false), Verdict::Allow, "{} should be auto-allowed", tool);
         }
     }
 
@@ -125,7 +130,7 @@ mod tests {
             "download_image", "evolve_tools", "refine_prompt", "remember",
             "generate_html",
         ] {
-            assert_eq!(decide(tool, &config), Verdict::Prompt, "{} should prompt", tool);
+            assert_eq!(decide_with(tool, &config, |_| false), Verdict::Prompt, "{} should prompt", tool);
         }
     }
 
@@ -133,14 +138,14 @@ mod tests {
     fn always_override_skips_prompt() {
         let mut config = serde_json::json!({});
         set_override(&mut config, "write_file", "always");
-        assert_eq!(decide("write_file", &config), Verdict::Allow);
+        assert_eq!(decide_with("write_file", &config, |_| false), Verdict::Allow);
     }
 
     #[test]
     fn never_override_blocks() {
         let mut config = serde_json::json!({});
         set_override(&mut config, "fetch_url", "never");
-        match decide("fetch_url", &config) {
+        match decide_with("fetch_url", &config, |_| false) {
             Verdict::Denied(msg) => assert!(msg.starts_with("error:")),
             other => panic!("expected Denied, got {:?}", other),
         }
@@ -149,7 +154,39 @@ mod tests {
     #[test]
     fn permission_mode_off_auto_allows_everything() {
         let config = serde_json::json!({ "permission_mode": "off" });
-        assert_eq!(decide("write_file", &config), Verdict::Allow);
-        assert_eq!(decide("send_hotkey", &config), Verdict::Allow);
+        assert_eq!(decide_with("write_file", &config, |_| false), Verdict::Allow);
+        assert_eq!(decide_with("send_hotkey", &config, |_| false), Verdict::Allow);
+    }
+
+    #[test]
+    fn plugin_tools_prompt_like_sensitive_tools() {
+        // Plugin tool names are dynamic, so the static SENSITIVE_TOOLS list
+        // can't know them — decide_with must prompt for them (Gate C HIGH:
+        // plugin tools run arbitrary shell commands and previously bypassed
+        // the permission prompt in build/auto mode).
+        let config = serde_json::json!({});
+        let is_plugin = |n: &str| n == "my_plugin_tool";
+        assert_eq!(
+            decide_with("my_plugin_tool", &config, is_plugin),
+            Verdict::Prompt,
+            "plugin tool names must prompt unless the user opted in"
+        );
+        // non-plugin tools are unaffected by the extra predicate
+        assert_eq!(decide_with("read_file", &config, is_plugin), Verdict::Allow);
+        // built-in sensitive tools still prompt even without the predicate
+        assert_eq!(decide_with("write_file", &config, |_| false), Verdict::Prompt);
+        // per-tool overrides still win for plugin tools
+        let mut config = serde_json::json!({});
+        set_override(&mut config, "my_plugin_tool", "always");
+        assert_eq!(decide_with("my_plugin_tool", &config, is_plugin), Verdict::Allow);
+        let mut config = serde_json::json!({});
+        set_override(&mut config, "my_plugin_tool", "never");
+        match decide_with("my_plugin_tool", &config, is_plugin) {
+            Verdict::Denied(msg) => assert!(msg.starts_with("error:")),
+            other => panic!("expected Denied for never-override, got {:?}", other),
+        }
+        // permission_mode off still auto-allows plugin tools
+        let config = serde_json::json!({ "permission_mode": "off" });
+        assert_eq!(decide_with("my_plugin_tool", &config, is_plugin), Verdict::Allow);
     }
 }
