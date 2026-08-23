@@ -49,6 +49,15 @@ Desktop.ini
 # ...and the linux/termux elf is the same app — keep it tracked too
 !dist/ayesha-os
 
+# Prevent applet build artifacts from polluting dist
+dist/applets/*/node_modules/
+dist/applets/*/src/
+dist/applets/*/dist/
+dist/applets/*/package*.json
+dist/applets/*/tsconfig.json
+dist/applets/*/*.ts
+dist/applets/*/*.tsx
+
 # HF repo clones (gitignored — pushed separately by sync-all.ps1)
 _hf-model/
 _hf-space/

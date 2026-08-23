@@ -1,6 +1,6 @@
 # ayesha-os
 
-a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant (like opencode) and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai. **v4.5.0**: rust engine with themes, sessions, skills & streaming syntax highlighting; an expo/react-native mobile chat app; a dockerized huggingface bot space; and a CI automation harness.
+a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai. **v4.5.0**: rust engine with themes, sessions, skills & streaming syntax highlighting; an expo/react-native mobile chat app; a dockerized huggingface bot space; and a CI automation harness.
 
 ```
                        _     
@@ -163,20 +163,19 @@ keys work the same as windows: `./scripts/setup-cloud.sh`.
 
 ### step 4 — (optional) enable free cloud models
 
-cloud backends (openrouter, opencode zen) are free and handy when local models are slow.
+cloud backends (openrouter, kilo gateway) are free and handy when local models are slow.
 set the keys once:
 
 ```powershell
 .\scripts\setup-cloud.ps1
 ```
 
-this writes `.env` with `OPENROUTER_API_KEY` and/or `OPENCODE_API_KEY` (it opens the key
+this writes `.env` with `OPENROUTER_API_KEY` (it opens the key
 pages in your browser for you). then, inside the engine:
 
 ```cmd
 fox> models                          # list everything (local + cloud)
 fox> model nvidia/nemotron-3-super:free
-fox> model opencode/big-pickle
 fox> auto                            # back to auto-routing
 ```
 
@@ -200,7 +199,7 @@ the engine is the heart of ayesha-os — an agentic coding assistant with a full
 |---------|----------|--------|
 | **local** | ollama @ `localhost:11434` | ayesha, qwen2.5-coder:14b, llama3.2-vision |
 | **cloud** | openrouter (free tier) | nvidia/nemotron-3-super:free, meta-llama/llama-3.3-70b-instruct:free, deepseek-r1:free, qwen-2.5-coder-32b:free, xiaomi/mimo-v2.5, xiaomi/mimo-v2.5-pro |
-| **cloud** | opencode | opencode/big-pickle |
+| **cloud** | kilo | kilo-auto/free |
 
 ```bash
 fox> models                  # list all available models (local + cloud)
@@ -493,7 +492,7 @@ $env:HF_TOKEN = "hf_..."
 | `build-exe.ps1` | build `dist\ayesha-os.exe` with config, models, applets bundled |
 | `build-linux.sh` | linux/termux twin — builds `dist/ayesha-os`, installs hivepipe on termux |
 | `sync-all.ps1` | push github + hf model + hf space |
-| `setup-cloud.ps1` | interactive `.env` setup for openrouter + opencode cloud keys |
+| `setup-cloud.ps1` | interactive `.env` setup for openrouter cloud keys |
 | `setup-cloud.sh` | bash twin of `setup-cloud.ps1` (linux/termux) |
 | `launcher.py` | system-tray applet launcher (pystray) |
 | `automation_harness.py` | zero-touch task queue / lint / self-correct loop |
