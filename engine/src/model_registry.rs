@@ -3,7 +3,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Backend {
-    Cloud,
+    Local,
     Cloud { provider: String },
 }
 
@@ -40,7 +40,7 @@ pub struct ModelProfile {
 }
 
 fn default_backend() -> Backend {
-    Backend::Cloud
+    Backend::Local
 }
 
 pub struct ModelRegistry {
@@ -122,13 +122,13 @@ impl ModelRegistry {
                     Capability::Thinking,
                 ],
                 context_length: 32768,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Vision],
                 context_length: 8192,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             // models from the user's ayesha-os cloud config
             ModelProfile {
@@ -140,49 +140,49 @@ impl ModelRegistry {
                     Capability::Agentic,
                 ],
                 context_length: 32768,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General],
                 context_length: 32768,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Coding],
                 context_length: 32768,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Coding, Capability::Tools],
                 context_length: 32768,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Coding, Capability::Tools],
                 context_length: 131072,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "Paul:latest".into(),
                 capabilities: vec![Capability::General],
                 context_length: 32768,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "mistral-small:latest".into(),
                 capabilities: vec![Capability::General, Capability::Coding, Capability::Tools],
                 context_length: 131072,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
             ModelProfile {
                 name: "gojo:latest".into(),
                 capabilities: vec![Capability::General, Capability::Coding],
                 context_length: 131072,
-                backend: Backend::Cloud,
+                backend: Backend::Local,
             },
         ];
         v.sort_by(|a, b| a.name.cmp(&b.name));
@@ -207,7 +207,7 @@ impl ModelRegistry {
                     capabilities: Self::infer_capabilities(&name),
                     context_length: 4096,
                     name,
-                    backend: Backend::Cloud,
+                    backend: Backend::Local,
                 }
             })
             .collect())
@@ -350,7 +350,7 @@ impl ModelRegistry {
         sorted.sort_by_key(|(_, m)| matches!(m.backend, Backend::Cloud { .. }));
         for (i, m) in sorted {
             let backend_label = match &m.backend {
-                Backend::Cloud => "local",
+                Backend::Local => "local",
                 Backend::Cloud { .. } => "cloud",
             };
             if backend_label != last_backend {

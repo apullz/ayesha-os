@@ -43,9 +43,9 @@ use applet_manager::AppletManager;
 use permissions::Verdict;
 
 
-/// Active backend — either local Cloud or cloud (OpenRouter/kilo)
+/// Active backend — either local LLM or cloud (kilo gateway)
 enum ActiveBackend {
-    Cloud(LlmClient),
+    Local(LlmClient),
     Cloud(CloudClient),
 }
 
@@ -418,7 +418,7 @@ impl ActiveBackend {
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> anyhow::Result<StreamResult> {
         match self {
-            ActiveBackend::Cloud(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
+            ActiveBackend::Local(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
             ActiveBackend::Cloud(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
         }
     }
@@ -432,7 +432,7 @@ impl ActiveBackend {
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> anyhow::Result<StreamResult> {
         match self {
-            ActiveBackend::Cloud(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
+            ActiveBackend::Local(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
             ActiveBackend::Cloud(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
         }
     }
@@ -638,10 +638,10 @@ fn graceful_shutdown(
 }
 
 /// Backend/provider tag for a model's quick-switcher row (the dim tag
-/// column next to the model name), e.g. "llm", "openrouter", "kilo".
+/// column next to the model name), e.g. "llm", "kilo".
 fn model_backend_tag(m: &model_registry::ModelProfile) -> String {
     match &m.backend {
-        model_registry::Backend::Cloud => "llm".to_string(),
+        model_registry::Backend::Local => "llm".to_string(),
         model_registry::Backend::Cloud { provider } => provider.clone(),
     }
 }
@@ -685,12 +685,12 @@ async fn apply_model_switch(
                         *current_model = "kilo-auto/free".to_string();
                         *client = match CloudClient::new("kilo-auto/free", "kilo") {
                             Ok(cc) => ActiveBackend::Cloud(cc),
-                            Err(_) => ActiveBackend::Cloud(LlmClient::new("ayesha")),
+                            Err(_) => ActiveBackend::Local(LlmClient::new("ayesha")),
                         };
                     }
                 }
             } else {
-                *client = ActiveBackend::Cloud(LlmClient::new(current_model));
+                *client = ActiveBackend::Local(LlmClient::new(current_model));
                 ui::show_system(&format!("switched to: {}", name));
             }
         }
@@ -738,7 +738,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Err(_) => {
                 current_model = "ayesha".to_string();
-                ActiveBackend::Cloud(LlmClient::new("ayesha"))
+                ActiveBackend::Local(LlmClient::new("ayesha"))
             }
         },
     };
@@ -746,12 +746,12 @@ async fn main() -> anyhow::Result<()> {
         Ok(cc) => ActiveBackend::Cloud(cc),
         Err(_) => match CloudClient::new(fallback_model, "openrouter") {
             Ok(cc) => ActiveBackend::Cloud(cc),
-            Err(_) => ActiveBackend::Cloud(LlmClient::new("kilo-auto/free")),
+            Err(_) => ActiveBackend::Local(LlmClient::new("kilo-auto/free")),
         },
     };
-    let mut tool_model_name = match &tool_client {
+    let mut tool_model_name =     match &tool_client {
         ActiveBackend::Cloud(c) => c.model.clone(),
-        ActiveBackend::Cloud(_) => "kilo-auto/free".to_string(),
+        ActiveBackend::Local(_) => "kilo-auto/free".to_string(),
     };
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
@@ -1255,11 +1255,11 @@ async fn main() -> anyhow::Result<()> {
                         Ok(cc) => client = ActiveBackend::Cloud(cc),
                         Err(_) => client = match CloudClient::new("kilo-auto/free", "kilo") {
                             Ok(cc) => ActiveBackend::Cloud(cc),
-                            Err(_) => ActiveBackend::Cloud(LlmClient::new("ayesha")),
+                            Err(_) => ActiveBackend::Local(LlmClient::new("ayesha")),
                         },
                     }
                 } else {
-                    client = ActiveBackend::Cloud(LlmClient::new(&current_model));
+                    client = ActiveBackend::Local(LlmClient::new(&current_model));
                 }
                 ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
             }
@@ -1281,11 +1281,11 @@ async fn main() -> anyhow::Result<()> {
                         Ok(cc) => client = ActiveBackend::Cloud(cc),
                         Err(_) => client = match CloudClient::new("kilo-auto/free", "kilo") {
                             Ok(cc) => ActiveBackend::Cloud(cc),
-                            Err(_) => ActiveBackend::Cloud(LlmClient::new("ayesha")),
+                            Err(_) => ActiveBackend::Local(LlmClient::new("ayesha")),
                         },
                     }
                 } else {
-                    client = ActiveBackend::Cloud(LlmClient::new(&current_model));
+                    client = ActiveBackend::Local(LlmClient::new(&current_model));
                 }
             }
         }
@@ -1973,7 +1973,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
     let executor = ToolExecutor::new(sandbox.clone());
     let client = LlmClient::new("ayesha");
     let tool_client = LlmClient::new("kilo-auto/free");
-    let backend = ActiveBackend::Cloud(client.clone());
+    let backend = ActiveBackend::Local(client.clone());
     let tools = tool_defs::tool_definitions_core();
     let tools = streaming::tool_payload_slice(&tools);
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
@@ -2221,7 +2221,7 @@ mod tests {
     async fn model_switch_rebuilds_llm_client() {
         let mut registry = ModelRegistry::new();
         let mut current_model = "kilo-auto/free".to_string();
-        let mut client = ActiveBackend::Cloud(LlmClient::new("ayesha"));
+        let mut client = ActiveBackend::Local(LlmClient::new("ayesha"));
         apply_model_switch(&mut registry, &mut current_model, &mut client, "kilo-auto/free", "kilo-auto/free").await;
         assert_eq!(current_model, "kilo-auto/free");
         assert!(matches!(client, ActiveBackend::Cloud(_)));
@@ -2232,7 +2232,7 @@ mod tests {
     async fn model_switch_unknown_model_keeps_current() {
         let mut registry = ModelRegistry::new();
         let mut current_model = "kilo-auto/free".to_string();
-        let mut client = ActiveBackend::Cloud(LlmClient::new("ayesha"));
+        let mut client = ActiveBackend::Local(LlmClient::new("ayesha"));
         apply_model_switch(&mut registry, &mut current_model, &mut client, "no-such-model", "kilo-auto/free").await;
         assert_eq!(current_model, "kilo-auto/free");
         assert!(matches!(client, ActiveBackend::Cloud(_)));
