@@ -22,7 +22,7 @@ last updated: 2026-08-23
 |---------|----------|-------|--------|
 | cloud | kilo gateway | kilo-auto/free | active |
 
-ollama fully removed. no daemon needed. all calls go through kilo gateway.
+legacy local llm fully removed. no daemon needed. all calls go through kilo gateway.
 
 ## commands
 
@@ -35,7 +35,7 @@ start with: python scripts/start_sleeper.py
 
 ## removed
 
-- ollama dependency (2026-08-23)
+- legacy local llm dependency (2026-08-23)
 - _hf-ayesha_bot gradio web ui (2026-08-23)
 - core/ stale worktree (2026-08-23)
 - ayesha-bot-mobile/ expo client (2026-08-23)
