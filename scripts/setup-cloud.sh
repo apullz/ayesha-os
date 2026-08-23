@@ -27,18 +27,14 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 # ── provider menu ──
-echo "  which provider(s) do you want to set up?"
+echo "  which provider do you want to set up?"
 echo ""
-echo "  [1] OpenRouter  (nemotron-3-super, llama-3.3-70b, deepseek-r1, qwen-coder — all FREE)"
-echo "  [2] OpenCode Zen  (big-pickle — FREE stealth coding model)"
-echo "  [3] Both"
+echo "  [1] kilo gateway  (kilo-auto/free, kilo, kilo, kilo — all FREE)"
 echo ""
-read -r -p "  enter 1, 2, or 3: " choice
+read -r -p "  enter 1: " choice
 
 do_openrouter=false
-do_opencode=false
-[ "$choice" = "1" ] || [ "$choice" = "3" ] && do_openrouter=true
-[ "$choice" = "2" ] || [ "$choice" = "3" ] && do_opencode=true
+[ "$choice" = "1" ] && do_openrouter=true
 
 env_lines=()
 
@@ -73,7 +69,7 @@ if $do_openrouter; then
         fi
         echo "  (opened browser for you, if one is available)"
         echo ""
-        read -r -p "  paste your OpenRouter API key: " or_key
+        read -r -p "  paste your kilo gateway API key: " or_key
         # trim whitespace
         or_key="${or_key#"${or_key%%[![:space:]]*}"}"
         or_key="${or_key%"${or_key##*[![:space:]]}"}"
@@ -86,53 +82,14 @@ if $do_openrouter; then
     fi
 fi
 
-# ── opencode zen setup ──
-if $do_opencode; then
-    echo ""
-    echo "  ── opencode zen setup ──"
-    echo ""
 
-    if [ -n "${existing[OPENCODE_API_KEY]:-}" ]; then
-        masked="${existing[OPENCODE_API_KEY]:0:12}..."
-        echo "  existing key found: $masked"
-        read -r -p "  keep it? (y/n): " reuse
-        if [ -z "$reuse" ] || [ "$reuse" = "y" ] || [ "$reuse" = "Y" ]; then
-            env_lines+=("OPENCODE_API_KEY=${existing[OPENCODE_API_KEY]}")
-            echo "  ✔ kept existing key"
-            do_opencode=false
-        fi
-    fi
-
-    if $do_opencode; then
-        echo "  1. go to: https://opencode.ai"
-        echo "  2. sign up (free) and get your API key"
-        echo "  3. paste it below"
-        echo ""
-        if command -v xdg-open >/dev/null 2>&1; then
-            xdg-open "https://opencode.ai" >/dev/null 2>&1 || true
-        elif command -v open >/dev/null 2>&1; then
-            open "https://opencode.ai" >/dev/null 2>&1 || true
-        fi
-        echo "  (opened browser for you, if one is available)"
-        echo ""
-        read -r -p "  paste your OpenCode Zen API key: " oc_key
-        oc_key="${oc_key#"${oc_key%%[![:space:]]*}"}"
-        oc_key="${oc_key%"${oc_key##*[![:space:]]}"}"
-        if [ -n "$oc_key" ]; then
-            env_lines+=("OPENCODE_API_KEY=$oc_key")
-            echo "  ✔ opencode key saved"
-        else
-            echo "  ✘ skipped (no key entered)"
-        fi
-    fi
-fi
 
 # ── preserve any other existing env vars ──
 if [ -f "$ENV_FILE" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
         if [[ "$line" =~ ^([A-Z_]+)= ]]; then
             key="${BASH_REMATCH[1]}"
-            if [ "$key" != "OPENROUTER_API_KEY" ] && [ "$key" != "OPENCODE_API_KEY" ]; then
+            if [ "$key" != "OPENROUTER_API_KEY" ]; then
                 env_lines+=("$line")
             fi
         fi
@@ -165,22 +122,17 @@ echo ""
 
 if has_key "OPENROUTER_API_KEY"; then
     echo "  openrouter (free tier):"
-    echo "    • nvidia/nemotron-3-super:free   (120B MoE, 1M context)"
-    echo "    • meta-llama/llama-3.3-70b:free   (70B instruct)"
-    echo "    • deepseek/deepseek-r1:free       (reasoning/thinking)"
+    echo "    • nvidia/kilo-auto/free:free   (120B MoE, 1M context)"
+    echo "    • meta-llama/kilo:free   (70B instruct)"
+    echo "    • deepseek/kilo:free       (reasoning/thinking)"
     echo "    • qwen/qwen-2.5-coder-32b:free    (coding specialist)"
     echo ""
 fi
 
-if has_key "OPENCODE_API_KEY"; then
-    echo "  opencode zen (free):"
-    echo "    • opencode/big-pickle             (stealth coding, 200k ctx)"
-    echo ""
-fi
+
 
 echo "  to use in ayesha engine:"
-echo "    /model nvidia/nemotron-3-super:free"
-echo "    /model opencode/big-pickle"
+echo "    /model nvidia/kilo-auto/free:free"
 echo "    /models                              (list all)"
 echo ""
 echo "  kapoo! you're all set (◕ᴗ◕✿)"

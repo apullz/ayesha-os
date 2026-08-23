@@ -2,7 +2,7 @@
 //!
 //! Every tool the model can call is declared exactly once here (name,
 //! description, parameters schema, qwen-core-subset membership). The old
-//! per-backend JSON builders in `ollama.rs` are gone; `ollama.rs`, `cloud.rs`
+//! per-backend JSON builders in `llm.rs` are gone; `llm.rs`, `cloud.rs`
 //! and `main.rs` (ToolEvolver) all consume this catalog, and the dispatch
 //! guard test in `tools.rs` (`every_catalog_tool_has_dispatch_arm`) pins the
 //! catalog to the executor. A tool added here without a dispatch arm fails
@@ -22,7 +22,7 @@ pub struct ToolDef {
     pub description: &'static str,
     /// Full ayesha-facing parameters schema (what `tool_definitions()` sends).
     pub parameters: Value,
-    /// True when this tool belongs to the qwen2.5 core subset.
+    /// True when this tool belongs to the kilo-auto/free core subset.
     pub core: bool,
     /// Core-subset description override. Some core tools intentionally use
     /// shorter strings than the full list — kept byte-identical here.
@@ -474,7 +474,7 @@ pub static TOOL_CATALOG: std::sync::LazyLock<Vec<ToolDef>> = std::sync::LazyLock
     ]
 });
 
-/// qwen2.5:7b can only handle ~5 tools reliably; this is the essential subset.
+/// kilo-auto/free can only handle ~5 tools reliably; this is the essential subset.
 /// Order matches the original qwen-facing builder exactly (read_file,
 /// write_file, generate_html, list_dir, grep) so the wire payload is
 /// identical to pre-catalog output. Keep the order — the full-list order

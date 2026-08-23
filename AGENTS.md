@@ -6,12 +6,12 @@
 ayesha-os/
 ├── engine/              rust — terminal persona host, model routing, tool-calling
 ├── tri_mind_sync/       python — bidirectional sync (github, huggingface, local)
-├── models/              ollama modelfile for ayesha personality
+├── models/              kilo modelfile for ayesha personality
 ├── scripts/             build-exe.ps1 / build-linux.sh, launcher, deploy scripts
 ├── applets/
 │   ├── flora-cli/       typescript — scottish flora phylogeny explorer
 │   └── hivebeat/        python — live-coding terminal music synth (numpy)
-├── ayesha.json          central config (personality, projects, ollama models)
+├── ayesha.json          central config (personality, projects, kilo models)
 ├── ayesha.bat           dev shortcut — NOT for delivery (see "delivery" below)
 └── ayesha.sh            linux/termux launcher — runs dist/ayesha-os (the elf IS the app)
 ```
@@ -72,19 +72,19 @@ cd applets/flora-cli && npx tsx cli.ts
 
 ## architecture
 
-- **engine** is the main CLI. connects to ollama, routes queries to best model, streams responses.
+- **engine** is the main CLI. connects to kilo, routes queries to best model, streams responses.
 - **core** orchestrates the hivemind. gradio web ui serves the public face via huggingface spaces.
 - **tri_mind_sync** handles bidirectional sync between local, github, and huggingface.
-- **applets** are standalone projects that share the ayesha personality via ollama at `localhost:11434`.
+- **applets** are standalone projects that share the ayesha personality via kilo at `kilo gateway`.
 - the **launcher** (`scripts/launcher.py`) reads `ayesha.json` and can start/stop any applet from the system tray.
 
 ## models needed
 
 ```bash
-ollama pull qwen2.5:7b
-ollama pull qwen2.5-coder:14b
-ollama pull llama3.2-vision
-ollama create ayesha -f models/Modelfile
+kilo pull kilo-auto/free
+kilo pull kilo-auto/free
+kilo pull kilo-auto/free
+kilo create ayesha -f models/Modelfile
 ```
 
 ## gotchas

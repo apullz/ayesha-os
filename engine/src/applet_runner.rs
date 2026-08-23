@@ -14,7 +14,7 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
     let flag2 = flag.clone();
 
     std::thread::spawn(move || {
-        use crossterm::event::{self, Event, KeyCode, KeyModifiers, KeyEventKind};
+        use crossterm::event::{self, Event, KeyCode, KeyModifiers, KeyEventKind, MouseEventKind};
         let mut input_buf = String::new();
         let mut completer = Completer::new(candidates);
 
@@ -201,6 +201,13 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                         let _ = std::io::stdout().flush();
                     }
                 }
+                Ok(Event::Mouse(mouse)) => {
+                    match mouse.kind {
+                        MouseEventKind::ScrollUp => { ui::convo_page_up(); }
+                        MouseEventKind::ScrollDown => { ui::convo_page_down(); }
+                        _ => {} // ScrollLeft/ScrollRight/Click/Drag ignored
+                    }
+                }
                 Ok(Event::Resize(_, _)) => {
                     // re-pin the docked region + status + prompt to the new size
                     ui::dock_refresh();
@@ -208,6 +215,7 @@ pub fn spawn_input_thread(steer_tx: mpsc::Sender<String>, candidates: Vec<String
                 _ => {}
             }
         }
+
     });
 
     flag

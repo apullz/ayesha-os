@@ -35,12 +35,6 @@
     "modified_at": "2026-08-04T20:34:18.075547",
     "sha256": "9a48b437d7c58b6f7fd050035f06b088efe988975fd1147a581576c2eebf8aa4"
   },
-  "opencode.json": {
-    "rel_path": "opencode.json",
-    "size": 353,
-    "modified_at": "2026-08-04T20:34:18.106126",
-    "sha256": "be6501589e5348ea344b2b8a3051c9e54f4afc644e355428749e1b987754b2fb"
-  },
   "progress.json": {
     "rel_path": "progress.json",
     "size": 1357,

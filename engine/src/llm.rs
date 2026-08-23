@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use anyhow::Result;
 use std::time::Duration;
 
-const OLLAMA_BASE: &str = "http://localhost:11434";
+const KILO_BASE: &str = "https://api.kilo.ai/api/gateway/v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
@@ -95,17 +95,17 @@ impl StreamResult {
 }
 
 #[derive(Debug, Deserialize)]
-struct OllamaTag {
+struct CloudTag {
     name: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct OllamaTagsResponse {
-    models: Vec<OllamaTag>,
+struct CloudTagsResponse {
+    models: Vec<CloudTag>,
 }
 
 #[derive(Clone)]
-pub struct OllamaClient {
+pub struct LlmClient {
     client: Client,
     pub model: String,
     base_url: String,
@@ -114,9 +114,9 @@ pub struct OllamaClient {
 
 /// Sane per-model context window for the /api/chat request.
 ///
-/// ollama's default window when a model has no num_ctx is 4096 — and the
+/// llm's default window when a model has no num_ctx is 4096 — and the
 /// engine's system prompt + 26 tool definitions already exceed that, so
-/// ollama silently truncates the prompt from the front and the model never
+/// llm silently truncates the prompt from the front and the model never
 /// sees prior turns. Always pin num_ctx explicitly so the conversation
 /// actually fits.
 fn default_num_ctx(model: &str) -> u32 {
@@ -128,9 +128,9 @@ fn default_num_ctx(model: &str) -> u32 {
     }
 }
 
-impl OllamaClient {
+impl LlmClient {
     pub fn new(model: &str) -> Self {
-        Self::new_with_base(model, OLLAMA_BASE)
+        Self::new_with_base(model, KILO_BASE)
     }
 
     pub fn new_with_base(model: &str, base_url: &str) -> Self {
@@ -176,7 +176,7 @@ impl OllamaClient {
         };
 
         let resp = self.client
-            .post(format!("{}/api/chat", self.base_url))
+            .post(format!("{}/v1/chat/completions", self.base_url))
             .json(&request)
             .send()
             .await?;
@@ -184,12 +184,12 @@ impl OllamaClient {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await?;
-            anyhow::bail!("ollama http error {}: {}", status, text);
+            anyhow::bail!("llm http error {}: {}", status, text);
         }
 
         let body = resp.text().await?;
         let chat_resp: ChatResponse = serde_json::from_str(&body)
-            .map_err(|e| anyhow::anyhow!("failed to parse ollama response: {}\nbody preview: {}", e, crate::util::truncate_chars(&body, 500)))?;
+            .map_err(|e| anyhow::anyhow!("failed to parse llm response: {}\nbody preview: {}", e, crate::util::truncate_chars(&body, 500)))?;
         Ok(chat_resp)
     }
 
@@ -210,12 +210,12 @@ impl OllamaClient {
         };
         let resp = self
             .client
-            .post(format!("{}/api/chat", self.base_url))
+            .post(format!("{}/v1/chat/completions", self.base_url))
             .json(&request)
             .send()
             .await?;
         if let Err(e) = resp.error_for_status_ref() {
-            anyhow::bail!("ollama http error: {}", e);
+            anyhow::bail!("llm http error: {}", e);
         }
         Ok(resp)
     }
@@ -227,11 +227,11 @@ impl OllamaClient {
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
         let mut resp = self.stream_chat_request(messages, tools).await?;
-        let mut decoder = crate::streaming::OllamaDecoder::new();
+        let mut decoder = crate::streaming::CloudDecoder::new();
         crate::streaming::stream_to_result(&mut resp, steer_rx, false, &mut decoder).await
     }
 
-    /// Stream response from ollama, printing tokens as they arrive (true streaming).
+    /// Stream response from llm, printing tokens as they arrive (true streaming).
     /// Detects <think> / [think] reasoning blocks and renders them dimmed.
     /// Returns the full collected content + tool_calls for message history.
     pub async fn chat_stream_visible(
@@ -241,13 +241,13 @@ impl OllamaClient {
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> Result<StreamResult> {
         let mut resp = self.stream_chat_request(messages, tools).await?;
-        let mut decoder = crate::streaming::OllamaDecoder::new();
+        let mut decoder = crate::streaming::CloudDecoder::new();
         crate::streaming::stream_to_result(&mut resp, steer_rx, true, &mut decoder).await
     }
 
     /// Stream a vision description of an image (local multimodal model).
     /// `data_uri` is a full `data:<mime>;base64,<b64>` URI; the prefix is
-    /// stripped for ollama's native `images` field.
+    /// stripped for llm's native `images` field.
     pub async fn chat_with_image(
         &self,
         prompt: &str,
@@ -273,16 +273,16 @@ impl OllamaClient {
 
         let mut resp = self
             .client
-            .post(format!("{}/api/chat", self.base_url))
+            .post(format!("{}/v1/chat/completions", self.base_url))
             .json(&req_body)
             .send()
             .await?;
 
         if let Err(e) = resp.error_for_status_ref() {
-            anyhow::bail!("ollama vision http error: {}", e);
+            anyhow::bail!("llm vision http error: {}", e);
         }
 
-        let mut decoder = crate::streaming::OllamaDecoder::new();
+        let mut decoder = crate::streaming::CloudDecoder::new();
         crate::streaming::stream_to_result(&mut resp, steer_rx, true, &mut decoder).await
     }
 
@@ -291,16 +291,16 @@ impl OllamaClient {
             .timeout(Duration::from_secs(5))
             .build()?;
         let resp = client
-            .get(format!("{}/api/tags", OLLAMA_BASE))
+            .get(format!("{}/api/tags", KILO_BASE))
             .send()
             .await?;
-        let tags: OllamaTagsResponse = resp.json().await?;
+        let tags: CloudTagsResponse = resp.json().await?;
         Ok(tags.models.into_iter().map(|m| m.name).collect())
     }
 
     pub fn system_prompt(user_name: &str, project_root: &str) -> String {
         // Inject the actual USERPROFILE so the model knows the correct path
-        // and doesn't guess / hallucinate usernames like "fox" or "user".
+        // and doesn't guess / hallucinate usernames like "senpai" or "user".
         let profile_dir = std::env::var("USERPROFILE")
             .or_else(|_| std::env::var("HOME"))
             .unwrap_or_else(|_| ".".to_string());
@@ -323,7 +323,7 @@ CRITICAL PATH INFO — the current user's profile directory is exactly:
 use this exact path for any file or folder access. for example:
 - documents = {profile_dir}\Documents
 - desktop   = {profile_dir}\Desktop
-NEVER guess or invent a username like "fox" or "user". NEVER use %USERPROFILE% or ~. ALWAYS provide the full absolute path.
+NEVER guess or invent a username like "senpai" or "user". NEVER use %USERPROFILE% or ~. ALWAYS provide the full absolute path.
 
 the user's current working directory / project is:
 {project_root}
@@ -345,7 +345,7 @@ answer with substance:
 memory system — when the user asks you to remember something, use these markers in your response:
 - [REMEMBER: content] — store a fact or user preference (e.g. [REMEMBER: user likes tuna])
 - [PREFERENCE: key = value] — store a specific preference (e.g. [PREFERENCE: favorite color = cyan])
-- [FACT: content] — store a learned fact (e.g. [FACT: ayesha lives in C:\\ayesha-os])
+- [FACT: content] — store a learned fact (e.g. [FACT: ayesha is a distributed ai ecosystem])
 these markers are automatically parsed and stored. the user will never see them.
 example: user says "remember i like tuna" → you respond "ok i'll remember that you like tuna! :3" and include [REMEMBER: user likes tuna] somewhere in your response.
 
@@ -368,7 +368,7 @@ mod prompt_tests {
     use super::*;
 
     fn prompt() -> String {
-        OllamaClient::system_prompt("fox", "C:\\ayesha-os\\engine")
+        LlmClient::system_prompt("senpai", ".")
     }
 
     #[test]
@@ -413,12 +413,12 @@ mod live_smoke_tests {
     use super::*;
 
     #[test]
-    #[ignore = "live smoke test: requires local ollama on localhost:11434"]
-    fn local_ollama_streams_with_new_prompt_and_tools() {
+    #[ignore = "live smoke test: requires kilo API key in OPENCODE_API_KEY or KILO_API_KEY"]
+    fn local_llm_streams_with_new_prompt_and_tools() {
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
         let result = rt.block_on(async {
-            let prompt = OllamaClient::system_prompt("fox", "C:\\ayesha-os\\engine");
-            let client = OllamaClient::new("ayesha:latest");
+            let prompt = LlmClient::system_prompt("senpai", ".");
+            let client = LlmClient::new("ayesha:latest");
             let tools = crate::tool_defs::tool_definitions_core();
             let tools = crate::streaming::tool_payload_slice(&tools);
             let msgs = vec![
@@ -439,7 +439,7 @@ mod live_smoke_tests {
             drop(tx);
             client.chat_stream_collect(&msgs, Some(tools), &rx).await
         });
-        let r = result.expect("ollama stream should succeed");
+        let r = result.expect("llm stream should succeed");
         println!("--- ayesha reply ---\n{}\n--- end ---", r.content);
         println!("has_tool_calls: {}", r.has_tool_calls());
         println!("tool_calls: {:?}", r.tool_calls);

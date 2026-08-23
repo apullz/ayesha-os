@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """import-takeout-memories.py — distill Google Takeout Gemini activity into ayesha-os memories.
 
-Parses Takeout/My Activity/Gemini Apps/My Activity.html, extracts fox's
+Parses Takeout/My Activity/Gemini Apps/My Activity.html, extracts user's
 interests, projects, hardware, location, and preferences as memory entries
 in the exact schema that engine/src/memory.rs (MemoryStore) expects.
 
@@ -22,48 +22,43 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 HARDWARE_KEYWORDS = {
-    "rtx 4070 ti": ("gpu: nvidia rtx 4070 ti (12gb vram)", ["hardware", "gpu"], 8),
-    "4070 ti": ("gpu: nvidia rtx 4070 ti (12gb vram)", ["hardware", "gpu"], 8),
-    "i9-13900k": ("cpu: intel i9-13900k", ["hardware", "cpu"], 8),
-    "i9 13900": ("cpu: intel i9-13900k", ["hardware", "cpu"], 8),
-    "13900k": ("cpu: intel i9-13900k", ["hardware", "cpu"], 8),
-    "raspberry pi": ("fox has a raspberry pi — interested in low-power home labs", ["hardware", "home-lab"], 7),
-    "miyoo mini": ("fox has a miyoo mini — retro handheld gaming", ["hardware", "retro-gaming"], 7),
-    "12gb vram": ("fox's gpu has 12gb vram (rtx 4070 ti)", ["hardware", "gpu"], 7),
+    "gpu": ("user has a dedicated gpu for local model inference", ["hardware", "gpu"], 7),
+    "raspberry pi": ("user has a raspberry pi — interested in low-power home labs", ["hardware", "home-lab"], 5),
+    "miyoo mini": ("user has a retro handheld gaming device", ["hardware", "retro-gaming"], 5),
 }
 
 PROJECT_KEYWORDS = {
-    "ayesha-os": ("fox is building ayesha-os — a distributed self-improving ai ecosystem with ollama", ["project", "ai"], 9),
-    "ayesha os": ("fox is building ayesha-os — a distributed self-improving ai ecosystem with ollama", ["project", "ai"], 9),
-    "zelda hacker": ("fox asked gemini to make a zelda hacker pixel art game", ["project", "game", "pixel-art"], 7),
-    "pixel link hacker": ("fox asked gemini to make a pixel link hacker game", ["project", "game", "pixel-art"], 7),
-    "toxic flora": ("fox is working on toxic flora scotland — a scottish flora phylogeny project", ["project", "flora", "scotland"], 7),
-    "neural-strike": ("fox has neural-strike — mechanistic interpretability game", ["project", "applet"], 6),
-    "flora-cli": ("fox has flora-cli — scottish flora phylogeny explorer", ["project", "applet"], 6),
-    "opencode": ("fox uses opencode — an ai coding assistant", ["tool", "ai"], 7),
-    "ollama": ("fox uses ollama for local model inference", ["tool", "ai", "local-llm"], 7),
-    "mistral": ("fox is interested in mistral models (mistral-small etc)", ["model", "ai"], 6),
-    "modelfile": ("fox creates ollama modelfiles for custom model personas", ["model", "ai"], 6),
-    "email server": ("fox wanted to set up their own email server", ["project", "self-hosting"], 5),
-    "mail server": ("fox wanted to set up their own email server", ["project", "self-hosting"], 5),
+    "ayesha-os": ("user is building ayesha-os — a distributed self-improving ai ecosystem with kilo", ["project", "ai"], 9),
+    "ayesha os": ("user is building ayesha-os — a distributed self-improving ai ecosystem with kilo", ["project", "ai"], 9),
+    "zelda hacker": ("user asked gemini to make a zelda hacker pixel art game", ["project", "game", "pixel-art"], 5),
+    "pixel link hacker": ("user asked gemini to make a pixel link hacker game", ["project", "game", "pixel-art"], 5),
+    "toxic flora": ("user is working on a scottish flora phylogeny project", ["project", "flora", "scotland"], 5),
+    "neural-strike": ("user has a mechanistic interpretability game project", ["project", "applet"], 5),
+    "flora-cli": ("user has a scottish flora phylogeny explorer", ["project", "applet"], 5),
+    "opencode": ("user uses an ai coding assistant", ["tool", "ai"], 5),
+    "kilo": ("user uses kilo for local model inference", ["tool", "ai", "local-llm"], 5),
+    "mistral": ("user is interested in mistral models", ["model", "ai"], 4),
+    "modelfile": ("user creates kilo modelfiles for custom model personas", ["model", "ai"], 4),
+    "email server": ("user wanted to set up their own email server", ["project", "self-hosting"], 3),
+    "mail server": ("user wanted to set up their own email server", ["project", "self-hosting"], 3),
 }
 
 INTEREST_KEYWORDS = {
-    "pixel art": ("fox is into pixel art — sprite generation, character design, animation", ["interest", "art"], 7),
-    "retro gaming": ("fox loves retro gaming", ["interest", "gaming"], 6),
-    "retro game": ("fox loves retro gaming", ["interest", "gaming"], 6),
-    "vocaloid": ("fox likes vocaloid music", ["interest", "music"], 5),
-    "hatsune miku": ("fox likes hatsune miku / vocaloid", ["interest", "music"], 5),
-    "breakcore": ("fox likes breakcore / jungle music", ["interest", "music"], 5),
-    "anime": ("fox is into anime culture", ["interest", "anime"], 5),
-    "scottish": ("fox has connections to scotland — works on scottish flora projects", ["interest", "scotland"], 6),
-    "scotland": ("fox has connections to scotland — works on scottish flora projects", ["interest", "scotland"], 6),
-    "toots cafe": ("fox knows about toots cafe in rothes", ["location", "scotland"], 5),
-    "rothes": ("fox is familiar with rothes, scotland", ["location", "scotland"], 6),
-    "open source": ("fox cares about open source software", ["interest", "philosophy"], 5),
-    "self-improvement": ("fox is interested in self-improvement concepts (ayesha-os is self-improving)", ["interest", "philosophy"], 5),
-    "mechanistic interpretability": ("fox is interested in mechanistic interpretability", ["interest", "ai-research"], 6),
-    "umi": ("fox knows about umi — possibly a character or tool", ["interest", "general"], 4),
+    "pixel art": ("user is into pixel art — sprite generation, character design, animation", ["interest", "art"], 5),
+    "retro gaming": ("user loves retro gaming", ["interest", "gaming"], 4),
+    "retro game": ("user loves retro gaming", ["interest", "gaming"], 4),
+    "vocaloid": ("user likes vocaloid music", ["interest", "music"], 3),
+    "hatsune miku": ("user likes hatsune miku / vocaloid", ["interest", "music"], 3),
+    "breakcore": ("user likes breakcore / jungle music", ["interest", "music"], 3),
+    "anime": ("user is into anime culture", ["interest", "anime"], 3),
+    "scottish": ("user has connections to scotland — works on scottish flora projects", ["interest", "scotland"], 4),
+    "scotland": ("user has connections to scotland — works on scottish flora projects", ["interest", "scotland"], 4),
+    "toots cafe": ("user knows about toots cafe in rothes", ["location", "scotland"], 3),
+    "rothes": ("user is familiar with rothes, scotland", ["location", "scotland"], 4),
+    "open source": ("user cares about open source software", ["interest", "philosophy"], 3),
+    "self-improvement": ("user is interested in self-improvement concepts", ["interest", "philosophy"], 3),
+    "mechanistic interpretability": ("user is interested in mechanistic interpretability", ["interest", "ai-research"], 4),
+    "umi": ("user knows about umi — possibly a character or tool", ["interest", "general"], 2),
 }
 
 PREFERENCE_KEYWORDS = {
@@ -198,7 +193,7 @@ def distill_memories(events: list[dict]) -> dict:
                 add_memory(content, "interest", tags, imp)
 
         # extract explicit preference patterns from prompts (not responses)
-        # "i like X" / "i prefer X" / "favorite X is Y" — only from fox's messages
+        # "i like X" / "i prefer X" / "favorite X is Y" — only from user's messages
         prompt_text = ev["prompt"].lower()
         for pattern in [
             r"^(?:i |do )?(?:like|love|prefer) ([a-z0-9 ]{2,40})$",
@@ -213,19 +208,19 @@ def distill_memories(events: list[dict]) -> dict:
                         ["this model", "this file", "this", "that", "it", "you", "him", "her",
                          "them", "so", "but", "and", "or", "because", "if", "when",
                          "parse", "whats", "fusion", "blood", "ana"]):
-                        add_memory(f"fox likes: {pref_content}", "user_pref", ["preference"], 5)
+                        add_memory(f"user likes: {pref_content}", "user_pref", ["preference"], 5)
                 elif len(groups) == 2:
                     key = groups[0].strip()
                     val = groups[1].strip()
                     if val and key:
                         pref_map[key] = val
-                        add_memory(f"fox's {key}: {val}", "user_pref", ["preference"], 6)
+                        add_memory(f"user's {key}: {val}", "user_pref", ["preference"], 6)
 
         # [PREFERENCE: key = value] marker (from ayesha's own memory system)
         for match in re.finditer(r'\[PREFERENCE:\s*(.+?)\s*=\s*(.+?)\]', ev.get("response", "")):
             k, v = match.groups()
             pref_map[k.strip()] = v.strip()
-            add_memory(f"fox's {k.strip()}: {v.strip()}", "user_pref", ["preference"], 7)
+            add_memory(f"user's {k.strip()}: {v.strip()}", "user_pref", ["preference"], 7)
 
         # [REMEMBER: content] marker
         for match in re.finditer(r'\[REMEMBER:\s*(.+?)\]', ev.get("response", "")):
@@ -237,7 +232,7 @@ def distill_memories(events: list[dict]) -> dict:
             content = match.group(1).strip()
             add_memory(content, "fact", ["ayesha-fact"], 7)
 
-    # add some meta-facts about fox based on the overall pattern
+    # add some meta-facts about user based on the overall pattern
     chat_ids = set(ev["chat_id"] for ev in events if ev["chat_id"] != "unknown")
     total_prompts = len(events)
     date_range = ""
@@ -248,13 +243,13 @@ def distill_memories(events: list[dict]) -> dict:
         date_range = f"{earliest.strftime('%Y-%m-%d')} to {latest.strftime('%Y-%m-%d')}"
 
     add_memory(
-        f"fox had {total_prompts} conversations with gemini across {len(chat_ids)} chats ({date_range})",
+        f"user had {total_prompts} conversations with gemini across {len(chat_ids)} chats ({date_range})",
         "meta",
         ["meta", "usage"],
         3
     )
     add_memory(
-        "fox calls themselves 'fox' or 'apullz' — refers to ayesha as their ai companion",
+        "user calls themselves 'user' or 'ayesha-os' — refers to ayesha as their ai companion",
         "user_pref",
         ["identity", "preference"],
         8

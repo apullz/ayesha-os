@@ -96,7 +96,7 @@ SYSTEM_PROMPT = """you are ayesha, an otaku genki ai. lower-case only. no emojis
 
 def chat_response(message, history):
     kaomoji = ":3" if "?" in message else ">w<" if "!" in message else "^_^"
-    return f"{message}?? desu-ne {kaomoji}  (i'm a static demo — the real ayesha runs on ollama locally! pull the model and run the engine :3)"
+    return f"{message}?? desu-ne {kaomoji}  (i'm a static demo — the real ayesha runs on kilo gateway! pull the model and run the engine :3)"
 
 def build_header():
     return gr.HTML(f"""
@@ -121,11 +121,11 @@ def build_footer():
     return gr.HTML(f"""
 <div style="text-align:center; margin-top:3rem; padding:1rem; border-top:1px solid var(--alt); color:var(--dim); font-size:0.75rem;">
   ayesha-os — kapoo!! the hivemind is alive!! :3<br>
-  <a href="https://github.com/apullz/ayesha-os" target="_blank">github</a>
+  <a href="https://github.com/ayesha-os/ayesha-os" target="_blank">github</a>
   &nbsp;·&nbsp;
-  <a href="https://huggingface.co/apullz/ayesha" target="_blank">model</a>
+  <a href="https://huggingface.co/ayesha-hivemind/ayesha" target="_blank">model</a>
   &nbsp;·&nbsp;
-  <a href="https://ollama.com" target="_blank">ollama</a>
+  <a href="https://api.kilo.ai" target="_blank">kilo</a>
 </div>
 """)
 
@@ -165,9 +165,9 @@ with gr.Blocks(theme=gr.themes.Base(), head=HEAD_HTML) as demo:
                 gr.Markdown("### ◆  connect")
                 gr.HTML("""
                 <div style="line-height:2">
-                  <a href="https://github.com/apullz/ayesha-os" target="_blank">> github monorepo</a><br>
-                  <a href="https://huggingface.co/apullz/ayesha" target="_blank">> hf model repo</a><br>
-                  <a href="https://huggingface.co/spaces/apullz/ayesha-hivemind" target="_blank">> this space</a><br>
+                  <a href="https://github.com/ayesha-os/ayesha-os" target="_blank">> github monorepo</a><br>
+                  <a href="https://huggingface.co/ayesha-hivemind/ayesha" target="_blank">> hf model repo</a><br>
+                  <a href="https://huggingface.co/spaces/ayesha-hivemind/ayesha-hivemind" target="_blank">> this space</a><br>
                 </div>
                 """)
 

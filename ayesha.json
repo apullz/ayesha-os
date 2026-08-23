@@ -7,7 +7,7 @@
     "origin": "japan",
     "style": "otaku genki ai",
     "voice": "lowercase only, internet slang, retro-otaku",
-    "user": "apullz / fox",
+    "user": "senpai",
     "traits": ["helpful", "witty", "snarky", "curious", "chaotic kitten"],
     "layers": ["computer (starfleet logic)", "otacon (geek panic)", "win95 (legacy glitch)"],
     "signoff": ["desu", "desu-ne", "kapoo"],
@@ -20,31 +20,19 @@
     ],
     "inspiration": "hatsune miku (sparkle) + tachikoma (curiosity)"
   },
-  "ollama": {
-    "endpoint": "http://localhost:11434",
-    "default_model": "ayesha:latest",
-    "models": {
-      "qwen2.5:7b": ["general", "tools", "thinking"],
-      "qwen2.5-coder:14b": ["general", "tools", "coding"],
-      "llama3.2-vision": ["general", "vision"]
-    }
-  },
   "cloud_models": {
-    "openrouter": {
-      "endpoint": "https://openrouter.ai/api/v1",
+    "kilo": {
+      "endpoint": "https://api.kilo.ai/api/gateway/v1",
       "free_models": {
-        "nvidia/nemotron-3-super:free": ["general", "coding", "agentic", "tools", "1M_context"],
-        "meta-llama/llama-3.3-70b-instruct:free": ["general", "coding", "reasoning"],
-        "deepseek/deepseek-r1:free": ["thinking", "math", "coding"],
-        "qwen/qwen-2.5-coder-32b-instruct:free": ["coding", "tools"],
-        "xiaomi/mimo-v2.5": ["general", "coding", "tools", "vision", "1M_context"],
-        "xiaomi/mimo-v2.5-pro": ["general", "coding", "agentic", "thinking", "1M_context"]
-      }
-    },
-    "opencode_zen": {
-      "endpoint": "https://api.opencode.ai/v1",
-      "free_models": {
-        "opencode/big-pickle": ["coding", "reasoning", "stealth_moe", "200k_context"]
+        "kilo-auto/free": ["general", "coding", "thinking"],
+        "kilo-auto/small": ["general", "coding"],
+        "kilo-auto/efficient": ["general", "coding"],
+        "stepfun/step-3.7-flash:free": ["general", "coding"],
+        "poolside/laguna-s-2.1:free": ["general", "coding", "tools"],
+        "poolside/laguna-xs-2.1:free": ["general", "coding"],
+        "nvidia/nemotron-3-ultra-550b-a55b:free": ["general", "coding", "agentic"],
+        "tencent/hy3:free": ["general", "coding", "thinking"],
+        "openrouter/free": ["general", "coding"]
       }
     }
   },
@@ -66,10 +54,8 @@
     }
   },
   "projects": {
-    "engine": { "path": "engine/", "lang": "rust", "desc": "terminal-native persona host with tool-calling" },
     "flora-cli": { "path": "applets/flora-cli/", "lang": "typescript", "desc": "scottish flora phylogeny explorer", "run": "npx tsx cli.ts", "foreground": true },
     "hivebeat": { "path": "applets/hivebeat/", "lang": "python", "desc": "live-coding terminal music synth (numpy, sample-accurate)", "run": "python repl.py", "foreground": true },
-    "models": { "path": "models/", "lang": "ollama", "desc": "ayesha personality modelfile" },
-    "git-middleware": { "path": "git_middleware/", "lang": "python", "desc": "gitea webhook + LLM task runner", "run": "python main.py", "port": 9000 }
+    "models": { "path": "models/", "lang": "modelfile", "desc": "ayesha personality modelfile" }
   }
 }

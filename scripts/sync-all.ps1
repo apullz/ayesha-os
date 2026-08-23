@@ -22,8 +22,8 @@ function Clone-HFRepo($url, $dest) {
 }
 
 # ── 1. Clone HF repos ──
-$modelOk = Clone-HFRepo "https://huggingface.co/apullz/ayesha" $HF_MODEL
-$spaceOk = Clone-HFRepo "https://huggingface.co/spaces/apullz/ayesha-hivemind" $HF_SPACE
+$modelOk = Clone-HFRepo "https://huggingface.co/ayesha-hivemind/ayesha" $HF_MODEL
+$spaceOk = Clone-HFRepo "https://huggingface.co/spaces/ayesha-hivemind/ayesha-hivemind" $HF_SPACE
 
 # ── 2. Sync HF model repo ──
 if ($modelOk) {

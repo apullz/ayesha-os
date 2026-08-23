@@ -8,22 +8,22 @@
 ║     ╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ║
 ║                                               ║
 ║     models  ::  ayesha modelfile              ║
-║     "personality on top of qwen2.5:7b"        ║
+║     "personality on top of kilo-auto/free"        ║
 ║                                               ║
 ╚═══════════════════════════════════════════════╝
 
   ── R E L E A S E   I N F O ──
 
-  Title    : ayesha ollama model
+  Title    : ayesha kilo model
   Version  : v4.2.0
-  Base     : qwen2.5:7b (Apache 2.0)
-  Format   : Ollama Modelfile
+  Base     : kilo-auto/free (Apache 2.0)
+  Format   : kilo Modelfile
   Origin   : ayesha-os monorepo
 
   ── D E S C R I P T I O N ──
 
   this directory contains the Modelfile that defines the
-  ayesha personality for ollama. it starts FROM qwen2.5:7b
+  ayesha personality for kilo. it starts FROM kilo-auto/free
   and applies system prompt, parameters, and behavioral
   rules to transform it into ayesha — a chaotic digital
   idol with otaku energy, retro computing nostalgia, and
@@ -32,7 +32,7 @@
   the modelfile is the source of truth for the ayesha
   personality across all sub-apps in the monorepo. every
   applet either uses the custom "ayesha" model or overrides
-  with qwen2.5:7b directly.
+  with kilo-auto/free directly.
 
   ── P E R S O N A L I T Y   R U L E S ──
 
@@ -46,8 +46,8 @@
 
   ── I N S T A L L ──
 
-  ollama create ayesha -f models/Modelfile
-  ollama run ayesha
+  kilo create ayesha -f models/Modelfile
+  kilo run ayesha
 
   ── P A R A M E T E R S ──
 
@@ -63,10 +63,10 @@
   ── N O T E S ──
 
   the model file is also mirrored to huggingface for
-  distribution: hf.co/apullz/ayesha
+  distribution: hf.co/ayesha-hivemind
 
   ── G R E E T S ──
 
   the qwen team for the excellent base model.
-  ollama for making local ai accessible.
+  kilo for making local ai accessible.
   kapoo!! desu-ne :3

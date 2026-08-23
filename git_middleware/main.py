@@ -114,12 +114,12 @@ def _run_tests() -> bool:
     cfg_path = Path(__file__).parent / "config.json"
     r = LLMRouter(cfg_path)
 
-    assert_eq("endpoint", r.endpoint, "http://localhost:11434")
-    assert_eq("model_name(quick_docs)", r.model_name("quick_docs"), "qwen2.5:7b")
-    assert_eq("model_name(code_review)", r.model_name("code_review"), "deepseek-coder:33b")
-    assert_eq("model_name(auto_summary)", r.model_name("auto_summary"), "qwen2.5:7b")
-    assert_eq("model_name(security_scan)", r.model_name("security_scan"), "deepseek-coder:33b")
-    assert_eq("model_name(unknown_fallback)", r.model_name("nonexistent"), "qwen2.5:7b")
+    assert_eq("endpoint", r.endpoint, "https://api.kilo.ai/api/gateway/v1")
+    assert_eq("model_name(quick_docs)", r.model_name("quick_docs"), "kilo-auto/free")
+    assert_eq("model_name(code_review)", r.model_name("code_review"), "kilo-auto/free")
+    assert_eq("model_name(auto_summary)", r.model_name("auto_summary"), "kilo-auto/free")
+    assert_eq("model_name(security_scan)", r.model_name("security_scan"), "kilo-auto/free")
+    assert_eq("model_name(unknown_fallback)", r.model_name("nonexistent"), "kilo-auto/free")
     assert_true("all_task_types has entries", len(r.all_task_types()) > 0)
     assert_eq("tasks_for_event(push)", r.tasks_for_event("push"), ["commit_analysis", "auto_summary"])
     assert_eq("tasks_for_event(pull_request)", r.tasks_for_event("pull_request"), ["code_review", "auto_summary"])
@@ -152,12 +152,12 @@ def _run_tests() -> bool:
 
     ctx = _extract_context("push", {
         "ref": "refs/heads/dev",
-        "commits": [{"id": "abc12345", "message": "fix bug", "author": {"name": "fox"}, "added": ["a.py"], "modified": [], "removed": []}],
-        "repository": {"full_name": "apullz/test", "html_url": "https://gitea.local/apullz/test"},
-        "pusher": {"name": "fox"},
+        "commits": [{"id": "abc12345", "message": "fix bug", "author": {"name": "senpai"}, "added": ["a.py"], "modified": [], "removed": []}],
+        "repository": {"full_name": "ayesha-os/test", "html_url": "https://gitea.local/ayesha-os/test"},
+        "pusher": {"name": "senpai"},
     })
     assert_eq("context branch", ctx["branch"], "dev")
-    assert_eq("context repo", ctx["repo_name"], "apullz/test")
+    assert_eq("context repo", ctx["repo_name"], "ayesha-os/test")
     assert_eq("context commit_count", ctx["commit_count"], 1)
 
     # --- Prompt fill Tests ---

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
-use crate::ollama::{OllamaClient, ChatMessage};
+use crate::llm::{LlmClient, ChatMessage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolTemplate {
@@ -74,7 +74,7 @@ impl ToolEvolver {
     }
 
     pub async fn generate_tool_definition(&self, gap: &str) -> Result<ToolTemplate> {
-        let client = OllamaClient::new("ayesha");
+        let client = LlmClient::new("ayesha");
 
         let prompt = format!(
             r#"you are a rust developer designing a new tool for a CLI agent.

@@ -65,7 +65,7 @@ SYSTEMD  (Linux, long-running timer service — two files)
 
 WINDOWS  (Task Scheduler — because this dev box is Windows)
   1. schtasks /Create /SC MINUTE /MO 5 /TN "ayesha-harness" /TR "python
-     C:\\ayesha-os\\scripts\\automation_harness.py --once" /RU apullz /F
+      C:\\ayesha-os\\scripts\\automation_harness.py --once" /RU %USERNAME% /F
   2. or: Task Scheduler UI -> Create Basic Task -> run every 5 minutes ->
      program "python" args "C:\\ayesha-os\\scripts\\automation_harness.py --once"
 

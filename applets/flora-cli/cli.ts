@@ -405,29 +405,29 @@ Terminal Formatting Instructions:
           { role: "user", content: question },
         ];
 
-        let ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
-        if (!ollamaHost.startsWith("http://") && !ollamaHost.startsWith("https://")) {
-          ollamaHost = "http://" + ollamaHost;
+        let kiloHost = process.env.KILO_HOST || "https://api.kilo.ai";
+        if (!kiloHost.startsWith("http://") && !kiloHost.startsWith("https://")) {
+          kiloHost = "http://" + kiloHost;
         }
-        ollamaHost = ollamaHost.replace(/\/+$/, "");
+        kiloHost = kiloHost.replace(/\/+$/, "");
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
-        const res = await fetch(`${ollamaHost}/api/chat`, {
+        const res = await fetch(`${kiloHost}/v1/chat/completions`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.KILO_API_KEY}` },
           body: JSON.stringify({
-            model: "qwen2.5:7b",
+            model: "kilo-auto/free",
             messages,
-            options: { temperature: 0.7 },
+            temperature: 0.7,
             stream: false,
           }),
           signal: controller.signal,
         });
         clearTimeout(timeout);
 
-        if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+        if (!res.ok) throw new Error(`kilo returned ${res.status}`);
         const data = await res.json();
-        const text = data.message?.content || "The sage was silent.";
+        const text = data.choices?.[0]?.message?.content || data.message?.content || "The sage was silent.";
 
         chatHistory.push({ role: "user", content: question });
         chatHistory.push({ role: "assistant", content: text });

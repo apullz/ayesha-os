@@ -1,4 +1,4 @@
-"""Ollama task triggers — runs AI tasks via the local ollama instance."""
+"""Ollama task triggers — runs AI tasks via the local kilo instance."""
 from __future__ import annotations
 
 import json
@@ -64,7 +64,7 @@ async def run_task(
 ) -> dict[str, Any]:
     """Execute a single LLM task and return the result."""
     model_cfg = router.select(task_type)
-    model_name = model_cfg.get("model", "qwen2.5:7b")
+    model_name = model_cfg.get("model", "kilo-auto/free")
     endpoint = router.endpoint
 
     prompt_template = PROMPTS.get(task_type, "Analyze the following:\n{extra_context}")
@@ -73,7 +73,7 @@ async def run_task(
     logger.info("running task=%s model=%s", task_type, model_name)
 
     try:
-        result = await _call_ollama(endpoint, model_name, prompt, model_cfg)
+        result = await _call_kilo(endpoint, model_name, prompt, model_cfg)
         return {
             "task_type": task_type,
             "model": model_name,
@@ -123,14 +123,14 @@ def _fill_prompt(template: str, ctx: dict[str, Any]) -> str:
         return result
 
 
-async def _call_ollama(
+async def _call_kilo(
     endpoint: str,
     model: str,
     prompt: str,
     cfg: dict[str, Any],
 ) -> str:
-    """Call ollama API and return the response text."""
-    url = f"{endpoint}/api/chat"
+    """Call kilo API and return the response text."""
+    url = f"{endpoint}/v1/chat/completions"
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],

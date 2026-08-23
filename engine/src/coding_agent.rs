@@ -1,5 +1,5 @@
 use crate::sandbox::Sandbox;
-use crate::ollama::OllamaClient;
+use crate::llm::LlmClient;
 use crate::memory::MemoryStore;
 use crate::self_analysis::SelfAnalyzer;
 use crate::tool_evolution::ToolEvolver;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[allow(dead_code)]
 pub struct CodingAgent {
     sandbox: Sandbox,
-    ollama: OllamaClient,
+    llm: LlmClient,
     memory: MemoryStore,
     analyzer: SelfAnalyzer,
     evolver: ToolEvolver,
@@ -25,13 +25,13 @@ pub struct CodingAgent {
 
 #[allow(dead_code)]
 impl CodingAgent {
-    pub fn new(sandbox: Sandbox, ollama: OllamaClient, memory: MemoryStore, 
+    pub fn new(sandbox: Sandbox, llm: LlmClient, memory: MemoryStore, 
                analyzer: SelfAnalyzer, evolver: ToolEvolver, 
                prometh: PromptHistory, applet_manager: AppletManager,
                project_root: PathBuf) -> Self {
         Self {
             sandbox,
-            ollama,
+            llm,
             memory,
             analyzer,
             evolver,
@@ -434,7 +434,7 @@ impl CodingAgent {
             .ok_or_else(|| anyhow::anyhow!("Could not extract content"))?
             .to_string();
         
-        // Use Ollama to generate the modification
+        // Use Cloud to generate the modification
         let prompt = format!(
             "You are a coding agent. Modify the following code according to the instruction.\n\n\
             FILE: {}\n\nCURRENT CODE:\n{}\n\nINSTRUCTION:\n{}\n\n\
@@ -442,13 +442,13 @@ impl CodingAgent {
             path, content, instruction
         );
         
-        let messages = vec![crate::ollama::ChatMessage {
+        let messages = vec![crate::llm::ChatMessage {
             role: "user".to_string(),
             content: prompt,
             tool_calls: None,
             tool_call_id: None,
         }];
-        let response = self.ollama.chat(&messages, None).await?;
+        let response = self.llm.chat(&messages, None).await?;
         let modified_code = response.message.content.trim();
         
         // Write the modified code back
@@ -478,7 +478,7 @@ impl CodingAgent {
             .ok_or_else(|| anyhow::anyhow!("Could not extract content"))?
             .to_string();
         
-        // Use Ollama to suggest improvements
+        // Use Cloud to suggest improvements
         let prompt = format!(
             "You are a senior software engineer. Review the following code and suggest improvements.\n\n\
             FILE: {}\n\nCODE:\n{}\n\n\
@@ -491,13 +491,13 @@ impl CodingAgent {
             path, content
         );
         
-        let messages = vec![crate::ollama::ChatMessage {
+        let messages = vec![crate::llm::ChatMessage {
             role: "user".to_string(),
             content: prompt,
             tool_calls: None,
             tool_call_id: None,
         }];
-        let suggestions = self.ollama.chat(&messages, None).await?;
+        let suggestions = self.llm.chat(&messages, None).await?;
         let suggestions = suggestions.message.content;
         
         Ok(json!({

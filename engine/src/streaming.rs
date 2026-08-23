@@ -1,6 +1,6 @@
 //! shared streaming machinery — one decoder + pipeline both backends consume.
 //!
-//! previously ollama (NDJSON) and cloud (SSE) each had their own streaming
+//! previously llm (NDJSON) and cloud (SSE) each had their own streaming
 //! loop, their own lowercase/think handling, and their own (slightly
 //! different) active tool-call reconstruction. this module is the single
 //! home for all of it:
@@ -22,7 +22,7 @@ use std::sync::mpsc;
 use serde_json::{json, Value};
 
 use crate::format::LowercaseStreamer;
-use crate::ollama::{StreamResult, ToolCall, ToolFunction};
+use crate::llm::{StreamResult, ToolCall, ToolFunction};
 
 /// One decoded record from a transport stream.
 #[derive(Debug, Clone, PartialEq)]
@@ -35,7 +35,7 @@ pub enum StreamEvent {
     ThinkOpen,
     /// a think block closed in the rolling content tail
     ThinkClose,
-    /// terminal marker: ollama `done:true` or SSE `data: [DONE]`
+    /// terminal marker: llm `done:true` or SSE `data: [DONE]`
     Done,
 }
 
@@ -49,12 +49,12 @@ pub trait StreamDecoder {
     fn finish(&mut self) -> Vec<StreamEvent>;
 }
 
-/// NDJSON decoder: one JSON object per line (ollama `/api/chat` stream).
-pub struct OllamaDecoder {
+/// NDJSON decoder for llm /api/chat stream
+pub struct CloudDecoder {
     buf: Vec<u8>,
 }
 
-impl OllamaDecoder {
+impl CloudDecoder {
     pub fn new() -> Self {
         Self { buf: Vec::new() }
     }
@@ -70,7 +70,7 @@ impl OllamaDecoder {
             Ok(v) => v,
             Err(e) => {
                 let preview: String = line.chars().take(80).collect();
-                eprintln!("ollama stream parse error: {} near: {}", e, preview);
+                eprintln!("llm stream parse error: {} near: {}", e, preview);
                 return Vec::new();
             }
         };
@@ -84,7 +84,7 @@ impl OllamaDecoder {
             }
         }
 
-        // tool calls (ollama usually sends them complete in the done chunk;
+        // tool calls (llm usually sends them complete in the done chunk;
         // emit them as deltas anyway so the shared reconstruction handles them)
         if let Some(tcs) = v
             .get("message")
@@ -126,7 +126,7 @@ impl OllamaDecoder {
     }
 }
 
-impl StreamDecoder for OllamaDecoder {
+impl StreamDecoder for CloudDecoder {
     fn feed(&mut self, bytes: &[u8]) -> Vec<StreamEvent> {
         self.buf.extend_from_slice(bytes);
         let mut events = Vec::new();
@@ -598,18 +598,18 @@ mod tests {
         rx
     }
 
-    // ── OllamaDecoder ──
+    // ── CloudDecoder ──
 
     #[test]
-    fn ollama_decoder_chunk_split_produces_identical_events() {
+    fn llm_decoder_chunk_split_produces_identical_events() {
         let payload = br#"{"message":{"content":"hi "},"done":false}
 {"message":{"content":"there"},"done":false}
 {"message":{"content":""},"done":true}
 "#;
         // byte-by-byte feeds must produce exactly the same events as one feed
         let split: Vec<&[u8]> = payload.chunks(1).collect();
-        let split_events = all_events(&mut OllamaDecoder::new(), &split);
-        let whole_events = all_events(&mut OllamaDecoder::new(), &[payload]);
+        let split_events = all_events(&mut CloudDecoder::new(), &split);
+        let whole_events = all_events(&mut CloudDecoder::new(), &[payload]);
         assert_eq!(split_events, whole_events);
         assert!(split_events.contains(&StreamEvent::Done));
         let chunks: Vec<StreamEvent> = split_events
@@ -627,12 +627,12 @@ mod tests {
     }
 
     #[test]
-    fn ollama_decoder_multibyte_split_is_not_corrupted() {
+    fn llm_decoder_multibyte_split_is_not_corrupted() {
         // a kaomoji whose bytes span a chunk boundary must survive intact
         // (the old per-chunk from_utf8_lossy turned it into U+FFFD)
         let payload = "{\"message\":{\"content\":\"(╯°□°)\"},".to_string() + "\"done\":false}\n";
         let bytes = payload.as_bytes();
-        let mut d = OllamaDecoder::new();
+        let mut d = CloudDecoder::new();
         let mut events = Vec::new();
         for b in bytes {
             events.extend(d.feed(&[*b]));
@@ -650,8 +650,8 @@ mod tests {
     }
 
     #[test]
-    fn ollama_decoder_tool_calls_normalized_and_done() {
-        let mut d = OllamaDecoder::new();
+    fn llm_decoder_tool_calls_normalized_and_done() {
+        let mut d = CloudDecoder::new();
         let line = r#"{"message":{"content":"","tool_calls":[{"function":{"name":"write_file","arguments":{"path":"C:/x/y.txt","content":"hello"}}}],"role":"assistant"},"done":true}
 "#;
         let events = d.feed(line.as_bytes());
@@ -670,8 +670,8 @@ mod tests {
     }
 
     #[test]
-    fn malformed_ollama_line_is_skipped() {
-        let mut d = OllamaDecoder::new();
+    fn malformed_llm_line_is_skipped() {
+        let mut d = CloudDecoder::new();
         assert!(d.feed(b"this is not json at all\n").is_empty());
         assert!(d.feed(b"{\"message\":{\"content\":\"hi\"},\"done\":false}\n").len() == 1);
     }
@@ -1010,7 +1010,7 @@ mod tests {
         for _ in 0..200 {
             p.feed_events(vec![StreamEvent::Chunk(String::new())]);
         }
-        let mut d = OllamaDecoder::new();
+        let mut d = CloudDecoder::new();
         p.feed_events(d.feed(br#"{"message":{"content":""},"done":true}
 "#));
         let r = p.finish();

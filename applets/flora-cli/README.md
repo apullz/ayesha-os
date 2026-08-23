@@ -25,7 +25,7 @@
   Version  : v1.2
   Type     : Terminal Flora Browser + AI Botanist
   Language : TypeScript / Express / React
-  Model    : qwen2.5:7b (via local ollama)
+  Model    : kilo-auto/free (via kilo gateway)
   Status   : LOCAL OLLAMA ONLY (Gemini removed 07/2026)
 
   ── D E S C R I P T I O N ──
@@ -39,14 +39,14 @@
   liverworts through flowering plants, with detailed lore
   about traditional uses, gaelic names, and ecological roles.
 
-  the "ask" command sends queries to a local ollama model
-  (qwen2.5:7b) with full context about the current taxonomic
+  the "ask" command sends queries to a kilo gateway model
+  (kilo-auto/free) with full context about the current taxonomic
   position. results are displayed in the terminal view.
 
   ── I N S T A L L ──
 
   npm install
-  ollama pull qwen2.5:7b
+  kilo pull kilo-auto/free
 
   ── U S A G E ──
 
@@ -65,10 +65,10 @@
   this app was originally part of Google AI Studio and used
   GEMINI_API_KEY for the botanist AI. as of july 2026:
 
-  - cli.ts: Gemini API call → ollama /api/chat
-  - server.ts: GoogleGenAI → direct ollama fetch
+  - cli.ts: Gemini API call → kilo /v1/chat/completions
+  - server.ts: GoogleGenAI → direct kilo fetch
   - caledonian-cli.js: deleted (compiled output)
-  - .env.example: GEMINI_API_KEY → OLLAMA_HOST
+  - .env.example: GEMINI_API_KEY → KILO_HOST
   - package.json: @google/genai removed
   - host: 0.0.0.0 → 127.0.0.1
 
@@ -102,5 +102,5 @@
   ── G R E E T S ──
 
   scotland's botanical heritage for the inspiration.
-  ollama for keeping the botanist sage alive without google.
+  kilo for keeping the botanist sage alive without google.
   "the rowan tree bears fruit of knowledge" — desu-ne :3

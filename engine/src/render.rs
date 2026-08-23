@@ -13,7 +13,7 @@
 
 use crate::theme::{self, Role, SyntaxRole};
 use crate::syntax;
-use crate::ui::{truncate_cells, visible_cells};
+use crate::ui::{truncate_cells, visible_cells, tool_box_width};
 
 #[derive(Default)]
 pub struct CodeStream {
@@ -118,13 +118,12 @@ impl CodeStream {
     }
 }
 
-/// Solid code-panel width for fenced blocks (opencode-style). Shrinks to
-/// fit narrow terminals — the designed 80 needs the gutter + indent too,
-/// which wrapped the panel on 80-col windows.
-const CODE_PANEL_WIDTH: usize = 80;
+/// Solid code-panel width for fenced blocks (ayesha-os-style). Uses the
+/// same formula as `tool_box_width()` in ui.rs so the code panel and the
+/// user command box always match.
 
 fn panel_width() -> usize {
-    CODE_PANEL_WIDTH.min(crossterm::terminal::size().map(|(c, _)| c as usize).unwrap_or(80).saturating_sub(6).max(24))
+    tool_box_width()
 }
 
 /// Paint a single code line: dim gutter + syntax-highlighted text on a solid
@@ -145,7 +144,7 @@ fn paint_code_line(line: &str) -> String {
     format!("  {gutter} {}", theme::bg_fill(Role::CodeBg, padded))
 }
 
-/// opencode-style code block header: the language name on the panel, followed
+/// ayesha-os-style code block header: the language name on the panel, followed
 /// by a dim rule.
 fn paint_code_header(lang: &str) -> String {
     let width = panel_width();

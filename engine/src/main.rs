@@ -1,4 +1,4 @@
-mod ollama;
+mod llm;
 mod permissions;
 mod cloud;
 mod streaming;
@@ -29,7 +29,7 @@ mod vision;
 
 use std::io::Write;
 use theme::Role;
-use ollama::{OllamaClient, ChatMessage, StreamResult};
+use llm::{LlmClient, ChatMessage, StreamResult};
 use cloud::CloudClient;
 use streaming::StreamDecoder;
 use tools::{ToolExecutor, ToolContext};
@@ -43,9 +43,9 @@ use applet_manager::AppletManager;
 use permissions::Verdict;
 
 
-/// Active backend — either local Ollama or cloud (OpenRouter/OpenCode)
+/// Active backend — either local Cloud or cloud (OpenRouter/kilo)
 enum ActiveBackend {
-    Ollama(OllamaClient),
+    Cloud(LlmClient),
     Cloud(CloudClient),
 }
 
@@ -80,7 +80,7 @@ impl Mode {
 /// Build the system prompt for a user, appending the skills hint if any
 /// skills are installed in the project's skills/ folder.
 fn build_system_prompt(user_name: &str, project_root: &std::path::Path) -> String {
-    let mut prompt = OllamaClient::system_prompt(user_name, &project_root.to_string_lossy());
+    let mut prompt = LlmClient::system_prompt(user_name, &project_root.to_string_lossy());
     if let Some(hint) = skills::system_prompt_hint(project_root) {
         prompt.push_str(&hint);
     }
@@ -140,7 +140,7 @@ async fn run_vision(
     let mut chain: Vec<(String, String)> = Vec::new();
     let vp = registry
         .cloud_provider(vision_model)
-        .unwrap_or_else(|| "ollama".to_string());
+        .unwrap_or_else(|| "llm".to_string());
     chain.push((vision_model.to_string(), vp));
     for (m, p) in vision::DEFAULT_FALLBACKS.iter().copied() {
         if !chain.iter().any(|(cm, _)| cm == m) {
@@ -151,8 +151,8 @@ async fn run_vision(
     let prompt = vision::describe_prompt(question);
     for (model, provider) in &chain {
         let attempt = format!("{} ({})", model, provider);
-        let result = if provider == "ollama" {
-            vision::describe_ollama(model, data_uri, &prompt, steer_rx).await
+        let result = if provider == "llm" {
+            vision::describe_llm(model, data_uri, &prompt, steer_rx).await
         } else {
             vision::describe_cloud(model, provider, data_uri, &prompt, steer_rx).await
         };
@@ -418,7 +418,7 @@ impl ActiveBackend {
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> anyhow::Result<StreamResult> {
         match self {
-            ActiveBackend::Ollama(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
+            ActiveBackend::Cloud(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
             ActiveBackend::Cloud(c) => c.chat_stream_visible(messages, tools, steer_rx).await,
         }
     }
@@ -432,7 +432,7 @@ impl ActiveBackend {
         steer_rx: &std::sync::mpsc::Receiver<String>,
     ) -> anyhow::Result<StreamResult> {
         match self {
-            ActiveBackend::Ollama(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
+            ActiveBackend::Cloud(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
             ActiveBackend::Cloud(c) => c.chat_stream_collect(messages, tools, steer_rx).await,
         }
     }
@@ -499,7 +499,7 @@ fn sync_config(root: &std::path::Path) -> (String, String, bool) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
             let g = v.get("github");
             let repo = g.and_then(|g| g.get("repo")).and_then(|r| r.as_str())
-                .unwrap_or("apullz/ayesha-os").to_string();
+                .unwrap_or("ayesha-os").to_string();
             let branch = g.and_then(|g| g.get("branch")).and_then(|b| b.as_str())
                 .unwrap_or("master").to_string();
             let auto_push = g.and_then(|g| g.get("auto_push")).and_then(|b| b.as_bool())
@@ -507,7 +507,7 @@ fn sync_config(root: &std::path::Path) -> (String, String, bool) {
             return (repo, branch, auto_push);
         }
     }
-    ("apullz/ayesha-os".to_string(), "master".to_string(), true)
+    ("ayesha-os".to_string(), "master".to_string(), true)
 }
 
 /// Print a status summary from .tri_mind_state/engine_state.json (per-node
@@ -629,6 +629,7 @@ fn graceful_shutdown(
         }
     }
     manager.stop_all();
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
     let _ = crossterm::terminal::disable_raw_mode();
     println!();
     println!("  {} {}", theme::paint(Role::Success, "●"), theme::paint(Role::Accent, "ayesha-os shutting down"));
@@ -637,10 +638,10 @@ fn graceful_shutdown(
 }
 
 /// Backend/provider tag for a model's quick-switcher row (the dim tag
-/// column next to the model name), e.g. "ollama", "openrouter", "opencode".
+/// column next to the model name), e.g. "llm", "openrouter", "kilo".
 fn model_backend_tag(m: &model_registry::ModelProfile) -> String {
     match &m.backend {
-        model_registry::Backend::Ollama => "ollama".to_string(),
+        model_registry::Backend::Cloud => "llm".to_string(),
         model_registry::Backend::Cloud { provider } => provider.clone(),
     }
 }
@@ -658,7 +659,7 @@ fn model_ctx_label(ctx: u32) -> String {
 }
 
 /// Switch the active model: update the registry, rebuild the client backend
-/// (cloud setup-failure reverts to opencode/big-pickle), refresh the dock
+/// (cloud setup-failure reverts to kilo-auto/free), refresh the dock
 /// status, and report the result. Shared by the `/model` command and the
 /// ctrl+p quick-switcher's model rows.
 async fn apply_model_switch(
@@ -681,15 +682,15 @@ async fn apply_model_switch(
                     Err(e) => {
                         ui::show_error(&format!("cloud setup failed: {}. run .\\scripts\\setup-cloud.ps1", e));
                         // Revert to default
-                        *current_model = "opencode/big-pickle".to_string();
-                        *client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                        *current_model = "kilo-auto/free".to_string();
+                        *client = match CloudClient::new("kilo-auto/free", "kilo") {
                             Ok(cc) => ActiveBackend::Cloud(cc),
-                            Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                            Err(_) => ActiveBackend::Cloud(LlmClient::new("ayesha")),
                         };
                     }
                 }
             } else {
-                *client = ActiveBackend::Ollama(OllamaClient::new(current_model));
+                *client = ActiveBackend::Cloud(LlmClient::new(current_model));
                 ui::show_system(&format!("switched to: {}", name));
             }
         }
@@ -726,9 +727,9 @@ async fn main() -> anyhow::Result<()> {
     let plugin_registry = plugins::PluginRegistry::from_config(&manager.plugins);
     let plugin_suffix = plugins::snippet_from_configs(&manager.plugins);
     let executor = ToolExecutor::new(sandbox).with_plugins(plugin_registry.clone());
-    let mut current_model = "opencode/big-pickle".to_string();
+    let mut current_model = "kilo-auto/free".to_string();
     let fallback_model = "xiaomi/mimo-v2.5-pro";
-    let mut client = match CloudClient::new("opencode/big-pickle", "opencode") {
+    let mut client = match CloudClient::new("kilo-auto/free", "kilo") {
         Ok(cc) => ActiveBackend::Cloud(cc),
         Err(_) => match CloudClient::new(fallback_model, "openrouter") {
             Ok(cc) => {
@@ -737,28 +738,28 @@ async fn main() -> anyhow::Result<()> {
             }
             Err(_) => {
                 current_model = "ayesha".to_string();
-                ActiveBackend::Ollama(OllamaClient::new("ayesha"))
+                ActiveBackend::Cloud(LlmClient::new("ayesha"))
             }
         },
     };
-    let mut tool_client = match CloudClient::new("opencode/big-pickle", "opencode") {
+    let mut tool_client = match CloudClient::new("kilo-auto/free", "kilo") {
         Ok(cc) => ActiveBackend::Cloud(cc),
         Err(_) => match CloudClient::new(fallback_model, "openrouter") {
             Ok(cc) => ActiveBackend::Cloud(cc),
-            Err(_) => ActiveBackend::Ollama(OllamaClient::new("qwen2.5:7b")),
+            Err(_) => ActiveBackend::Cloud(LlmClient::new("kilo-auto/free")),
         },
     };
     let mut tool_model_name = match &tool_client {
         ActiveBackend::Cloud(c) => c.model.clone(),
-        ActiveBackend::Ollama(_) => "qwen2.5:7b".to_string(),
+        ActiveBackend::Cloud(_) => "kilo-auto/free".to_string(),
     };
     let mut memory = MemoryStore::load();
     let mut prompt_history = PromptHistory::load();
 
-    // Self-analysis, tool evolution, and a separate ollama client for generative tools
+    // Self-analysis, tool evolution, and a separate llm client for generative tools
     let project_root = std::env::current_dir().unwrap_or_default();
     let analyzer = SelfAnalyzer::new(project_root.clone());
-    let tool_ollama = OllamaClient::new("ayesha");
+    let tool_llm = LlmClient::new("ayesha");
     let evolver = ToolEvolver::new(
         tool_defs::known_tool_names().into_iter().map(|s| s.to_string()).collect()
     );
@@ -785,7 +786,7 @@ async fn main() -> anyhow::Result<()> {
     theme::load_from_config(active_theme.as_deref());
 
     // Output enforcement (lowercase + emoji strip, code-fence aware).
-    // Default ON — mirrors the opencode lowercase-proxy. Disable with
+    // Default ON — mirrors the ayesha-os lowercase-proxy. Disable with
     // "lowercase_enforce": false in config.json if you need raw output.
     let enforce = config.get("lowercase_enforce").and_then(|v| v.as_bool()).unwrap_or(true);
     format::set_enabled(enforce);
@@ -851,6 +852,11 @@ async fn main() -> anyhow::Result<()> {
     // Enable raw mode for Ctrl+M detection
     let _ = crossterm::terminal::enable_raw_mode();
 
+    // Enable mouse capture once at startup — NOT in the input thread, to
+    // avoid a race where an old thread's DisableMouseCapture clobbers the
+    // new thread's capture when the input thread is recycled.
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture);
+
     // Steering channel: input thread sends keys here. The thread is poll-based
     // so it can be suspended while a foreground applet owns the terminal.
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
@@ -863,6 +869,7 @@ async fn main() -> anyhow::Result<()> {
         "joke", "time", "uptime", "config",
         "memory", "skills", "analyze", "evolve", "refine",
         "sessions", "resume", "newsession",
+        "ascii",
     ].into_iter().map(String::from).collect();
     for name in manager.names() {
         completion_candidates.push(name);
@@ -885,11 +892,11 @@ async fn main() -> anyhow::Result<()> {
     tools_arr.extend(plugin_registry.tool_definitions());
     let tools_payload = serde_json::Value::Array(tools_arr);
     let tools = streaming::tool_payload_slice(&tools_payload);
-    let mut vision_model = "llama3.2-vision".to_string();
+    let mut vision_model = "kilo-auto/free".to_string();
     ui::show_system(&format!("chat model: {} | tool model: {}", current_model, tool_model_name));
 
-    // Warm up ollama — preload local models into memory so first interaction is
-    // fast. Skipped when the default model is cloud (big pickle), which has no
+    // Warm up llm — preload local models into memory so first interaction is
+    // fast. Skipped when the default model is cloud (kilo-auto/free), which has no
     // local preload. Set "boot_warmup": false in config.json to disable entirely.
     let default_is_local = !registry.is_cloud_model(&current_model);
     if default_is_local && config.get("boot_warmup").and_then(|v| v.as_bool()).unwrap_or(true) {
@@ -903,12 +910,12 @@ async fn main() -> anyhow::Result<()> {
                 let (_, warmup_rx) = std::sync::mpsc::channel::<String>();
                 let _ = tokio::join!(
                     async {
-                        let client = OllamaClient::new("ayesha");
+                        let client = LlmClient::new("ayesha");
                         let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
                         let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
                     },
                     async {
-                        let client = OllamaClient::new(&tool_model);
+                        let client = LlmClient::new(&tool_model);
                         let msgs = vec![ChatMessage { role: "user".to_string(), content: "hi".to_string(), tool_calls: None, tool_call_id: None }];
                         let _ = client.chat_stream_collect(&msgs, None, &warmup_rx).await;
                     }
@@ -924,8 +931,8 @@ async fn main() -> anyhow::Result<()> {
     let mut input_mode = InputMode::Normal;
     let mut applet_cycle_idx: Option<usize> = None;
 
-    // Build the quick-switcher item list once at startup (all applets first,
-    // then all registered models); statuses refresh on each menu open.
+    // Build the quick-switcher item list once at startup (all applets only);
+    // statuses refresh on each menu open.
     let mut menu_items: Vec<ui::MenuItem> = Vec::new();
     {
         menu_items.push(ui::MenuItem {
@@ -951,20 +958,9 @@ async fn main() -> anyhow::Result<()> {
                 });
             }
         }
-        for m in &registry.models {
-            menu_items.push(ui::MenuItem {
-                name: m.name.clone(),
-                desc: model_backend_tag(m),
-                kind: ui::MenuItemKind::Model,
-                running: false,
-                active: m.name == current_model,
-                foreground: false,
-                ctx: Some(model_ctx_label(m.context_length)),
-            });
-        }
     }
 
-    // Pin status bar + input prompt to the bottom of the screen, opencode-style.
+    // Pin status bar + input prompt to the bottom of the screen, ayesha-os-style.
     ui::dock_init(&format!("{} | tool: {}", current_model, tool_model_name));
 
     loop {
@@ -1002,10 +998,10 @@ async fn main() -> anyhow::Result<()> {
             graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
             break;
         }
-        // Ctrl+M / Ctrl+P → open interactive quick switcher (applets + models)
+        // Ctrl+M / Ctrl+P → open interactive applet switcher
         if input == "\0ctrl-m" || input == "\0ctrl-p" {
             input_mode = InputMode::AppletMenu;
-            // Refresh applet running statuses (model rows are static)
+            // Refresh applet running statuses
             for item in menu_items.iter_mut() {
                 if item.kind != ui::MenuItemKind::Applet { continue; }
                 item.running = item.name == "engine" || manager.is_running(&item.name);
@@ -1071,10 +1067,6 @@ async fn main() -> anyhow::Result<()> {
                         if let Some(item) = filtered.get(menu_idx) {
                             if item.kind == ui::MenuItemKind::Applet {
                                 selected = Some(item.name.clone());
-                            } else {
-                                // Model row → switch model, then close the menu
-                                let name = item.name.clone();
-                                apply_model_switch(&mut registry, &mut current_model, &mut client, &name, &tool_model_name).await;
                             }
                         }
                         break;
@@ -1129,6 +1121,18 @@ async fn main() -> anyhow::Result<()> {
 
         // Ctrl+V → see what's on the clipboard (image or copied image file)
         if input == "\0paste-vision" || input.starts_with("\0paste-vision:") {
+            let effective_vision_model = if registry.has_vision(&vision_model) {
+                vision_model.clone()
+            } else {
+                let fallback = registry.models.iter()
+                    .find(|m| m.capabilities.contains(&model_registry::Capability::Vision))
+                    .map(|m| m.name.clone())
+                    .unwrap_or_else(|| "kilo-auto/free".to_string());
+                if fallback != vision_model {
+                    ui::show_system(&format!("auto-routing vision to: {}", fallback));
+                }
+                fallback
+            };
             let data_uri: Option<(String, String)> = if let Some(p) = input.strip_prefix("\0paste-vision:") {
                 vision::image_data_uri(&std::path::PathBuf::from(p))
                     .ok()
@@ -1151,7 +1155,7 @@ async fn main() -> anyhow::Result<()> {
 
             match data_uri {
                 Some((uri, label)) => {
-                    if let Some(steer) = run_vision(&registry, &vision_model, &uri, &label, "", &steer_rx).await {
+                    if let Some(steer) = run_vision(&registry, &effective_vision_model, &uri, &label, "", &steer_rx).await {
                         pending_input = Some(steer);
                     }
                 }
@@ -1199,660 +1203,15 @@ async fn main() -> anyhow::Result<()> {
 
         let lower = input.to_lowercase();
 
-        // ── meta-commands ──
+        // ── exit only ──
         match lower.as_str() {
             "exit" | "quit" | "q" => {
                 graceful_shutdown(&mut messages, &mut memory, &mut prompt_history, &mut manager, &project_root);
                 break;
             }
-            "help" | "h" | "?" => {
-                ui::print_help();
-                continue;
-            }
-            "clear" | "cls" => {
-                print!("\x1B[2J\x1B[1;1H");
-                std::io::stdout().flush()?;
-                ui::dock_redraw_bottom();
-                continue;
-            }
-            "reset" => {
-                messages = vec![
-                    ChatMessage {
-                        role: "system".to_string(),
-                        content: build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix),
-                        tool_calls: None,
-                        tool_call_id: None,
-                    },
-                ];
-                memory = MemoryStore::load();
-                ui::show_system("conversation history and memory cleared");
-                continue;
-            }
-            "models" => {
-                println!();
-                println!("{}", registry.list_models());
-                continue;
-            }
-            _ if lower == "auto" || lower.starts_with("auto ") => {
-                let enabled = !lower.contains("off") && !lower.contains("disable");
-                registry.set_auto_route(enabled);
-                ui::show_system(if enabled { "auto-routing enabled" } else { "auto-routing disabled" });
-                continue;
-            }
-            _ if lower == "mode" || lower.starts_with("mode ") => {
-                let arg = input.trim_start_matches("mode").trim();
-                if arg.is_empty() {
-                    ui::show_system(&format!(
-                        "mode: {} (plan = read-only research | build = full toolset | auto = agent decides)",
-                        current_mode.as_str()
-                    ));
-                    continue;
-                }
-                match Mode::from_str(arg) {
-                    Some(m) => {
-                        current_mode = m;
-                        manager.set_mode(m.as_str());
-                        messages[0].content =
-                            build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix);
-                        ui::show_system(&format!("mode set to {}", m.as_str()));
-                    }
-                    None => ui::show_error(&format!("unknown mode '{}' (plan | build | auto)", arg)),
-                }
-                continue;
-            }
-            "sync" => {
-                let (repo, branch, auto_push) = sync_config(&project_root);
-                ui::show_system(&format!("initiating tri-mind sync → {repo} ({branch})"));
-                let _ = std::process::Command::new("python")
-                    .args(["-m", "tri_mind_sync.cli", "sync"])
-                    .output();
-
-                if auto_push {
-                    let _ = std::process::Command::new("git")
-                        .args(["add", "."])
-                        .status();
-                    let _ = std::process::Command::new("git")
-                        .args(["commit", "-m", "ayesha-os: auto sync update"])
-                        .status();
-                    let push_status = std::process::Command::new("git")
-                        .args(["push", "origin", &branch])
-                        .status();
-
-                    match push_status {
-                        Ok(s) if s.success() => {
-                            ui::show_system(&format!("successfully pushed updates to https://github.com/{repo} ({branch}) (๑>◡<๑)"));
-                        }
-                        _ => {
-                            ui::show_error("git push failed (check authentication / branch).");
-                        }
-                    }
-                } else {
-                    ui::show_system("auto_push disabled in tri_mind_sync.json — skipped git push");
-                }
-
-                show_sync_state(&project_root);
-                continue;
-            }
-            _ if lower == "sync status" || lower.starts_with("sync status ") => {
-                show_sync_state(&project_root);
-                continue;
-            }
-            "apps" | "applets" => {
-                println!("\n{}", manager.list());
-                continue;
-            }
-            _ if lower.starts_with("run ") => {
-                let name = input[4..].trim();
-                if manager.has(name) {
-                    if manager.is_foreground(name) {
-                        match manager.run_in_window(name, &steer_tx, &steer_rx, &mut input_flag, &menu_flag) {
-                            Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", name)),
-                            Err(e) => ui::show_error(&e),
-                        }
-                    } else if manager.is_running(name) {
-                        ui::show_system(&format!("{} is already running", name));
-                    } else {
-                        match manager.launch(name) {
-                            Ok(()) => ui::show_system(&format!("launched {}", name)),
-                            Err(e) => ui::show_error(&e),
-                        }
-                    }
-                } else {
-                    ui::show_error(&format!("unknown applet: {}", name));
-                }
-                continue;
-            }
-            _ if lower.starts_with("stop ") => {
-                let name = input[5..].trim();
-                match manager.stop(name) {
-                    Ok(()) => ui::show_system(&format!("stopped {}", name)),
-                    Err(e) => ui::show_error(&e),
-                }
-                continue;
-            }
-            _ if lower.starts_with("model ") => {
-                let name = input[6..].trim();
-                apply_model_switch(&mut registry, &mut current_model, &mut client, name, &tool_model_name).await;
-                continue;
-            }
-            _ if lower.starts_with("toolmodel ") || lower == "toolmodel" => {
-                let name = input.get(10..).unwrap_or("").trim();
-                if registry.is_cloud_model(name) {
-                    let provider = registry.cloud_provider(name).unwrap_or_default();
-                    match CloudClient::new(name, &provider) {
-                        Ok(cc) => {
-                            tool_client = ActiveBackend::Cloud(cc);
-                            tool_model_name = name.to_string();
-                            ui::show_system(&format!("tool model: {} ({})", name, provider));
-                        }
-                        Err(e) => ui::show_error(&format!("cloud setup failed: {}", e)),
-                    }
-                } else if registry.models.iter().any(|m| m.name == name) {
-                    tool_client = ActiveBackend::Ollama(OllamaClient::new(name));
-                    tool_model_name = name.to_string();
-                    ui::show_system(&format!("tool model: {}", name));
-                } else {
-                    ui::show_error(&format!("model '{}' not found. use 'models' to list available models", name));
-                }
-                ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
-                continue;
-            }
-            _ if lower.starts_with("pull ") || lower == "pull" => {
-                let name = input.get(5..).unwrap_or("").trim();
-                ui::show_system(&format!("run `ollama pull {}` in another terminal, then `models` to refresh", name));
-                continue;
-            }
-            _ if lower == "visionmodels" => {
-                let mut names: Vec<String> = registry.models.iter()
-                    .filter(|m| m.capabilities.contains(&model_registry::Capability::Vision))
-                    .map(|m| m.name.clone())
-                    .collect();
-                names.sort();
-                println!("\n  {}  (current: {})", theme::bold(Role::Accent, "vision models"), vision_model);
-                for n in names {
-                    let arrow = if n == vision_model { " << active" } else { "" };
-                    println!("  {:<45}{}", n, arrow);
-                }
-                println!();
-                continue;
-            }
-            _ if lower.starts_with("visionmodel ") || lower == "visionmodel" => {
-                let name = input.get(12..).unwrap_or("").trim();
-                if name.is_empty() {
-                    ui::show_system(&format!("vision model: {}", vision_model));
-                } else {
-                    vision_model = name.to_string();
-                    ui::show_system(&format!("vision model set to: {}", vision_model));
-                }
-                continue;
-            }
-            _ if lower.starts_with("vision") => {
-                // /vision [path|--latest] [question...]
-                let rest = input.get(7..).unwrap_or("").trim();
-                let (path_arg, question) = if rest.is_empty() {
-                    (String::new(), String::new())
-                } else {
-                    let mut parts = rest.splitn(2, ' ');
-                    let p = parts.next().unwrap_or("").trim().to_string();
-                    (p, parts.next().unwrap_or("").trim().to_string())
-                };
-
-                let path = if path_arg.is_empty() || path_arg == "--latest" {
-                    match vision::latest_screenshot() {
-                        Ok(p) => p,
-                        Err(e) => {
-                            ui::show_error(&e.to_string());
-                            continue;
-                        }
-                    }
-                } else {
-                    std::path::PathBuf::from(&path_arg)
-                };
-
-                if !path.exists() {
-                    ui::show_error(&format!("image not found: {}", path.display()));
-                    continue;
-                }
-
-                let data_uri = match vision::image_data_uri(&path) {
-                    Ok(u) => u,
-                    Err(e) => {
-                        ui::show_error(&e.to_string());
-                        continue;
-                    }
-                };
-                if let Some(steer) = run_vision(&registry, &vision_model, &data_uri, &path.display().to_string(), &question, &steer_rx).await {
-                    pending_input = Some(steer);
-                }
-                continue;
-            }
-            _ if lower.starts_with("name ") || lower == "name" => {
-                let name = input.get(5..).unwrap_or("").trim().to_string();
-                if name.is_empty() {
-                    ui::show_system("usage: /name <you>");
-                } else {
-                    config["user_name"] = serde_json::json!(name);
-                    if let Ok(content) = serde_json::to_string_pretty(&config) {
-                        let _ = std::fs::write(&config_path, content);
-                    }
-                    if !messages.is_empty() {
-                        messages[0].content = build_system_prompt_full(&name, &project_root, current_mode, &plugin_suffix);
-                    }
-                    ui::show_system(&format!("okay, {} it is!", name));
-                }
-                continue;
-            }
-            _ if lower.starts_with("theme ") || lower == "theme" => {
-                let arg = input.get(6..).unwrap_or("").trim();
-                if arg.is_empty() {
-                    let current = theme::get().name.clone();
-                    println!("\n  {}", theme::bold(Role::Accent, format!("themes  (current: {})", current)));
-                    for name in theme::names() {
-                        let is_active = name == current;
-                        println!("  {} {}",
-                            theme::paint(if is_active { Role::Primary } else { Role::Dim },
-                                if is_active { "▶" } else { " " }),
-                            theme::paint(Role::Text, theme::render_swatch(name)));
-                    }
-                    println!();
-                } else {
-                    match theme::switch(arg) {
-                        Ok(t) => {
-                            config["theme"] = serde_json::json!(t.name);
-                            if let Ok(content) = serde_json::to_string_pretty(&config) {
-                                let _ = std::fs::write(&config_path, content);
-                            }
-                            ui::show_system(&format!("theme switched to {}", t.name));
-                        }
-                        Err(e) => ui::show_error(&e),
-                    }
-                }
-                continue;
-            }
-            "stats" => {
-                match executor.execute("get_tool_stats", &serde_json::json!({}), &mut ToolContext {
-                    memory: &mut memory, prompt_history: &mut prompt_history,
-                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
-                    backend: &client,
-                    project_root: &project_root, applet_manager: &mut manager,
-                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
-                    menu_flag: &menu_flag,
-                }).await {
-                    Ok(r) => println!("\n{}", r),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            _ if lower == "history" || lower.starts_with("history ") => {
-                let n: usize = input.get(7..).unwrap_or("").trim().parse().unwrap_or(10);
-                let recent = messages.iter().rev().take(n).rev();
-                for m in recent {
-                    let role = if m.role == "user" { "you" } else { "ayesha" };
-                    let preview: String = m.content.chars().take(100).collect();
-                    println!("  \x1b[90m{}\x1b[0m \x1b[36m{}\x1b[0m: {}{}", role,
-                        if m.role == "user" { "" } else { "" },
-                        preview,
-                        if m.content.chars().count() > 100 { "..." } else { "" });
-                }
-                continue;
-            }
-            "compact" => {
-                let before = messages.len();
-                // Keep system message + as many recent messages as fit cleanly
-                if messages.len() > 9 {
-                    let system = messages[0].clone();
-                    // Walk backwards to find a clean cut point (not in the middle of tool calls)
-                    let mut cut = messages.len();
-                    // Start from the end, count up to 8 messages
-                    let mut kept = 0;
-                    let mut i = messages.len();
-                    while i > 1 && kept < 8 {
-                        i -= 1;
-                        kept += 1;
-                        // If this is a tool result, skip all consecutive tool results
-                        // so we don't split a tool-call sequence
-                        if messages[i].role == "tool" {
-                            while i > 1 && messages[i - 1].role == "tool" {
-                                i -= 1;
-                                kept += 1;
-                            }
-                            // Also include the preceding assistant with tool_calls
-                            if i > 1 && messages[i - 1].tool_calls.is_some() {
-                                i -= 1;
-                                kept += 1;
-                            }
-                        }
-                    }
-                    cut = i;
-                    let recent: Vec<_> = messages[cut..].to_vec();
-                    messages.clear();
-                    messages.push(system);
-                    messages.extend(recent);
-                    ui::show_system(&format!("compacted: {} → {} messages (kept system + last {})", before, messages.len(), kept));
-                } else {
-                    ui::show_system(&format!("already compact ({} messages)", before));
-                }
-                continue;
-            }
-            _ if lower == "save" || lower.starts_with("save ") => {
-                let path_str = input.get(5..).unwrap_or("").trim();
-                let path = if path_str.is_empty() {
-                    project_root.join("conversation.json")
-                } else {
-                    std::path::PathBuf::from(path_str)
-                };
-                match serde_json::to_string_pretty(&messages) {
-                    Ok(json) => {
-                        if let Err(e) = std::fs::write(&path, json) {
-                            ui::show_error(&format!("failed to save: {}", e));
-                        } else {
-                            ui::show_system(&format!("saved {} messages to {}", messages.len(), path.display()));
-                        }
-                    }
-                    Err(e) => ui::show_error(&format!("serialize error: {}", e)),
-                }
-                continue;
-            }
-            _ if lower == "load" || lower.starts_with("load ") => {
-                let path_str = input.get(5..).unwrap_or("").trim();
-                let path = if path_str.is_empty() {
-                    project_root.join("conversation.json")
-                } else {
-                    std::path::PathBuf::from(path_str)
-                };
-                match std::fs::read_to_string(&path) {
-                    Ok(json) => {
-                        match serde_json::from_str::<Vec<ChatMessage>>(&json) {
-                            Ok(loaded) => {
-                                let n = loaded.len();
-                                messages = loaded;
-                                ui::show_system(&format!("loaded {} messages from {}", n, path.display()));
-                            }
-                            Err(e) => ui::show_error(&format!("parse error: {}", e)),
-                        }
-                    }
-                    Err(e) => ui::show_error(&format!("read error: {}", e)),
-                }
-                continue;
-            }
-            "sessions" => {
-                let names = session::list_sessions(&project_root);
-                if names.is_empty() {
-                    ui::show_system("no saved sessions yet");
-                } else {
-                    println!("\n  {}", theme::bold(Role::Accent, "sessions:"));
-                    for name in names {
-                        let file = std::path::Path::new(&project_root)
-                            .join(session::SESSION_DIR)
-                            .join(format!("{name}.json"));
-                        let msgs = session::load_session(&project_root, &name)
-                            .map(|m| m.len().saturating_sub(1))
-                            .unwrap_or(0);
-                        let mtime = file.metadata()
-                            .and_then(|m| m.modified())
-                            .map(|t| {
-                                let d = std::time::SystemTime::now()
-                                    .duration_since(t)
-                                    .map(|x| x.as_secs())
-                                    .unwrap_or(0);
-                                format!("{}s ago", d)
-                            })
-                            .unwrap_or_else(|_| "?".to_string());
-                        let is_default = name == session::DEFAULT_SESSION;
-                        println!("  {} {}  ({} msgs, {})",
-                            theme::paint(if is_default { Role::Primary } else { Role::Dim },
-                                if is_default { "▶" } else { " " }),
-                            theme::paint(Role::Text, &name),
-                            msgs,
-                            mtime);
-                    }
-                    println!();
-                }
-                continue;
-            }
-            _ if lower == "resume" || lower.starts_with("resume ") => {
-                let name = input.get(7..).unwrap_or("").trim();
-                let name = if name.is_empty() { session::DEFAULT_SESSION } else { name };
-                match session::load_session(&project_root, name) {
-                    Ok(saved) => {
-                        let n = saved.len().saturating_sub(1);
-                        messages.clear();
-                        messages.push(ChatMessage {
-                            role: "system".to_string(),
-                            content: build_system_prompt_full(&user_name, &project_root, current_mode, &plugin_suffix),
-                            tool_calls: None,
-                            tool_call_id: None,
-                        });
-                        messages.extend(saved.into_iter().skip(1));
-                        ui::show_system(&format!("resumed session '{}' ({} messages)", name, n));
-                    }
-                    Err(e) => ui::show_error(&format!("no session '{}': {}", name, e)),
-                }
-                continue;
-            }
-            "newsession" => {
-                let kept = messages.len();
-                messages.truncate(1);
-                ui::show_system(&format!("started a new session (dropped {} messages)", kept.saturating_sub(1)));
-                continue;
-            }
-            "system" => {
-                if !messages.is_empty() {
-                    println!("\n{}", theme::bold(Role::Warning, "System Prompt:"));
-                    for line in messages[0].content.lines() {
-                        println!("  {}", theme::paint(Role::Dim, line));
-                    }
-                } else {
-                    ui::show_system("no system prompt loaded");
-                }
-                continue;
-            }
-            _ if lower == "export" || lower.starts_with("export ") => {
-                let path_str = input.get(7..).unwrap_or("").trim();
-                let path = if path_str.is_empty() {
-                    project_root.join("conversation.md")
-                } else {
-                    std::path::PathBuf::from(path_str)
-                };
-                let mut md = String::from("# ayesha conversation\n\n");
-                for m in &messages {
-                    if m.role == "system" { continue; }
-                    let role = if m.role == "user" { "## you" } else { "## ayesha" };
-                    md.push_str(&format!("{}\n\n{}\n\n", role, m.content));
-                }
-                match std::fs::write(&path, &md) {
-                    Ok(()) => ui::show_system(&format!("exported {} messages to {}", messages.len().saturating_sub(1), path.display())),
-                    Err(e) => ui::show_error(&format!("write error: {}", e)),
-                }
-                continue;
-            }
-            "ping" => {
-                use std::time::Instant;
-                let start = Instant::now();
-                let test_msgs = vec![ChatMessage {
-                    role: "user".to_string(),
-                    content: "ping".to_string(),
-                    tool_calls: None,
-                    tool_call_id: None,
-                }];
-                match client.chat_stream_collect(&test_msgs, None, &steer_rx).await {
-                    Ok(_) => {
-                        let elapsed = start.elapsed().as_millis();
-                        ui::show_system(&format!("pong! {}ms (model: {})", elapsed, current_model));
-                    }
-                    Err(e) => ui::show_error(&format!("ping failed: {}", e)),
-                }
-                continue;
-            }
-            "joke" => {
-                let jokes = [
-                    "why do programmers prefer dark mode? because light attracts bugs.",
-                    "there are 10 types of people in the world: those who understand binary and those who don't.",
-                    "a sql query walks into a bar, walks up to two tables and asks: 'can i join you?'",
-                    "why was the javascript developer sad? because he didn't node how to express himself.",
-                    "what's a programmer's favorite hangout place? foo bar.",
-                    "why do java developers wear glasses? because they can't c#.",
-                    "how many programmers does it take to change a light bulb? none — that's a hardware problem.",
-                    "what is a robot's favorite type of music? heavy metal.",
-                    "why did the developer go broke? because he used up all his cache.",
-                    "what's a computer's least favorite food? spam.",
-                ];
-                let joke = {
-                    use std::collections::hash_map::RandomState;
-                    use std::hash::{BuildHasher, Hasher};
-                    let key = RandomState::new().build_hasher().finish();
-                    jokes[key as usize % jokes.len()]
-                };
-                println!("\n  {}", theme::paint(Role::Secondary, joke));
-                continue;
-            }
-            "time" => {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                // Simple UTC time display
-                let hours = (now / 3600) % 24;
-                let mins = (now / 60) % 60;
-                let secs = now % 60;
-                ui::show_system(&format!("utc time: {:02}:{:02}:{:02}", hours, mins, secs));
-                continue;
-            }
-            "uptime" => {
-                let elapsed = session_start.elapsed();
-                let secs = elapsed.as_secs();
-                let hours = secs / 3600;
-                let mins = (secs % 3600) / 60;
-                let secs = secs % 60;
-                ui::show_system(&format!("uptime: {}h {}m {}s", hours, mins, secs));
-                continue;
-            }
-            _ if lower == "config" || lower.starts_with("config ") => {
-                let key = input.get(7..).unwrap_or("").trim();
-                if key.is_empty() {
-                    println!("\n{}", theme::bold(Role::Warning, "Configuration:"));
-                    println!("  user_name: {}", config.get("user_name").and_then(|v| v.as_str()).unwrap_or("(not set)"));
-                    println!("  tool_model: {}", tool_model_name);
-                    println!("  chat_model: {}", current_model);
-                    println!("  config_path: {}", config_path.display());
-                } else {
-                    let parts: Vec<&str> = key.splitn(2, '=').collect();
-                    if parts.len() == 2 {
-                        let k = parts[0].trim();
-                        let v = parts[1].trim();
-                        config[k] = serde_json::json!(v);
-                        if let Ok(content) = serde_json::to_string_pretty(&config) {
-                            let _ = std::fs::write(&config_path, content);
-                        }
-                        ui::show_system(&format!("set {} = {}", k, v));
-                    } else {
-                        let val = config.get(key).map(|v| v.to_string()).unwrap_or("(not found)".to_string());
-                        println!("  {} = {}", theme::paint(Role::Accent, key), theme::paint(Role::Text, val));
-                    }
-                }
-                continue;
-            }
-            "memory" => {
-                match executor.execute("list_memories", &serde_json::json!({}), &mut ToolContext {
-                    memory: &mut memory, prompt_history: &mut prompt_history,
-                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
-                    backend: &client,
-                    project_root: &project_root, applet_manager: &mut manager,
-                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
-                    menu_flag: &menu_flag,
-                }).await {
-                    Ok(r) => println!("\n{}", r),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "skills" => {
-                match executor.execute("list_skills", &serde_json::json!({}), &mut ToolContext {
-                    memory: &mut memory, prompt_history: &mut prompt_history,
-                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
-                    backend: &client,
-                    project_root: &project_root, applet_manager: &mut manager,
-                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
-                    menu_flag: &menu_flag,
-                }).await {
-                    Ok(r) => println!("\n{}", r),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "analyze" => {
-                match executor.execute("analyze_self", &serde_json::json!({}), &mut ToolContext {
-                    memory: &mut memory, prompt_history: &mut prompt_history,
-                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
-                    backend: &client,
-                    project_root: &project_root, applet_manager: &mut manager,
-                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
-                    menu_flag: &menu_flag,
-                }).await {
-                    Ok(r) => println!("\n{}", r),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "evolve" => {
-                match executor.execute("evolve_tools", &serde_json::json!({}), &mut ToolContext {
-                    memory: &mut memory, prompt_history: &mut prompt_history,
-                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
-                    backend: &client,
-                    project_root: &project_root, applet_manager: &mut manager,
-                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
-                    menu_flag: &menu_flag,
-                }).await {
-                    Ok(r) => println!("\n{}", r),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            "refine" => {
-                match executor.execute("refine_prompt", &serde_json::json!({}), &mut ToolContext {
-                    memory: &mut memory, prompt_history: &mut prompt_history,
-                    analyzer: &analyzer, evolver: &evolver, ollama: &tool_ollama,
-                    backend: &client,
-                    project_root: &project_root, applet_manager: &mut manager,
-                    steer_tx: &steer_tx, steer_rx: &steer_rx, input_flag: &mut input_flag,
-                    menu_flag: &menu_flag,
-                }).await {
-                    Ok(r) => println!("\n{}", r),
-                    Err(e) => ui::show_error(&e.to_string()),
-                }
-                continue;
-            }
-            _ => {
-                // If it was a slash command, check applet short names
-                if was_slash && manager.has(&input) {
-                    if manager.is_foreground(&input) {
-                        match manager.run_in_window(&input, &steer_tx, &steer_rx, &mut input_flag, &menu_flag) {
-                            Ok(()) => ui::show_system(&format!("returned from {} — press ctrl+p to switch pages again", input)),
-                            Err(e) => ui::show_error(&e),
-                        }
-                    } else if manager.is_running(&input) {
-                        match manager.stop(&input) {
-                            Ok(()) => ui::show_system(&format!("stopped {}", input)),
-                            Err(e) => ui::show_error(&e),
-                        }
-                    } else {
-                        match manager.launch(&input) {
-                            Ok(()) => ui::show_system(&format!("launched {}", input)),
-                            Err(e) => ui::show_error(&e),
-                        }
-                    }
-                    continue;
-                }
-            }
+            _ => {}
         }
-
-        // After match, if was_slash but no command matched, show error
-        // (route is handled below the match block, so exclude it here)
-        if was_slash && !lower.starts_with("route ") && !lower.starts_with("routes ") {
-            ui::show_error(&format!("unknown command: /{}. type /help", input));
-            continue;
-        }
-
+        let is_ascii_cmd = lower == "ascii" || lower.starts_with("ascii ");
         // ── natural-language applet phrases (no model round-trip) ──
         // "launch flora cli", "open hivebeat", "stop flora-cli", etc.
         if let Some((name, is_stop)) = parse_applet_phrase(&manager.names(), &input) {
@@ -1867,8 +1226,24 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        // ── route (handle `route <query>` prefix) ──
-        let user_content = if lower.starts_with("route ") {
+        // ── ascii art shortcut (no model round-trip for bare `ascii`) ──
+        let user_content = if is_ascii_cmd {
+            let subject = if lower == "ascii" {
+                "ayesha".to_string()
+            } else {
+                input[6..].trim().to_string()
+            };
+            if subject.is_empty() {
+                ui::show_system("usage: ascii <subject> — display ascii art of something (e.g. ascii cat)");
+                continue;
+            }
+            format!(
+                "generate a large, detailed ASCII art piece of a {subject}. \
+                use depth, shading, and character detail as a master of ascii art. \
+                output ONLY the ascii art, nothing else — no commentary, no explanation."
+            )
+        } else if lower.starts_with("route ") {
+            // ── route (handle `route <query>` prefix) ──
             let query = input[6..].trim().to_string();
             let target = registry.select_model(&query);
             if target.name != current_model {
@@ -1878,13 +1253,13 @@ async fn main() -> anyhow::Result<()> {
                     let provider = registry.cloud_provider(&current_model).unwrap_or_default();
                     match CloudClient::new(&current_model, &provider) {
                         Ok(cc) => client = ActiveBackend::Cloud(cc),
-                        Err(_) => client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                        Err(_) => client = match CloudClient::new("kilo-auto/free", "kilo") {
                             Ok(cc) => ActiveBackend::Cloud(cc),
-                            Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                            Err(_) => ActiveBackend::Cloud(LlmClient::new("ayesha")),
                         },
                     }
                 } else {
-                    client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
+                    client = ActiveBackend::Cloud(LlmClient::new(&current_model));
                 }
                 ui::dock_status(&format!("{} | tool: {}", current_model, tool_model_name));
             }
@@ -1904,13 +1279,13 @@ async fn main() -> anyhow::Result<()> {
                     let provider = registry.cloud_provider(&current_model).unwrap_or_default();
                     match CloudClient::new(&current_model, &provider) {
                         Ok(cc) => client = ActiveBackend::Cloud(cc),
-                        Err(_) => client = match CloudClient::new("opencode/big-pickle", "opencode") {
+                        Err(_) => client = match CloudClient::new("kilo-auto/free", "kilo") {
                             Ok(cc) => ActiveBackend::Cloud(cc),
-                            Err(_) => ActiveBackend::Ollama(OllamaClient::new("ayesha")),
+                            Err(_) => ActiveBackend::Cloud(LlmClient::new("ayesha")),
                         },
                     }
                 } else {
-                    client = ActiveBackend::Ollama(OllamaClient::new(&current_model));
+                    client = ActiveBackend::Cloud(LlmClient::new(&current_model));
                 }
             }
         }
@@ -2069,7 +1444,7 @@ async fn main() -> anyhow::Result<()> {
                         prompt_history: &mut prompt_history,
                         analyzer: &analyzer,
                         evolver: &evolver,
-                    ollama: &tool_ollama,
+                    llm: &tool_llm,
                     backend: &client,
                     project_root: &project_root,
                         applet_manager: &mut manager,
@@ -2188,10 +1563,10 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        // Step 2: If ayesha didn't call tools, check if qwen2.5 would
+        // Step 2: If ayesha didn't call tools, check if kilo-auto/free would
         // Skip for pure-chit-chat to save ~2s latency per message.
         if !steer_happened && !first_had_tools && needs_tools {
-            // Try qwen2.5 with tools to see if it wants to call any
+            // Try kilo-auto/free with tools to see if it wants to call any
             // (invisible — tool model deliberation is not shown to user)
             // IMPORTANT: strip ayesha's system prompt ("never output tool calls")
             // and replace with a tool-friendly instruction for the tool model.
@@ -2366,7 +1741,7 @@ async fn main() -> anyhow::Result<()> {
                                     prompt_history: &mut prompt_history,
                                     analyzer: &analyzer,
                                     evolver: &evolver,
-                        ollama: &tool_ollama,
+                        llm: &tool_llm,
                         backend: &client,
                         project_root: &project_root,
                                     applet_manager: &mut manager,
@@ -2451,7 +1826,7 @@ async fn main() -> anyhow::Result<()> {
                             break;
                         }
 
-                        // Re-prompt qwen2.5 for next tool calls (invisible)
+                        // Re-prompt kilo-auto/free for next tool calls (invisible)
                         let tool_messages2: Vec<ChatMessage> = messages.iter().enumerate().filter_map(|(i, m)| {
                             if i == 0 && m.role == "system" {
                                 Some(ChatMessage {
@@ -2596,9 +1971,9 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
     let mut manager = AppletManager::new();
     let sandbox = Sandbox::default_workspace().with_sandbox(manager.sandbox);
     let executor = ToolExecutor::new(sandbox.clone());
-    let client = OllamaClient::new("ayesha");
-    let tool_client = OllamaClient::new("qwen2.5:7b");
-    let backend = ActiveBackend::Ollama(client.clone());
+    let client = LlmClient::new("ayesha");
+    let tool_client = LlmClient::new("kilo-auto/free");
+    let backend = ActiveBackend::Cloud(client.clone());
     let tools = tool_defs::tool_definitions_core();
     let tools = streaming::tool_payload_slice(&tools);
     let (steer_tx, steer_rx) = std::sync::mpsc::channel::<String>();
@@ -2633,7 +2008,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
         prompt_history: &mut prompt_history,
         analyzer: &analyzer,
         evolver: &evolver,
-        ollama: &client,
+        llm: &client,
         backend: &backend,
         project_root: &project_root,
         applet_manager: &mut manager,
@@ -2684,7 +2059,7 @@ async fn run_headless(message: &str) -> anyhow::Result<()> {
     }
 }
 
-/// Headless E2E smoke test — verifies ollama is reachable, both models respond,
+/// Headless E2E smoke test — verifies llm is reachable, both models respond,
 /// and basic tool execution works. Called via `ayesha-os --selftest`.
 async fn selftest() -> anyhow::Result<()> {
     let mut pass = 0u32;
@@ -2703,17 +2078,17 @@ async fn selftest() -> anyhow::Result<()> {
 
     println!("\n  \x1b[36m◆ ayesha-os selftest\x1b[0m\n");
 
-    // 1. Ollama reachable
-    let ollama_ok = OllamaClient::list_models().await.is_ok();
-    check("ollama reachable at localhost:11434", ollama_ok, &mut checks);
+    // 1. Cloud reachable
+    let llm_ok = LlmClient::list_models().await.is_ok();
+    check("llm reachable at kilo gateway", llm_ok, &mut checks);
 
-    if !ollama_ok {
-        println!("\n  \x1b[31mobort: ollama not reachable\x1b[0m\n");
+    if !llm_ok {
+        println!("\n  \x1b[31mobort: llm not reachable\x1b[0m\n");
         std::process::exit(1);
     }
 
     // 2. Ayesha model responds
-    let ayesha = OllamaClient::new("ayesha");
+    let ayesha = LlmClient::new("ayesha");
     let (_, rx) = std::sync::mpsc::channel::<String>();
     let msgs = vec![ChatMessage {
         role: "user".to_string(),
@@ -2732,11 +2107,11 @@ async fn selftest() -> anyhow::Result<()> {
     );
 
     // 3. Qwen model responds
-    let qwen = OllamaClient::new("qwen2.5:7b");
+    let qwen = LlmClient::new("kilo-auto/free");
     let qwen_resp = qwen.chat_stream_collect(&msgs, None, &rx).await;
     let qwen_ok = qwen_resp.as_ref().map(|r| !r.content.is_empty()).unwrap_or(false);
     check(
-        &format!("qwen2.5 model responds{}", if let Err(e) = &qwen_resp {
+        &format!("kilo-auto/free model responds{}", if let Err(e) = &qwen_resp {
             format!(" (error: {})", e)
         } else { String::new() }),
         qwen_ok,
@@ -2759,7 +2134,7 @@ async fn selftest() -> anyhow::Result<()> {
     let qwen_tool_resp = qwen.chat_stream_collect(&tool_msgs, Some(tools), &rx).await;
     let qwen_tool_ok = qwen_tool_resp.as_ref().map(|r| r.has_tool_calls()).unwrap_or(false);
     check(
-        &format!("qwen2.5 emits tool_calls{}", if let Err(e) = &qwen_tool_resp {
+        &format!("kilo-auto/free emits tool_calls{}", if let Err(e) = &qwen_tool_resp {
             format!(" (error: {})", e)
         } else { String::new() }),
         qwen_tool_ok,
@@ -2771,7 +2146,7 @@ async fn selftest() -> anyhow::Result<()> {
     check("truncate_chars works", trunc_ok, &mut checks);
 
     // 7. Shared stream decoders work
-    let mut decoder = streaming::OllamaDecoder::new();
+    let mut decoder = streaming::CloudDecoder::new();
     let events = decoder.feed(
         br#"{"message":{"content":"test"},"done":false}
 {"message":{"content":" ok"},"done":false}
@@ -2843,24 +2218,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn model_switch_rebuilds_ollama_client() {
+    async fn model_switch_rebuilds_llm_client() {
         let mut registry = ModelRegistry::new();
-        let mut current_model = "opencode/big-pickle".to_string();
-        let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
-        apply_model_switch(&mut registry, &mut current_model, &mut client, "qwen2.5:7b", "qwen2.5:7b").await;
-        assert_eq!(current_model, "qwen2.5:7b");
-        assert!(matches!(client, ActiveBackend::Ollama(_)));
-        assert!(registry.models.iter().any(|m| m.name == "qwen2.5:7b"));
+        let mut current_model = "kilo-auto/free".to_string();
+        let mut client = ActiveBackend::Cloud(LlmClient::new("ayesha"));
+        apply_model_switch(&mut registry, &mut current_model, &mut client, "kilo-auto/free", "kilo-auto/free").await;
+        assert_eq!(current_model, "kilo-auto/free");
+        assert!(matches!(client, ActiveBackend::Cloud(_)));
+        assert!(registry.models.iter().any(|m| m.name == "kilo-auto/free"));
     }
 
     #[tokio::test]
     async fn model_switch_unknown_model_keeps_current() {
         let mut registry = ModelRegistry::new();
-        let mut current_model = "opencode/big-pickle".to_string();
-        let mut client = ActiveBackend::Ollama(OllamaClient::new("ayesha"));
-        apply_model_switch(&mut registry, &mut current_model, &mut client, "no-such-model", "qwen2.5:7b").await;
-        assert_eq!(current_model, "opencode/big-pickle");
-        assert!(matches!(client, ActiveBackend::Ollama(_)));
+        let mut current_model = "kilo-auto/free".to_string();
+        let mut client = ActiveBackend::Cloud(LlmClient::new("ayesha"));
+        apply_model_switch(&mut registry, &mut current_model, &mut client, "no-such-model", "kilo-auto/free").await;
+        assert_eq!(current_model, "kilo-auto/free");
+        assert!(matches!(client, ActiveBackend::Cloud(_)));
     }
 
     #[test]

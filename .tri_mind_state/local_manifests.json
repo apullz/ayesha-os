@@ -47,22 +47,6 @@
     "source": "local",
     "status": "synced"
   },
-  "opencode.json": {
-    "rel_path": "opencode.json",
-    "size": 332,
-    "modified_at": "2026-07-29T14:37:35.114184",
-    "sha256": "f207f078f4eb2a207d7b7492a194ff6b3dd611ca2d664d17a33f3f45a9d07476",
-    "source": "local",
-    "status": "synced"
-  },
-  "progress.json": {
-    "rel_path": "progress.json",
-    "size": 1357,
-    "modified_at": "2026-07-26T11:29:40.375168",
-    "sha256": "9b7ccec07f90fdd3122fe3ee7d18933285621862ffade9279c8edc1db883a73b",
-    "source": "local",
-    "status": "synced"
-  },
   "README.md": {
     "rel_path": "README.md",
     "size": 11708,
@@ -76,22 +60,6 @@
     "size": 5586,
     "modified_at": "2026-08-01T19:03:32.398417",
     "sha256": "f5886e24f8eb8c727b839d4880cb55a7b1ec6bf892f0661e3871f0b8738f2562",
-    "source": "local",
-    "status": "synced"
-  },
-  "test-output.txt": {
-    "rel_path": "test-output.txt",
-    "size": 616,
-    "modified_at": "2026-08-01T06:47:37.393171",
-    "sha256": "27c591465b2108118ae4bd13fa43019b736401f0158f7b894ba1fa4eea9eaa79",
-    "source": "local",
-    "status": "synced"
-  },
-  "tri_mind_sync.json": {
-    "rel_path": "tri_mind_sync.json",
-    "size": 1010,
-    "modified_at": "2026-08-04T20:34:05.044577",
-    "sha256": "dd9aa0cacf81d192b31ecee8eccbce99baa0dafd5a711b03dba2eb1b9b10dd99",
     "source": "local",
     "status": "synced"
   },

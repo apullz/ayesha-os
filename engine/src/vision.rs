@@ -1,5 +1,5 @@
 //! Image vision — lets ayesha "see" screenshots and image files using a
-//! vision-capable model (local ollama like llama3.2-vision, or any cloud
+//! vision-capable model (local llm like kilo-auto/free, or any cloud
 //! OpenAI-compatible vision model such as cloudflare / gpt-4o / grok-4).
 
 use anyhow::Result;
@@ -7,7 +7,7 @@ use base64::Engine;
 use std::path::{Path, PathBuf};
 
 use crate::cloud::CloudClient;
-use crate::ollama::OllamaClient;
+use crate::llm::LlmClient;
 
 /// Convert an image file into a data URI (`data:<mime>;base64,...`) ready for
 /// OpenAI-compatible image_url content parts.
@@ -108,14 +108,14 @@ pub fn latest_screenshot() -> Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("no screenshots found in {}", dir.display()))
 }
 
-/// Stream a vision description from a local ollama vision model.
-pub async fn describe_ollama(
+/// Stream a vision description from a local llm vision model.
+pub async fn describe_llm(
     model: &str,
     data_uri: &str,
     prompt: &str,
     steer_rx: &std::sync::mpsc::Receiver<String>,
-) -> Result<crate::ollama::StreamResult> {
-    OllamaClient::new(model)
+) -> Result<crate::llm::StreamResult> {
+    LlmClient::new(model)
         .chat_with_image(prompt, data_uri, steer_rx)
         .await
 }
@@ -127,7 +127,7 @@ pub async fn describe_cloud(
     data_uri: &str,
     prompt: &str,
     steer_rx: &std::sync::mpsc::Receiver<String>,
-) -> Result<crate::ollama::StreamResult> {
+) -> Result<crate::llm::StreamResult> {
     CloudClient::new(model, provider)?
         .chat_with_image(prompt, data_uri, steer_rx)
         .await
@@ -144,7 +144,7 @@ pub fn describe_prompt(question: &str) -> String {
 
 /// Default vision model preference chain: [user-selected or local, cloudflare, gpt-4o]
 pub const DEFAULT_FALLBACKS: &[(&str, &str)] = &[
-    ("llama3.2-vision", "ollama"),
+    ("kilo-auto/free", "llm"),
     ("@cf/meta/llama-3.2-11b-vision-instruct", "cloudflare"),
     ("gpt-4o", "github"),
 ];

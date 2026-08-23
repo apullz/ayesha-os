@@ -33,7 +33,11 @@ const BANNER_LINES: &[&str] = &[
 
 /// Rows the banner occupies. Must match `banner_lines()` exactly: 8 logo
 /// lines + blank + version + system online + separator + blank.
-pub const BANNER_HEIGHT: u16 = 13;
+/// Rows the banner occupies. Derived from banner_lines() so it can
+/// never drift apart from the actual content.
+pub fn banner_height() -> u16 {
+    banner_lines().len() as u16
+}
 
 /// Render the banner (rainbow logo + themed info lines) as display lines.
 /// Shared by the plain startup print and the docked top-pinned redraw so
@@ -60,8 +64,10 @@ pub fn banner_lines() -> Vec<String> {
     lines.push(format!("  {} {}",
         theme::paint(Role::Dim, "  system online"),
         theme::paint(Role::Accent, "(๑蔷๑)")));
+    // Dynamically sized separator: fill the terminal width minus indent.
+    let sep_len = terminal_cols().saturating_sub(2).max(10);
     lines.push(format!("  {}",
-        theme::paint(Role::Dim, "──────────────────────────────────────────────")));
+        theme::paint(Role::Dim, "─".repeat(sep_len))));
     lines.push(String::new());
     lines
 }
@@ -91,7 +97,8 @@ const TOOL_BOX_WIDTH: usize = 78;
 /// The tool box needs the 2-space indent + both rails on top of
 /// `TOOL_BOX_WIDTH`, so a hardcoded 78 overflowed on 80-col terminals and
 /// wrapped the panel — one of the "layout buggy" desyncs. Shrink to fit.
-fn tool_box_width() -> usize {
+/// Also used by the code-panel renderer so both panels match.
+pub(crate) fn tool_box_width() -> usize {
     TOOL_BOX_WIDTH.min(terminal_cols().saturating_sub(6).max(20))
 }
 
@@ -392,7 +399,7 @@ fn pad_cells(s: &str, width: usize) -> String {
 
 fn tool_box_line(content: &str, color: Role) -> String {
     let t = truncate_cells(content, tool_box_width());
-    // opencode renders tool/file content in syntax colors, not flat dim
+    // ayesha-os renders tool/file content in syntax colors, not flat dim
     let highlighted = syntax::highlight_line(&t);
     let pad = tool_box_width().saturating_sub(visible_cells(&highlighted));
     let padded = format!("{highlighted}{}", " ".repeat(pad));
@@ -445,7 +452,7 @@ pub fn show_error(msg: &str) {
         theme::paint(Role::Error, msg)));
 }
 
-/// Echo the user's message opencode-style: a solid pink accent bar, then the
+/// Echo the user's message ayesha-os-style: a solid pink accent bar, then the
 /// message text on a raised panel, wrapped at a readable width.
 pub fn show_user_msg(msg: &str) {
     convo_write(&format_user_msg(msg));
@@ -517,10 +524,15 @@ fn format_user_msg_w(msg: &str, content_w: usize) -> String {
         }
         out.push('\n');
     }
+    // Accent underline below the card — always drawn so every user message
+    // gets a consistent visual separator (was missing on some messages).
+    let bar_w = content_w + 1; // matches the body width (pad + 2 spaces − 1)
+    out.push_str(&format!("  {}\n",
+        theme::paint(Role::Primary, "─".repeat(bar_w))));
     out
 }
 
-/// Thin dim separator between turns, opencode-style.
+/// Thin dim separator between turns, ayesha-os-style.
 pub fn show_turn_separator() {
     convo_line(&format!("  {}",
         theme::paint(Role::Primary, "─".repeat(38))));
@@ -537,7 +549,7 @@ pub fn show_processing() {
 #[allow(dead_code)]
 pub fn hide_processing() {
     print!("\r");
-    for _ in 0..40 { print!(" "); }
+    for _ in 0..terminal_cols().min(80) { print!(" "); }
     print!("\r");
     stdout().flush().ok();
 }
@@ -600,7 +612,7 @@ pub fn menu_prompt() {
     stdout().flush().ok();
 }
 
-// ── docked bottom prompt (opencode-style) ──────────────────
+// ── docked bottom prompt (ayesha-os-style) ──────────────────
 // The conversation scrolls inside a DECSTBM region (rows 1..h-2) while the
 // status bar (row h-1) and the input line (row h) stay pinned to the bottom.
 
@@ -612,22 +624,22 @@ fn dock_status_slot() -> &'static std::sync::RwLock<String> {
 }
 
 /// Dock geometry as 1-based row numbers, or None when the terminal is too
-/// small (banner + conversation + status + prompt can't all fit) — callers
-/// then fall back to plain prompt behaviour.
+/// small (banner + conversation + padding + status + prompt can't all fit)
+/// — callers then fall back to plain prompt behaviour.
 fn dock_geometry() -> Option<(u16, u16, u16, u16)> {
     let (_, rows) = crossterm::terminal::size().ok()?;
-    if rows <= 5 {
+    if rows <= 7 {
         return None;
     }
-    let region_top = BANNER_HEIGHT + 1;
-    let region_bottom = rows.saturating_sub(2);
+    let region_top = banner_height() + 1;
+    let region_bottom = rows.saturating_sub(3); // leave a blank row before the status bar
     if region_top > region_bottom {
         return None;
     }
     Some((region_top, region_bottom, rows - 1, rows)) // (region_top, region_bottom, status_row, input_row)
 }
 
-/// Redraw the rainbow banner at the top of the screen (rows 1..BANNER_HEIGHT).
+/// Redraw the rainbow banner at the top of the screen (rows 1..banner_height()).
 /// Keeps it pinned there: it lives above the DECSTBM scroll region, so
 /// conversation output scrolls beneath it and `/clear` can restore it.
 /// Lines are clipped to the terminal width so a narrow window can't wrap
@@ -661,9 +673,18 @@ fn render_status(status: &str) -> String {
 /// prompt. Call once after the startup banner.
 pub fn dock_init(status: &str) {
     let _ = dock_status_slot().write().map(|mut s| { *s = status.to_string(); });
-    // ask the terminal to use the theme's background colour (opencode-style)
-    let bg_hex = theme::get().hex(Role::Background).to_string();
-    print!("\x1b]11;{}\x07", bg_hex);
+    // only set terminal bg colour on terminals known to handle OSC 11
+    let term_prog = std::env::var("TERM_PROGRAM").unwrap_or_default();
+    let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+    let term = std::env::var("TERM").unwrap_or_default();
+    let capable = colorterm.contains("truecolor") || colorterm.contains("24bit")
+        || term_prog.contains("iTerm") || term_prog.contains("WindowsTerminal")
+        || term_prog.contains("mintty") || term_prog.contains("WezTerm")
+        || term.contains("256color");
+    if capable {
+        let bg_hex = theme::get().hex(Role::Background).to_string();
+        print!("\x1b]11;{}\x07", bg_hex);
+    }
     dock_redraw_bottom();
 }
 
@@ -1056,10 +1077,10 @@ pub fn draw_popup_centered(rendered: &str, line_count: usize) {
 /// fields a row's `kind` doesn't use are ignored.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MenuItem {
-    /// Applet name, or model id (e.g. "qwen2.5:7b").
+    /// Applet name, or model id (e.g. "kilo-auto/free").
     pub name: String,
     /// Applet description, or the model's provider/backend tag
-    /// (e.g. "ollama", "openrouter", "opencode").
+    /// (e.g. "llm", "openrouter", "kilo").
     pub desc: String,
     pub kind: MenuItemKind,
     /// Applets: true while the applet is running (●). Models: ignored.
@@ -1107,18 +1128,14 @@ fn menu_row_line(plain: &str, colored: &str, fw: usize, selected: bool, cb: Colo
     }
 }
 
-/// Draw the interactive quick switcher (ctrl+p): an "apps" section (real
-/// applets, engine pinned first by the caller) and a "models" section
-/// share one box, one selection bar and one type-to-filter. Rows render
-/// grouped by `kind` — applets, then models — so callers MUST pass
-/// `items` already in that order (engine first); `idx` indexes the
-/// filtered, grouped sequence. Returns
+/// Draw the interactive applet switcher (ctrl+p): an "apps" section
+/// with applet rows. Returns
 /// (rendered_string, line_count) for draw_popup_centered.
 pub fn draw_launcher_menu(items: &[MenuItem], idx: usize, filter: &str) -> (String, usize) {
     let mut out = String::new();
     let inner_w = 64usize.min(terminal_cols().saturating_sub(8).max(24));
     let fw = inner_w.saturating_sub(2); // content field between the rails
-    let title = "quick switcher (ctrl+p)";
+    let title = "applet switcher (ctrl+p)";
     let dashes = inner_w.saturating_sub(1).saturating_sub(title.len());
     let cb = theme::get().color(Role::CodeBg);
     let pop_line = |fg: Role, s: String| -> String {
@@ -1131,7 +1148,7 @@ pub fn draw_launcher_menu(items: &[MenuItem], idx: usize, filter: &str) -> (Stri
     out.push_str(&format!("  {}\n",
         pop_line(Role::Dim, format!("│{}│", "─".repeat(inner_w)))));
 
-    // opencode-style section divider: Success label + dim dash run
+    // ayesha-os-style section divider: Success label + dim dash run
     let header = |label: &str| -> String {
         let label = truncate_cells(label, inner_w.saturating_sub(3));
         let n = inner_w.saturating_sub(3).saturating_sub(visible_cells(&label));
@@ -1160,8 +1177,6 @@ pub fn draw_launcher_menu(items: &[MenuItem], idx: usize, filter: &str) -> (Stri
     } else {
         let apps: Vec<&MenuItem> = filtered.iter().copied()
             .filter(|it| it.kind == MenuItemKind::Applet).collect();
-        let models: Vec<&MenuItem> = filtered.iter().copied()
-            .filter(|it| it.kind == MenuItemKind::Model).collect();
 
         let mut row_idx = 0usize;
 
@@ -1176,43 +1191,6 @@ pub fn draw_launcher_menu(items: &[MenuItem], idx: usize, filter: &str) -> (Stri
                     cursor, status,
                     pad_cells(&it.name, 11), pad_cells(&it.desc, 24), pad_cells(mode_tag, 8));
                 out.push_str(&menu_row_line(&plain, &plain, fw, selected, cb));
-                row_idx += 1;
-            }
-        }
-
-        if !models.is_empty() {
-            out.push_str(&header("models"));
-            for it in &models {
-                let selected = row_idx == display_idx;
-                let cursor = if selected { "►" } else { " " };
-                // active marker: ✓ (hot pink) — visually distinct from the
-                // plain ●/○ applet running dots; space when not current
-                let marker = if it.active { "✓" } else { " " };
-                // name-first truncation keeps the tag/ctx columns rigid
-                // even for monster ids like nvidia/nemotron-3-...-a12b:free
-                let name_shown = if visible_cells(&it.name) > 35 {
-                    format!("{}...", truncate_cells(&it.name, 32))
-                } else {
-                    it.name.clone()
-                };
-                let tag_shown = truncate_cells(&it.desc, 12);
-                let ctx_shown = it.ctx.as_deref()
-                    .map(|c| truncate_cells(c, 8)).unwrap_or_default();
-                let pad = " ".repeat(8 - visible_cells(&ctx_shown));
-                let plain = format!("{} {} {}{} {}{}{}",
-                    cursor, marker,
-                    pad_cells(&name_shown, 30), " ",
-                    pad_cells(&tag_shown, 12), pad, ctx_shown);
-                let colored = format!("{}{}{}{}{}{}{}{}",
-                    theme::paint(Role::Text, cursor),
-                    theme::paint(Role::Text, " "),
-                    theme::paint(if it.active { Role::Primary } else { Role::Text }, marker),
-                    theme::paint(Role::Text, " "),
-                    theme::paint(Role::Text, pad_cells(&name_shown, 30)),
-                    theme::paint(Role::Text, " "),
-                    theme::paint(Role::Dim, pad_cells(&tag_shown, 12)),
-                    theme::paint(Role::Dim, format!("{}{}", pad, ctx_shown)));
-                out.push_str(&menu_row_line(&plain, &colored, fw, selected, cb));
                 row_idx += 1;
             }
         }
@@ -1232,7 +1210,7 @@ pub fn draw_launcher_menu(items: &[MenuItem], idx: usize, filter: &str) -> (Stri
     out.push_str(&format!("  {}\n",
         pop_line(Role::Dim, format!("│  {}│",
             pad_cells(&truncate_cells(
-                "↑↓ nav  enter open  x stop  esc back  ● running  ✓ current", fw), fw)))));
+                "↑↓ nav  enter open  x stop  esc back  ● running", fw), fw)))));
     out.push_str(&format!("  {}\n",
         pop_line(Role::Primary, format!("└{}┘", "─".repeat(inner_w)))));
 
@@ -1320,22 +1298,27 @@ mod tests {
     #[test]
     fn user_msg_single_line_for_short_input() {
         let out = strip_ansi(&format_user_msg("hello"));
-        assert_eq!(out.lines().count(), 1);
-        assert!(out.contains("hello"));
-        assert!(out.contains("you"));
+        // card line + accent underline = 2 lines
+        assert_eq!(out.lines().count(), 2);
+        let card = out.lines().next().unwrap();
+        assert!(card.contains("hello"));
+        assert!(card.contains("you"));
     }
 
     #[test]
     fn user_msg_wraps_long_input() {
         let long = "word ".repeat(30); // 150 chars, breaks at whitespace
         let out = strip_ansi(&format_user_msg(&long));
-        assert!(out.lines().count() > 1, "long message was not wrapped");
+        assert!(out.lines().count() > 2, "long message was not wrapped");
         let lines: Vec<&str> = out.lines().collect();
-        // marker only on the first line, all lines are card panels
+        // marker only on the first line, card lines contain content
         assert!(lines[0].contains("you ▸"), "bad first line: {}", lines[0]);
-        for line in &lines {
+        // last line is the accent underline (───), skip it for content checks
+        for line in &lines[..lines.len() - 1] {
             assert!(line.contains("word"), "missing content: {}", line);
         }
+        // accent underline present
+        assert!(lines.last().unwrap().contains('─'), "missing accent underline");
     }
 
     #[test]
@@ -1538,25 +1521,20 @@ mod tests {
     }
 
     #[test]
-    fn launcher_lines_align_with_long_models_and_wide_chars() {
+    fn launcher_lines_align_with_long_applets_and_wide_chars() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
             applet("flora-cli", "scottish flora explorer", false, true),
             applet("hivebeat", "(๑•蔷•๑) music synth", true, false),
-            model("nvidia/nemotron-3-super-120b-a12b:free", "openrouter", false, Some("128k")),
-            model("✿kaomoji✿ name", "ollama", true, Some("32k")),
-            model("opencode/big-pickle", "opencode", false, None),
+            applet("✿kaomoji✿ applet", "wide char test", false, false),
         ];
         let (out, line_count) = draw_launcher_menu(&items, 0, "");
         let lines: Vec<&str> = out.lines().collect();
         assert_eq!(lines.len(), line_count);
         let w = assert_lines_aligned(&out);
         assert!(w >= 28, "box below the documented floor: {w}");
-        // the long-model truncation and wide-char rows only fully render
-        // on a wide-enough box; alignment holds at every width
         if w >= 60 {
-            assert!(out.contains("..."), "long model name should ellipsize");
-            assert!(strip_ansi(&out).contains("✿kaomoji✿ name"));
+            assert!(strip_ansi(&out).contains("✿kaomoji✿ applet"));
         }
     }
 
@@ -1575,43 +1553,36 @@ mod tests {
     }
 
     #[test]
-    fn launcher_has_apps_and_models_headers() {
+    fn launcher_has_apps_header() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
-            model("qwen2.5:7b", "ollama", true, Some("32k")),
+            applet("flora-cli", "scottish flora explorer", false, true),
         ];
         let (out, _) = draw_launcher_menu(&items, 0, "");
         let lines: Vec<&str> = out.lines().collect();
         let apps_header = lines.iter().find(|l| strip_ansi(l).contains("apps")).expect("apps header missing");
-        let models_header = lines.iter().find(|l| strip_ansi(l).contains("models")).expect("models header missing");
         // a section divider carries Text rail + Success label + Dim dashes:
         // at least 3 distinct fg codes, on the solid CodeBg fill
-        for header in [apps_header, models_header] {
-            let mut codes = fg_codes(header);
-            codes.sort();
-            codes.dedup();
-            assert!(codes.len() >= 3, "header not Success/dim-styled: {header}");
-            assert!(header.contains("48;2;"), "header must sit on the CodeBg fill");
-        }
+        let mut codes = fg_codes(apps_header);
+        codes.sort();
+        codes.dedup();
+        assert!(codes.len() >= 3, "header not Success/dim-styled: {apps_header}");
+        assert!(apps_header.contains("48;2;"), "header must sit on the CodeBg fill");
         assert_lines_aligned(&out);
     }
 
     #[test]
-    fn launcher_marks_active_model_and_selection_bar() {
+    fn launcher_marks_selection_bar() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
             applet("flora-cli", "scottish flora explorer", false, true),
-            model("qwen2.5:7b", "ollama", true, Some("32k")),
-            model("deepseek/deepseek-r1:free", "openrouter", false, Some("64k")),
+            applet("hivebeat", "(๑•蔷•๑) music synth", true, false),
         ];
-        let (out, _) = draw_launcher_menu(&items, 3, ""); // select the last visible row
+        let (out, _) = draw_launcher_menu(&items, 2, ""); // select the last visible row
         let plain = strip_ansi(&out);
         assert!(plain.contains("►"), "selection cursor missing");
-        let qwen_line = plain.lines().find(|l| l.contains("qwen2.5:7b")).unwrap();
-        assert!(qwen_line.contains("✓"), "active model not marked: {qwen_line}");
-        let deepseek_line = plain.lines().find(|l| l.contains("deepseek")).unwrap();
-        assert!(deepseek_line.contains("►"), "selected row must carry the cursor");
-        assert!(!deepseek_line.contains("✓"), "non-active model must not be marked");
+        let hivebeat_line = plain.lines().find(|l| l.contains("hivebeat")).unwrap();
+        assert!(hivebeat_line.contains("►"), "selected row must carry the cursor");
         // the selection bar: black-on-Primary full-width fill (black fg
         // + a solid 48;2; bg on the row that carries the cursor)
         let raw_lines: Vec<&str> = out.lines().collect();
@@ -1620,65 +1591,43 @@ mod tests {
         // on the bar's 48;2; fill
         assert!(bar_line.contains(";30m"), "bar must be black text: {bar_line}");
         assert!(bar_line.contains("48;2;"), "bar must be a solid fill: {bar_line}");
-
-        // no active model → no ✓ on any row (the footer legend still mentions it)
-        let items2 = vec![model("qwen2.5:7b", "ollama", false, None)];
-        let (out2, _) = draw_launcher_menu(&items2, 0, "");
-        let plain2 = strip_ansi(&out2);
-        let qwen2 = plain2.lines().find(|l| l.contains("qwen2.5:7b")).unwrap();
-        assert!(!qwen2.contains("✓"), "stray active marker on an inactive model");
     }
 
     #[test]
-    fn launcher_filter_matches_apps_and_models() {
+    fn launcher_filter_matches_apps() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
             applet("flora-cli", "scottish flora explorer", false, true),
-            model("qwen2.5:7b", "ollama", true, Some("32k")),
-            model("opencode/big-pickle", "opencode", false, Some("200k")),
+            applet("hivebeat", "(๑•蔷•๑) music synth", true, false),
         ];
         // name match in the apps section
         let (out, _) = draw_launcher_menu(&items, 0, "flora");
         let plain = strip_ansi(&out);
         let w = assert_lines_aligned(&out);
         assert!(plain.contains("flora-cli"));
-        assert!(!plain.contains("qwen2.5:7b"));
+        assert!(!plain.contains("hivebeat"));
         assert!(plain.contains("apps"), "apps header should remain");
-        assert!(!plain.contains("models"), "models header must hide when its section is empty");
-        // provider tag match in the models section
-        let (out, _) = draw_launcher_menu(&items, 0, "ollama");
-        let plain = strip_ansi(&out);
-        assert!(plain.contains("qwen2.5:7b"));
-        if w >= 60 {
-            assert!(plain.contains("ollama"), "tag column should show the provider");
-        }
-        assert!(!plain.contains("flora-cli"));
-        assert!(plain.contains("models"));
-        assert!(!plain.contains("apps"), "apps header must hide when its section is empty");
-        // model name match
-        let (out, _) = draw_launcher_menu(&items, 0, "big-pickle");
-        assert!(strip_ansi(&out).contains("opencode/big-pickle"));
-        assert_lines_aligned(&out);
+        assert!(!plain.contains("models"), "models header must not render");
     }
 
     #[test]
     fn launcher_empty_filter_and_no_matches() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
-            model("qwen2.5:7b", "ollama", true, Some("32k")),
+            applet("flora-cli", "scottish flora explorer", false, true),
         ];
         let (out, _) = draw_launcher_menu(&items, 0, "");
         let plain = strip_ansi(&out);
         assert!(plain.contains("type to filter..."));
         assert!(plain.contains("engine"));
-        assert!(plain.contains("qwen2.5:7b"));
+        assert!(plain.contains("flora-cli"));
 
         let (out, _) = draw_launcher_menu(&items, 0, "zzz-nope");
         let plain = strip_ansi(&out);
         assert!(plain.contains("no matches for '"), "no-matches row missing");
         assert!(!plain.contains("engine"));
-        assert!(!plain.contains("qwen2.5:7b"));
-        assert!(!plain.contains("apps") && !plain.contains("models"), "headers must hide with no rows");
+        assert!(!plain.contains("flora-cli"));
+        assert!(!plain.contains("apps"), "headers must hide with no rows");
         assert_lines_aligned(&out);
     }
 
@@ -1686,28 +1635,26 @@ mod tests {
     fn launcher_truncates_very_long_names_and_stays_aligned() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
-            model(&"x".repeat(80), "ollama", false, Some("128k")),
-            model("✿薔薇✿-flower", "opencode", true, None),
+            applet(&"x".repeat(80), "long applet name", false, false),
+            applet("✿薔薇✿-flower", "wide char applet", true, false),
         ];
         let (out, _) = draw_launcher_menu(&items, 1, "");
         let w = assert_lines_aligned(&out);
         assert!(w >= 28, "box below the documented floor: {w}");
         if w >= 60 {
             let plain = strip_ansi(&out);
-            let long_line = plain.lines().find(|l| l.contains("ollama")).unwrap();
-            assert!(long_line.contains("..."), "long name must ellipsize: {long_line}");
-            assert!(long_line.contains("128k"), "right-aligned ctx column must survive: {long_line}");
+            assert!(plain.contains("..."), "long name must ellipsize");
             assert!(plain.contains("✿薔薇✿-flower"), "wide-char name lost");
         }
     }
 
     #[test]
     fn launcher_skips_empty_sections() {
-        let items = vec![model("qwen2.5:7b", "ollama", true, Some("32k"))];
+        let items: Vec<MenuItem> = vec![];
         let (out, _) = draw_launcher_menu(&items, 0, "");
         let plain = strip_ansi(&out);
-        assert!(plain.contains("models"));
         assert!(!plain.contains("apps"), "empty apps section must not render a header");
+        assert!(!plain.contains("models"), "empty models section must not render a header");
         assert_lines_aligned(&out);
     }
 
@@ -1715,12 +1662,12 @@ mod tests {
     fn launcher_clamps_out_of_range_selection() {
         let items = vec![
             applet("engine", "terminal persona host", true, true),
-            model("qwen2.5:7b", "ollama", true, Some("32k")),
+            applet("flora-cli", "scottish flora explorer", false, true),
         ];
         let (out, _) = draw_launcher_menu(&items, 99, "");
         let plain = strip_ansi(&out);
         let selected = plain.lines().find(|l| l.contains("►")).unwrap();
-        assert!(selected.contains("qwen2.5:7b"), "selection should clamp to the last visible row");
+        assert!(selected.contains("flora-cli"), "selection should clamp to the last visible row");
         assert_lines_aligned(&out);
     }
 
@@ -1784,6 +1731,7 @@ pub fn draw_command_overlay(filter: Option<&str>) {
         ("analyze", "analyze own source code"),
         ("evolve",  "suggest new tools"),
         ("refine",  "analyze prompt history"),
+        ("ascii",   "generate ascii art: ascii <subject>"),
     ];
 
     let filtered: Vec<&(&str, &str)> = match filter {
@@ -1796,9 +1744,9 @@ pub fn draw_command_overlay(filter: Option<&str>) {
         _ => cmds.iter().collect(),
     };
 
-    let box_w = 54;
+    let box_w = 54.min(terminal_cols().saturating_sub(4));
 
-    // opencode-style solid palette popout: raised panel + pink frame
+    // ayesha-os-style solid palette popout: raised panel + pink frame
     let pop = |s: String| -> String { theme::bg_fill(Role::CodeBg, s) };
 
     println!();
@@ -1850,6 +1798,13 @@ pub fn draw_command_overlay(filter: Option<&str>) {
 
 pub fn print_help() {
     println!();
+    if terminal_cols() < 50 {
+        // compact help for narrow terminals
+        println!("  {}", theme::paint(Role::Dim, "commands: help, exit, clear, reset, models, model, toolmodel, auto, dock, settings, vision, ascii, tui"));
+        println!("  {}", theme::paint(Role::Dim, "type any command name for details, or use the command palette (ctrl+k)"));
+        println!();
+        return;
+    }
     println!("  {}",
         theme::paint(Role::Primary, "┌─ commands ──────────────────────────────────┐"));
     println!("  {}",
@@ -1889,6 +1844,7 @@ pub fn print_help() {
         ("analyze",   "analyze own source code"),
         ("evolve",    "suggest new tools"),
         ("refine",    "analyze prompt history"),
+        ("ascii",     "generate ascii art: ascii <subject>"),
         ("ctrl+p",    "page switcher (in-window)"),
     ];
     for (cmd, desc) in &help_cmds {

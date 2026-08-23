@@ -1,6 +1,6 @@
 {
   "github": {
-    "repo": "apullz/ayesha-os",
+    "repo": "ayesha-os",
     "branch": "master",
     "token_env": "GITHUB_TOKEN",
     "auto_push": true,
@@ -13,8 +13,8 @@
     ]
   },
   "huggingface": {
-    "space_id": "apullz/ayesha-hivemind",
-    "model_id": "apullz/ayesha",
+    "space_id": "ayesha-hivemind",
+    "model_id": "ayesha",
     "token_env": "HF_TOKEN",
     "auto_sync": true,
     "sync_interval": 60,

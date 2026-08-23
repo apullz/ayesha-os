@@ -3,7 +3,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Backend {
-    Ollama,
+    Cloud,
     Cloud { provider: String },
 }
 
@@ -40,7 +40,7 @@ pub struct ModelProfile {
 }
 
 fn default_backend() -> Backend {
-    Backend::Ollama
+    Backend::Cloud
 }
 
 pub struct ModelRegistry {
@@ -59,7 +59,7 @@ impl ModelRegistry {
     }
 
     pub async fn detect(&mut self) {
-        if let Ok(additional) = Self::detect_from_ollama().await {
+        if let Ok(additional) = Self::detect_from_cloud().await {
             for m in additional {
                 if !self.models.iter().any(|e| e.name == m.name) {
                     self.models.push(m);
@@ -68,8 +68,8 @@ impl ModelRegistry {
         }
         // Add cloud models
         self.detect_cloud_models();
-        // Default to big pickle if available (default model is opencode/big-pickle)
-        if let Some(idx) = self.models.iter().position(|m| m.name == "opencode/big-pickle") {
+        // Default to kilo-auto/free if available (default model is kilo-auto/free)
+        if let Some(idx) = self.models.iter().position(|m| m.name == "kilo-auto/free") {
             self.active_index = idx;
         } else if let Some(idx) = self.models.iter().position(|m| m.name == "ayesha:latest") {
             self.active_index = idx;
@@ -96,78 +96,16 @@ impl ModelRegistry {
 
     fn cloud_models() -> Vec<ModelProfile> {
         let mut v = vec![
-            // openrouter (kept for backwards compat)
-            Self::m("nvidia/nemotron-3-super-120b-a12b:free", "openrouter", &[Capability::General, Capability::Coding, Capability::Tools, Capability::Agentic], 1_000_000),
-            Self::m("meta-llama/llama-3.3-70b-instruct:free", "openrouter", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("deepseek/deepseek-r1:free", "openrouter", &[Capability::Thinking, Capability::Coding], 65_536),
-            Self::m("qwen/qwen-2.5-coder-32b-instruct:free", "openrouter", &[Capability::Coding, Capability::Tools], 32_768),
-            Self::m("xiaomi/mimo-v2.5", "openrouter", &[Capability::General, Capability::Coding, Capability::Tools, Capability::Vision], 1_000_000),
-            Self::m("xiaomi/mimo-v2.5-pro", "openrouter", &[Capability::General, Capability::Coding, Capability::Agentic, Capability::Thinking], 1_000_000),
-            Self::m("opencode/big-pickle", "opencode", &[Capability::Coding, Capability::Thinking], 200_000),
-            // sambanova
-            Self::m("Meta-Llama-3.3-70B-Instruct", "sambanova", &[Capability::General, Capability::Coding, Capability::Tools], 131_072),
-            Self::m("Meta-Llama-3.1-8B-Instruct", "sambanova", &[Capability::General], 131_072),
-            Self::m("Meta-Llama-3.1-70B-Instruct", "sambanova", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("DeepSeek-R1", "sambanova", &[Capability::Thinking, Capability::Coding], 131_072),
-            Self::m("DeepSeek-V3", "sambanova", &[Capability::General, Capability::Coding, Capability::Tools], 131_072),
-            Self::m("Qwen2.5-72B-Instruct", "sambanova", &[Capability::General, Capability::Coding, Capability::Tools], 131_072),
-            Self::m("Qwen2.5-Coder-32B-Instruct", "sambanova", &[Capability::Coding, Capability::Tools], 131_072),
-            Self::m("Gemma-3-27B-IT", "sambanova", &[Capability::General, Capability::Vision], 131_072),
-            // cloudflare
-            Self::m("@cf/aisingapore/gemma-sea-lion-v4-27b-it", "cloudflare", &[Capability::General], 32_768),
-            Self::m("@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", "cloudflare", &[Capability::Thinking, Capability::Coding], 32_768),
-            Self::m("@cf/google/gemma-4-26b-a4b-it", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/ibm-granite/granite-4.0-h-micro", "cloudflare", &[Capability::General, Capability::Tools], 131_072),
-            Self::m("@cf/meta/llama-3.1-8b-instruct-fp8", "cloudflare", &[Capability::General], 32_768),
-            Self::m("@cf/meta/llama-3.2-11b-vision-instruct", "cloudflare", &[Capability::General, Capability::Vision], 32_768),
-            Self::m("@cf/meta/llama-3.2-1b-instruct", "cloudflare", &[Capability::General], 32_768),
-            Self::m("@cf/meta/llama-3.2-3b-instruct", "cloudflare", &[Capability::General], 32_768),
-            Self::m("@cf/meta/llama-3.3-70b-instruct-fp8-fast", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/meta/llama-4-scout-17b-16e-instruct", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/meta/llama-guard-3-8b", "cloudflare", &[Capability::General], 32_768),
-            Self::m("@cf/mistralai/mistral-small-3.1-24b-instruct", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/moonshotai/kimi-k2.6", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/moonshotai/kimi-k2.7-code", "cloudflare", &[Capability::Coding], 131_072),
-            Self::m("@cf/nvidia/nemotron-3-120b-a12b", "cloudflare", &[Capability::General, Capability::Coding, Capability::Agentic], 131_072),
-            Self::m("@cf/openai/gpt-oss-120b", "cloudflare", &[Capability::General, Capability::Coding, Capability::Tools], 131_072),
-            Self::m("@cf/openai/gpt-oss-20b", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/qwen/qwen2.5-coder-32b-instruct", "cloudflare", &[Capability::Coding, Capability::Tools], 32_768),
-            Self::m("@cf/qwen/qwen3-30b-a3b-fp8", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/qwen/qwq-32b", "cloudflare", &[Capability::Thinking, Capability::Coding], 32_768),
-            Self::m("@cf/zai-org/glm-4.7-flash", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("@cf/zai-org/glm-5.2", "cloudflare", &[Capability::General, Capability::Coding], 131_072),
-            // replicate
-            Self::m("meta/meta-llama-3-70b-instruct", "replicate", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("meta/meta-llama-3.1-70b-instruct", "replicate", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("meta/meta-llama-3.3-70b-instruct", "replicate", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("meta/llama-4-scout-instruct", "replicate", &[Capability::General, Capability::Coding, Capability::Vision], 1_000_000),
-            Self::m("meta/llama-4-maverick-instruct", "replicate", &[Capability::General, Capability::Coding, Capability::Vision, Capability::Agentic], 1_000_000),
-            // github
-            Self::m("gpt-4o", "github", &[Capability::General, Capability::Coding, Capability::Vision, Capability::Tools], 131_072),
-            Self::m("gpt-4.1", "github", &[Capability::General, Capability::Coding, Capability::Tools], 1_000_000),
-            Self::m("gpt-4.1-mini", "github", &[Capability::General, Capability::Coding, Capability::Tools], 1_000_000),
-            Self::m("gpt-4.1-nano", "github", &[Capability::General, Capability::Coding], 1_000_000),
-            Self::m("o4-mini", "github", &[Capability::Thinking, Capability::Coding], 200_000),
-            Self::m("o3", "github", &[Capability::Thinking, Capability::Coding], 200_000),
-            Self::m("claude-sonnet-4-20250514", "github", &[Capability::General, Capability::Coding, Capability::Agentic], 200_000),
-            Self::m("meta-llama-3.3-70b-instruct", "github", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("meta-llama-4-scout", "github", &[Capability::General, Capability::Coding, Capability::Vision], 1_000_000),
-            Self::m("meta-llama-4-maverick", "github", &[Capability::General, Capability::Coding, Capability::Agentic], 1_000_000),
-            Self::m("mistral-large-2411", "github", &[Capability::General, Capability::Coding], 131_072),
-            Self::m("cohere-command-r-plus-08-2024", "github", &[Capability::General, Capability::Coding, Capability::Tools], 131_072),
-            // xai
-            Self::m("grok-4", "xai", &[Capability::General, Capability::Coding, Capability::Thinking, Capability::Tools, Capability::Vision], 262_144),
-            Self::m("grok-4-mini", "xai", &[Capability::General, Capability::Coding, Capability::Thinking, Capability::Tools], 262_144),
-            Self::m("grok-3", "xai", &[Capability::General, Capability::Coding, Capability::Thinking, Capability::Tools], 262_144),
-            Self::m("grok-3-mini", "xai", &[Capability::General, Capability::Coding, Capability::Thinking], 131_072),
-            // zai
-            Self::m("glm-4.7", "zai", &[Capability::General, Capability::Coding, Capability::Tools], 128_000),
-            Self::m("glm-4.7-flash", "zai", &[Capability::General, Capability::Coding], 128_000),
-            Self::m("glm-4.6", "zai", &[Capability::General, Capability::Coding, Capability::Tools], 128_000),
-            Self::m("glm-4.6-air", "zai", &[Capability::General, Capability::Coding], 128_000),
-            Self::m("glm-4.5", "zai", &[Capability::General, Capability::Coding, Capability::Tools], 128_000),
-            Self::m("glm-4.5-air", "zai", &[Capability::General, Capability::Coding], 128_000),
-            Self::m("glm-4.5-flash", "zai", &[Capability::General, Capability::Coding], 128_000),
+            // kilo auto free
+            Self::m("kilo-auto/free", "kilo", &[Capability::General, Capability::Coding, Capability::Thinking], 200_000),
+            Self::m("kilo-auto/small", "kilo", &[Capability::General, Capability::Coding], 128_000),
+            Self::m("kilo-auto/efficient", "kilo", &[Capability::General, Capability::Coding], 128_000),
+            Self::m("stepfun/step-3.7-flash:free", "kilo", &[Capability::General, Capability::Coding], 128_000),
+            Self::m("poolside/laguna-s-2.1:free", "kilo", &[Capability::General, Capability::Coding, Capability::Tools], 128_000),
+            Self::m("poolside/laguna-xs-2.1:free", "kilo", &[Capability::General, Capability::Coding], 128_000),
+            Self::m("nvidia/nemotron-3-ultra-550b-a55b:free", "kilo", &[Capability::General, Capability::Coding, Capability::Agentic], 128_000),
+            Self::m("tencent/hy3:free", "kilo", &[Capability::General, Capability::Coding, Capability::Thinking], 128_000),
+
         ];
         v.sort_by(|a, b| a.name.cmp(&b.name));
         v
@@ -176,7 +114,7 @@ impl ModelRegistry {
     fn known_models() -> Vec<ModelProfile> {
         let mut v = vec![
             ModelProfile {
-                name: "qwen2.5-coder:14b".into(),
+                name: "kilo-auto/free".into(),
                 capabilities: vec![
                     Capability::General,
                     Capability::Tools,
@@ -184,15 +122,15 @@ impl ModelRegistry {
                     Capability::Thinking,
                 ],
                 context_length: 32768,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
-                name: "llama3.2-vision".into(),
+                name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Vision],
                 context_length: 8192,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
-            // models from the user's opencode ollama config
+            // models from the user's ayesha-os cloud config
             ModelProfile {
                 name: "ayesha:latest".into(),
                 capabilities: vec![
@@ -202,61 +140,61 @@ impl ModelRegistry {
                     Capability::Agentic,
                 ],
                 context_length: 32768,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
-                name: "qwen2.5:0.5b".into(),
+                name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General],
                 context_length: 32768,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
-                name: "qwen2.5:3b".into(),
+                name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Coding],
                 context_length: 32768,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
-                name: "qwen2.5:7b".into(),
+                name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Coding, Capability::Tools],
                 context_length: 32768,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
-                name: "mistral-nemo:12b".into(),
+                name: "kilo-auto/free".into(),
                 capabilities: vec![Capability::General, Capability::Coding, Capability::Tools],
                 context_length: 131072,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
                 name: "Paul:latest".into(),
                 capabilities: vec![Capability::General],
                 context_length: 32768,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
                 name: "mistral-small:latest".into(),
                 capabilities: vec![Capability::General, Capability::Coding, Capability::Tools],
                 context_length: 131072,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
             ModelProfile {
                 name: "gojo:latest".into(),
                 capabilities: vec![Capability::General, Capability::Coding],
                 context_length: 131072,
-                backend: Backend::Ollama,
+                backend: Backend::Cloud,
             },
         ];
         v.sort_by(|a, b| a.name.cmp(&b.name));
         v
     }
 
-    async fn detect_from_ollama() -> anyhow::Result<Vec<ModelProfile>> {
+    async fn detect_from_cloud() -> anyhow::Result<Vec<ModelProfile>> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
             .build()?;
         let resp = client
-            .get("http://localhost:11434/api/tags")
+            .get("https://api.kilo.ai/api/gateway/v1/api/tags")
             .send()
             .await?;
         let body: serde_json::Value = resp.json().await?;
@@ -269,7 +207,7 @@ impl ModelRegistry {
                     capabilities: Self::infer_capabilities(&name),
                     context_length: 4096,
                     name,
-                    backend: Backend::Ollama,
+                    backend: Backend::Cloud,
                 }
             })
             .collect())
@@ -295,7 +233,7 @@ impl ModelRegistry {
         if lower.contains("deepseek") || lower.contains("r1") {
             caps.push(Capability::Thinking);
         }
-        if lower.contains("nemotron") {
+        if lower.contains("kilo") {
             caps.push(Capability::Agentic);
             caps.push(Capability::Coding);
         }
@@ -316,6 +254,11 @@ impl ModelRegistry {
                 None
             }
         })
+    }
+
+    /// Check whether a model has vision capability.
+    pub fn has_vision(&self, name: &str) -> bool {
+        self.models.iter().any(|m| m.name == name && m.capabilities.contains(&Capability::Vision))
     }
 
     pub fn select_model(&self, query: &str) -> &ModelProfile {
@@ -407,7 +350,7 @@ impl ModelRegistry {
         sorted.sort_by_key(|(_, m)| matches!(m.backend, Backend::Cloud { .. }));
         for (i, m) in sorted {
             let backend_label = match &m.backend {
-                Backend::Ollama => "local",
+                Backend::Cloud => "local",
                 Backend::Cloud { .. } => "cloud",
             };
             if backend_label != last_backend {

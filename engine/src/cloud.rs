@@ -5,7 +5,7 @@ use std::time::Duration;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::ollama::{ChatMessage, StreamResult, ToolCall, ChatResponse, ChatResponseMessage};
+use crate::llm::{ChatMessage, StreamResult, ToolCall, ChatResponse, ChatResponseMessage};
 
 #[derive(Debug)]
 pub struct CloudClient {
@@ -41,39 +41,33 @@ impl CloudClient {
         std::env::current_dir().unwrap_or_default()
     }
 
-fn opencode_auth_json() -> Option<Value> {
+fn kilo_auth_json() -> Option<Value> {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME")).ok()?;
     let path = PathBuf::from(home)
-        .join(".local").join("share").join("opencode").join("auth.json");
+        .join(".local").join("share").join("ayesha").join("auth.json");
     let s = fs::read_to_string(path).ok()?;
     serde_json::from_str(&s).ok()
 }
 
 fn auth_json_key(provider: &str) -> Option<String> {
-    Self::opencode_auth_json()?
+    Self::kilo_auth_json()?
         .get(provider)?
         .get("key")?
         .as_str()
         .map(|k| k.to_string())
 }
 
-/// Environment variable opencode would resolve `{env:...}` from.
-fn env_key_name(provider: &str) -> Option<&'static str> {
-    Some(match provider {
-        "openrouter" => "OPENROUTER_API_KEY",
-        "sambanova" => "SAMBANOVA_API_KEY",
-        "cloudflare" => "CLOUDFLARE_API_TOKEN",
-        "replicate" => "REPLICATE_API_TOKEN",
-        "github" => "GITHUB_TOKEN",
-        "xai" => "XAI_API_KEY",
-        "zai" => "ZAI_API_KEY",
-        _ => return None,
-    })
-}
+    /// Environment variable ayesha-os would resolve `{env:...}` from.
+    fn env_key_name(provider: &str) -> Option<&'static str> {
+        Some(match provider {
+            "kilo" => "KILO_API_KEY",
+            _ => return None,
+        })
+    }
 
 fn get_api_key(provider: &str) -> Option<String> {
-    // 1. environment variable (matches opencode's {env:...} option)
+    // 1. environment variable (matches ayesha-os's {env:...} option)
     if let Some(var) = Self::env_key_name(provider) {
         if let Ok(v) = std::env::var(var) {
             if !v.trim().is_empty() {
@@ -81,7 +75,7 @@ fn get_api_key(provider: &str) -> Option<String> {
             }
         }
     }
-    // 2. opencode's auth store (~/.local/share/opencode/auth.json)
+    // 2. ayesha-os's auth store (~/.local/share/ayesha/auth.json)
     if let Some(k) = Self::auth_json_key(provider) {
         return Some(k);
     }
@@ -114,30 +108,22 @@ fn get_base_url(provider: &str) -> Option<String> {
     let config_str = fs::read_to_string(root.join("ayesha.json")).ok()?;
     let json_val: Value = serde_json::from_str(&config_str).ok()?;
 
-    let provider_key = if provider == "openrouter" { "openrouter" } else { "opencode_zen" };
+    let provider_key = "kilo";
     let url = json_val.get("cloud_models")?.get(provider_key)?.get("endpoint")?.as_str()?;
     Some(url.to_string())
 }
 
-/// Base URLs mirrored from the user's opencode provider config.
+/// Base URLs mirrored from the user's ayesha-os provider config.
 fn provider_base_url(provider: &str) -> Option<&'static str> {
     Some(match provider {
-        "openrouter" => "https://openrouter.ai/api/v1",
-        "opencode" => "https://opencode.ai/zen/v1",
-        "sambanova" => "https://api.sambanova.ai/v1",
-        "cloudflare" => "https://api.cloudflare.com/client/v4/accounts/d8370a3df64172a1dbeed8c11f6e33d9/ai/v1",
-        "replicate" => "https://openai-proxy.replicate.com/v1",
-        "github" => "https://models.inference.ai.azure.com/v1",
-        "xai" => "https://api.x.ai/v1",
-        "zai" => "https://api.z.ai/api/paas/v4",
+        "kilo" => "https://api.kilo.ai/api/gateway/v1",
         _ => return None,
     })
 }
 
     /// Create a new cloud client. Resolves the API key from the environment,
-    /// opencode's auth store, then the legacy project .env.
-    /// provider is one of: openrouter, opencode, sambanova, cloudflare,
-    /// replicate, github, xai, zai.
+    /// ayesha-os's auth store, then the legacy project .env.
+    /// provider must be "kilo".
     pub fn new(model: &str, provider: &str) -> Result<Self> {
         let api_key = Self::get_api_key(provider)
             .ok_or_else(|| anyhow::anyhow!("API key not found for provider: {}", provider))?;
@@ -145,27 +131,13 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         let base_url = Self::provider_base_url(provider)
             .map(|u| u.to_string())
             .or_else(|| Self::get_base_url(provider))
-            .unwrap_or_else(|| {
-                if provider == "openrouter" {
-                    "https://openrouter.ai/api/v1".to_string()
-                } else {
-                    "https://opencode.ai/zen/v1".to_string()
-                }
-            });
-
-        // OpenCode Zen expects the bare model id ("big-pickle"), not the
-        // provider-prefixed form ("opencode/big-pickle") used internally.
-        let model = if provider == "opencode" {
-            model.strip_prefix("opencode/").unwrap_or(model).to_string()
-        } else {
-            model.to_string()
-        };
+            .unwrap_or_else(|| "https://api.kilo.ai/api/gateway/v1".to_string());
 
         Ok(Self {
             client: Client::builder()
                 .timeout(Duration::from_secs(120))
                 .build()?,
-            model,
+            model: model.to_string(),
             provider: provider.to_string(),
             base_url,
             api_key,
@@ -182,17 +154,19 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
     #[allow(dead_code)]
     pub fn available_models() -> Vec<(String, String, Vec<String>)> {
         vec![
-            ("nvidia/nemotron-3-super:free".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string(), "agentic".to_string()]),
-            ("meta-llama/llama-3.3-70b-instruct:free".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string()]),
-            ("deepseek/deepseek-r1:free".to_string(), "openrouter".to_string(), vec!["thinking".to_string(), "coding".to_string()]),
-            ("qwen/qwen-2.5-coder-32b-instruct:free".to_string(), "openrouter".to_string(), vec!["coding".to_string(), "tools".to_string()]),
-            ("xiaomi/mimo-v2.5".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string(), "tools".to_string(), "vision".to_string()]),
-            ("xiaomi/mimo-v2.5-pro".to_string(), "openrouter".to_string(), vec!["general".to_string(), "coding".to_string(), "agentic".to_string(), "thinking".to_string()]),
-            ("opencode/big-pickle".to_string(), "opencode".to_string(), vec!["coding".to_string(), "reasoning".to_string()]),
+            ("kilo-auto/free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string(), "thinking".to_string()]),
+            ("kilo-auto/small".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string()]),
+            ("kilo-auto/efficient".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string()]),
+            ("stepfun/step-3.7-flash:free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string()]),
+            ("poolside/laguna-s-2.1:free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string(), "tools".to_string()]),
+            ("poolside/laguna-xs-2.1:free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string()]),
+            ("nvidia/nemotron-3-ultra-550b-a55b:free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string(), "agentic".to_string()]),
+            ("tencent/hy3:free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string(), "thinking".to_string()]),
+            ("kilo-auto/free".to_string(), "kilo".to_string(), vec!["general".to_string(), "coding".to_string(), "agentic".to_string()]),
         ]
     }
 
-    /// Non-streaming chat (same signature pattern as OllamaClient::chat)
+    /// Non-streaming chat (same signature pattern as LlmClient::chat)
     #[allow(dead_code)]
     pub async fn chat(
         &self,
@@ -209,11 +183,6 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
         let mut req = self.client.post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json");
-
-        if self.provider == "openrouter" {
-            req = req.header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
-                     .header("X-Title", "ayesha-os");
-        }
 
         let resp = req.json(&req_body).send().await?;
         let status = resp.status();
@@ -259,16 +228,10 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json");
 
-        if self.provider == "openrouter" {
-            req = req
-                .header("HTTP-Referer", "https://github.com/apullz/ayesha-os")
-                .header("X-Title", "ayesha-os");
-        }
-
         Ok(req.json(&body))
     }
 
-    /// Streaming chat with visible output (same pattern as OllamaClient::chat_stream_visible)
+    /// Streaming chat with visible output (same pattern as LlmClient::chat_stream_visible)
     pub async fn chat_stream_visible(
         &self,
         messages: &[ChatMessage],
@@ -350,20 +313,20 @@ fn provider_base_url(provider: &str) -> Option<&'static str> {
 mod live_smoke_tests {
     use super::*;
 
-    const FREE_MODEL: &str = "nvidia/nemotron-3-super-120b-a12b:free";
+    const FREE_MODEL: &str = "kilo-auto/free";
 
     #[test]
-    #[ignore = "live smoke test: requires an opencode zen key"]
-    fn cloud_client_uses_zen_url_for_opencode() {
-        // When a zen key is present, opencode/big-pickle must hit the zen
-        // gateway with the bare model id and the correct base url. Without
+    #[ignore = "live smoke test: requires a kilo gateway key"]
+    fn cloud_client_uses_kilo_url() {
+        // When a kilo key is present, kilo-auto/free must hit the kilo
+        // gateway with the correct base url. Without
         // a key we just skip — the openrouter fallback is tested separately.
-        let Ok(client) = CloudClient::new("opencode/big-pickle", "opencode") else {
-            println!("skip: no opencode zen key configured");
+        let Ok(client) = CloudClient::new("kilo-auto/free", "kilo") else {
+            println!("skip: no kilo gateway key configured");
             return;
         };
-        assert_eq!(client.model, "big-pickle", "zen wants the bare model id");
-        assert_eq!(client.base_url, "https://opencode.ai/zen/v1");
+        assert_eq!(client.model, "kilo-auto/free");
+        assert_eq!(client.base_url, "https://api.kilo.ai/api/gateway/v1");
     }
 
     #[test]
@@ -373,7 +336,7 @@ mod live_smoke_tests {
         let (tx, rx) = std::sync::mpsc::channel::<String>();
         drop(tx);
         let result = rt.block_on(async {
-            let prompt = crate::ollama::OllamaClient::system_prompt("senpai", "C:\\ayesha-os\\engine");
+            let prompt = crate::llm::LlmClient::system_prompt("senpai", ".");
             let client = CloudClient::new(FREE_MODEL, "openrouter")
                 .expect("openrouter key must resolve");
             let tools = crate::tool_defs::tool_definitions_core();

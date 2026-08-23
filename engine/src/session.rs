@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use crate::ollama::ChatMessage;
+use crate::llm::ChatMessage;
 
 /// Directory (relative to project_root) where sessions are stored.
 pub const SESSION_DIR: &str = "sessions";

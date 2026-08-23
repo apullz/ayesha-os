@@ -48,7 +48,7 @@ pub fn needs_tools(msg: &str) -> bool {
         // common tool-adjacent nouns
         "script", "program", "app", "tool", "project", "repo",
         "terminal", "console", "shell", "powershell", "cmd",
-        "ollama", "model", "ollama model",
+        "llm", "model", "cloud model",
     ];
     hints.iter().any(|h| lower.contains(h))
 }

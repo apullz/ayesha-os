@@ -5,42 +5,42 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const OLLAMA_HOST = (process.env.OLLAMA_HOST || "http://localhost:11434").replace(/\/+$/, "");
-const MODEL = "qwen2.5:7b";
+const KILO_HOST = (process.env.KILO_HOST || "https://api.kilo.ai").replace(/\/+$/, "");
+const MODEL = "kilo-auto/free";
 
-async function askOllama(system: string, user: string): Promise<string> {
-  const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+async function askKilo(system: string, user: string): Promise<string> {
+  const res = await fetch(`${KILO_HOST}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.KILO_API_KEY}` },
     body: JSON.stringify({
       model: MODEL,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      options: { temperature: 0.7 },
+      temperature: 0.7,
       stream: false,
     }),
   });
-  if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+  if (!res.ok) throw new Error(`kilo returned ${res.status}`);
   const data = await res.json();
-  return data.message?.content || "";
+  return data.choices?.[0]?.message?.content || "";
 }
 
-async function askOllamaFromMessages(messages: Array<{ role: string; content: string }>): Promise<string> {
-  const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
+async function askKiloFromMessages(messages: Array<{ role: string; content: string }>): Promise<string> {
+  const res = await fetch(`${KILO_HOST}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.KILO_API_KEY}` },
     body: JSON.stringify({
       model: MODEL,
       messages,
-      options: { temperature: 0.7 },
+      temperature: 0.7,
       stream: false,
     }),
   });
-  if (!res.ok) throw new Error(`ollama returned ${res.status}`);
+  if (!res.ok) throw new Error(`kilo returned ${res.status}`);
   const data = await res.json();
-  return data.message?.content || "";
+  return data.choices?.[0]?.message?.content || "";
 }
 
 async function startServer() {
@@ -82,7 +82,7 @@ Terminal Formatting Instructions:
       }
       messages.push({ role: "user", content: prompt });
 
-      const text = await askOllamaFromMessages(messages);
+      const text = await askKiloFromMessages(messages);
       res.json({ text });
     } catch (err: any) {
       console.error("Ollama Botanist Error:", err);

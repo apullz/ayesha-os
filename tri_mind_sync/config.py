@@ -13,7 +13,7 @@ from typing import Optional
 @dataclass
 class GitHubConfig:
     """github sync settings"""
-    repo: str = "apullz/ayesha-os"
+    repo: str = "ayesha-os"
     branch: str = "main"
     token_env: str = "GITHUB_TOKEN"
     auto_push: bool = True
@@ -29,8 +29,8 @@ class GitHubConfig:
 @dataclass
 class HuggingFaceConfig:
     """huggingface sync settings"""
-    space_id: str = "apullz/ayesha-spaces"
-    model_id: str = "apullz/ayesha"
+    space_id: str = "ayesha-hivemind"
+    model_id: str = "ayesha"
     token_env: str = "HF_TOKEN"
     auto_sync: bool = True
     sync_interval: int = 60

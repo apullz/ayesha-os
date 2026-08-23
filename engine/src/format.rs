@@ -1,4 +1,4 @@
-// defense-in-depth output enforcement — port of the opencode lowercase-proxy
+// defense-in-depth output enforcement — port of the ayesha-os lowercase-proxy
 // (bin/lowercase-proxy.js). guarantees the ayesha format rules at the stream
 // level instead of trusting the model's system prompt:
 //   1. lowercase everything outside real code fences
@@ -212,7 +212,7 @@ mod tests {
     fn lowercases_plain_text() {
         let _g = hold_enforce();
         let s = enforce_lowercase("HELLO WORLD, FOX!");
-        assert_eq!(s, "hello world, fox!");
+        assert_eq!(s, "hello world, senpai!");
     }
 
     #[test]
@@ -291,8 +291,8 @@ mod tests {
     fn prose_wrapped_in_fence_is_still_enforced() {
         let _g = hold_enforce();
         let mut st = LowercaseStreamer::new();
-        let out = st.feed("```\n🌙 Hello fox~ :3\n```\n");
-        assert_eq!(out, "```\n hello fox~ :3\n```\n");
+        let out = st.feed("```\n🌙 Hello senpai~ :3\n```\n");
+        assert_eq!(out, "```\n hello senpai~ :3\n```\n");
     }
 
     #[test]

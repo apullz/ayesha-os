@@ -34,7 +34,7 @@ impl Role {
 }
 
 // ── syntax token roles (used by the code-block renderer) ─────────
-// Mirrors the monokai++ opencode theme's `syntax*` tokens so code
+// Mirrors the monokai++ ayesha-os theme's `syntax*` tokens so code
 // blocks can be colored independently of the chrome roles above.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -227,8 +227,8 @@ fn preset_hexes(name: &str) -> Option<[&'static str; ROLE_COUNT]> {
             "#0A0A0A", "#111111", "#CCCCCC", "#FFFFFF", "#FFFFFF", "#999999",
             "#FFFFFF", "#BBBBBB", "#FF6B6B", "#666666", "#333333", "#181818",
         ]),
-        // monokai++ — ported from ~/.config/opencode/themes/monokai++.json
-        // background stack matches opencode: bg / bgDeeper / bgSubtle
+        // monokai++ — ported from ~/.config/ayesha-os/themes/monokai++.json
+        // background stack matches ayesha-os: bg / bgDeeper / bgSubtle
         "monokai++" | "monokai" => Some([
             "#221F22", "#262226", "#FCFCFA", "#FF6188", "#FF6188", "#78DCE8",
             "#A9DC76", "#FFD866", "#FF5F5F", "#6C696E", "#454147", "#353238",
@@ -395,6 +395,12 @@ pub fn bg(role: Role, text: impl AsRef<str>) -> colored::ColoredString {
 /// popup panels and code blocks where token colors must not punch holes in
 /// the fill.
 pub fn bg_fill(role: Role, text: impl AsRef<str>) -> String {
+    let has_truecolor = std::env::var("COLORTERM")
+        .map(|v| v.contains("truecolor") || v.contains("24bit"))
+        .unwrap_or(false);
+    if !has_truecolor {
+        return text.as_ref().to_string(); // no truecolor, skip background fill
+    }
     let color = get().color(role);
     let (r, g, b) = match color {
         colored::Color::TrueColor { r, g, b } => (r, g, b),

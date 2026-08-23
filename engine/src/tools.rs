@@ -10,7 +10,7 @@ use crate::memory::MemoryStore;
 use crate::prompt_refinement::PromptHistory;
 use crate::self_analysis::SelfAnalyzer;
 use crate::tool_evolution::ToolEvolver;
-use crate::ollama::{OllamaClient, ChatMessage};
+use crate::llm::{LlmClient, ChatMessage};
 use crate::applet_manager::AppletManager;
 use crate::plugins::{PluginRegistry, run_plugin_tool};
 
@@ -82,8 +82,8 @@ pub struct ToolContext<'a> {
     pub prompt_history: &'a mut PromptHistory,
     pub analyzer: &'a SelfAnalyzer,
     pub evolver: &'a ToolEvolver,
-    pub ollama: &'a OllamaClient,
-    /// The active backend (local Ollama or cloud) — used by `delegate` so the
+    pub llm: &'a LlmClient,
+    /// The active backend (local Cloud or cloud) — used by `delegate` so the
     /// sub-agent runs on the same model the user is talking to.
     pub backend: &'a crate::ActiveBackend,
     pub project_root: &'a Path,
@@ -289,14 +289,14 @@ impl ToolExecutor {
             "list_source_files" => self.list_source_files(ctx.analyzer),
 
             // Evolution
-            "evolve_tools" => self.evolve_tools(args, ctx.evolver, ctx.ollama).await,
+            "evolve_tools" => self.evolve_tools(args, ctx.evolver, ctx.llm).await,
 
             // Prompt
             "refine_prompt" => self.refine_prompt(ctx.prompt_history),
             "get_tool_stats" => self.get_tool_stats(ctx.prompt_history),
 
             // Coding agent
-            "coding_agent" => self.coding_agent(args, ctx.ollama, ctx.project_root, &self.sandbox).await,
+            "coding_agent" => self.coding_agent(args, ctx.llm, ctx.project_root, &self.sandbox).await,
 
             // Applets
             "manage_applet" => self.manage_applet(args, ctx).await,
@@ -1456,7 +1456,7 @@ dr(0)
     //  Evolution
     // ═══════════════════════════════════════════
 
-    async fn evolve_tools(&self, args: &Value, evolver: &ToolEvolver, _ollama: &OllamaClient) -> Result<String> {
+    async fn evolve_tools(&self, args: &Value, evolver: &ToolEvolver, _llm: &LlmClient) -> Result<String> {
         let specific = args.get("gap").and_then(|v| v.as_str());
 
         let gaps = evolver.analyze_gaps();
@@ -1507,7 +1507,7 @@ dr(0)
     //  Coding agent (multi-action coding tool)
     // ═══════════════════════════════════════════
 
-    async fn coding_agent(&self, args: &Value, ollama: &OllamaClient, project_root: &Path, sandbox: &Sandbox) -> Result<String> {
+    async fn coding_agent(&self, args: &Value, llm: &LlmClient, project_root: &Path, sandbox: &Sandbox) -> Result<String> {
 
         let action = args.get("action")
             .and_then(|v| v.as_str())
@@ -1624,7 +1624,7 @@ dr(0)
                     role: "user".to_string(), content: prompt,
                     tool_calls: None, tool_call_id: None,
                 }];
-                let resp = ollama.chat(&msg, None).await?;
+                let resp = llm.chat(&msg, None).await?;
                 let raw = resp.message.content.trim();
                 // Strip markdown code fences if present (```rust ... ``` or ``` ... ```)
                 let modified = if raw.starts_with("```") {
@@ -1656,7 +1656,7 @@ dr(0)
                     role: "user".to_string(), content: prompt,
                     tool_calls: None, tool_call_id: None,
                 }];
-                let resp = ollama.chat(&msg, None).await?;
+                let resp = llm.chat(&msg, None).await?;
                 Ok(json!({"path": path, "suggestions": resp.message.content}).to_string())
             }
             _ => Err(anyhow::anyhow!("unknown coding_agent action: {}", action)),
@@ -1682,8 +1682,8 @@ mod tests {
             prompt_history: &mut PromptHistory::default(),
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
-            ollama: &OllamaClient::new("test"),
-            backend: &crate::ActiveBackend::Ollama(OllamaClient::new("test")),
+            llm: &LlmClient::new("test"),
+            backend: &crate::ActiveBackend::Cloud(LlmClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,
@@ -1737,8 +1737,8 @@ mod tests {
             prompt_history: &mut PromptHistory::default(),
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
-            ollama: &OllamaClient::new("test"),
-            backend: &crate::ActiveBackend::Ollama(OllamaClient::new("test")),
+            llm: &LlmClient::new("test"),
+            backend: &crate::ActiveBackend::Cloud(LlmClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,
@@ -2231,8 +2231,8 @@ mod tests {
             prompt_history: &mut PromptHistory::default(),
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
-            ollama: &OllamaClient::new("test"),
-            backend: &crate::ActiveBackend::Ollama(OllamaClient::new("test")),
+            llm: &LlmClient::new("test"),
+            backend: &crate::ActiveBackend::Cloud(LlmClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,

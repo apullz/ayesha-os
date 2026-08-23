@@ -27,29 +27,29 @@
   ── D E S C R I P T I O N ──
 
   the engine is the heart of ayesha-os. it functions as both
-  an agentic coding assistant (like opencode) and a jarvis-like
+  an agentic coding assistant and a jarvis-like
   chatbot, all wrapped in the ayesha personality.
 
-  connects to local ollama + cloud providers (openrouter,
-  opencode), routes queries to the best model, streams
+  connects to local kilo + cloud providers (openrouter,
+  kilo), routes queries to the best model, streams
   responses with a retro cyberpunk typewriter effect, detects
   <think> reasoning blocks, and supports real-time steering.
 
   ── F E A T U R E S ──
 
   DUAL BACKEND
-    local:   ollama @ localhost:11434
-    cloud:   openrouter (free tier), opencode
-    models:  auto-detected from ollama + cloud config
+    local:   kilo @ kilo gateway
+    cloud:   openrouter (archived), kilo
+    models:  auto-detected from kilo + cloud config
 
   MODEL ROUTING
     auto-detects coding/vision queries by keyword
-    coding -> qwen2.5-coder:14b
-    vision -> llama3.2-vision
+    coding -> kilo-auto/free
+    vision -> kilo-auto/free
     manual: /model <name>, /route <query>, /auto
 
   TRUE STREAMING
-    tokens print as they arrive from ollama
+    tokens print as they arrive from kilo
     <think> blocks render dimmed
     ~20ms/char typewriter effect
 
@@ -124,8 +124,8 @@
   ── B U I L D   R E Q U I R E M E N T S ──
 
   Rust 1.80+ (stable, x86_64-pc-windows-msvc)
-  ollama running on localhost:11434
-  models: ayesha (custom), qwen2.5-coder:14b, llama3.2-vision
+  kilo running on kilo gateway
+  models: ayesha (custom), kilo-auto/free, kilo-auto/free
   Windows SDK with rc.exe (for icon embedding)
 
   ── B U I L D ──
@@ -188,8 +188,8 @@
 
   src/
     main.rs             entry point, agent loop, commands
-    ollama.rs           ollama client, streaming, tool defs
-    cloud.rs            cloud client (openrouter/opencode)
+    kilo.rs           kilo client, streaming, tool defs
+    cloud.rs            cloud client (openrouter/kilo)
     ui.rs               retro terminal rendering
     tools.rs            tool definitions + dispatch
     sandbox.rs          file I/O sandbox + security
@@ -215,7 +215,7 @@
 
   runtime:
     tokio            async runtime
-    reqwest          HTTP client for ollama + cloud APIs
+    reqwest          HTTP client for kilo + cloud APIs
     serde/serde_json JSON parsing
     crossterm        terminal control + raw mode
     anyhow           error handling
@@ -235,7 +235,7 @@
   openrouter   meta-llama/llama-3.3-70b:free      131K     gen+code
   openrouter   deepseek/deepseek-r1:free          64K      think
   openrouter   qwen/qwen-2.5-coder-32b:free       32K      code
-  opencode     opencode/big-pickle                200K     code
+  kilo     kilo-auto/free                200K     code
 
   ── N O T E S ──
 
@@ -248,6 +248,6 @@
   ── G R E E T S ──
 
   rust community for the best systems language.
-  ollama team for local AI infrastructure.
-  qwen team for the base model.
+  kilo team for local AI infrastructure.
+  kilo team for the gateway.
   you, for reading this far. kapoo!! desu-ne!! :3

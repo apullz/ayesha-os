@@ -9,7 +9,7 @@ _CONFIG_PATH = Path(__file__).parent / "config.json"
 
 
 class LLMRouter:
-    """Routes task types to ollama models based on config.json mappings."""
+    """Routes task types to kilo models based on config.json mappings."""
 
     def __init__(self, config_path: Path | None = None) -> None:
         self._config_path = config_path or _CONFIG_PATH
@@ -21,7 +21,7 @@ class LLMRouter:
             self._config = json.loads(self._config_path.read_text(encoding="utf-8"))
         else:
             self._config = {
-                "ollama_endpoint": "http://localhost:11434",
+                "kilo_endpoint": "https://api.kilo.ai/api/gateway/v1",
                 "models": {},
                 "task_triggers": {},
             }
@@ -32,7 +32,7 @@ class LLMRouter:
 
     @property
     def endpoint(self) -> str:
-        return self._config.get("ollama_endpoint", "http://localhost:11434")
+        return self._config.get("kilo_endpoint", "https://api.kilo.ai/api/gateway/v1")
 
     @property
     def models(self) -> dict[str, dict[str, Any]]:
@@ -45,13 +45,13 @@ class LLMRouter:
     def select(self, task_type: str) -> dict[str, Any]:
         """Return model config for a task type, falling back to quick_docs."""
         return self.models.get(task_type, self.models.get("quick_docs", {
-            "model": "qwen2.5:7b",
+            "model": "kilo-auto/free",
             "max_tokens": 2048,
             "temperature": 0.3,
         }))
 
     def model_name(self, task_type: str) -> str:
-        return self.select(task_type).get("model", "qwen2.5:7b")
+        return self.select(task_type).get("model", "kilo-auto/free")
 
     def tasks_for_event(self, event_type: str) -> list[str]:
         """Return task types to run for a given gitea event type."""
