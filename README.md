@@ -1,17 +1,19 @@
 # ayesha-os
 
-a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai. **v4.5.0**: rust engine with themes, sessions, skills & streaming syntax highlighting; an expo/react-native mobile chat app; a dockerized huggingface bot space; and a CI automation harness.
-
 ```
-                       _     
-                      | |    
-  __ _ _   _  ___  ___| |__   __ _ ______ ___  ___ 
- / _` | | | |/ _ \/ __| '_ \ / _` |______/ _ \/ __|
-| (_| | |_| |  __/\__ \ | | | (_| |     | (_) \__ \
- \__,_|\__, |\___||___/_| |_|\__,_|      \___/|___/
+                        _     
+                       | |    
+   __ _ _   _  ___  ___| |__   __ _ ______ ___  ___ 
+  / _` | | | |/ _ \/ __| '_ \ / _` |______/ _ \/ __|
+ | (_| | |_| |  __/\__ \ | | | (_| |     | (_) \__ \
+  \__,_|\__, |\___||___/_| |_|\__,_|      \___/|___/
         __/ |                                       
        |___/                                        
 ```
+
+a distributed, self-improving ai ecosystem powered by local ollama models. ayesha-os is an agentic coding assistant and a jarvis-like chatbot, all wrapped in the personality of ayesha — an otaku genki ai. **v4.5.0**: rust engine with themes, sessions, skills & streaming syntax highlighting; an expo/react-native mobile chat app; a dockerized huggingface bot space; and a CI automation harness.
+
+(๑•᎑•๑) welcome to the hivemind, senpai! desu~
 
 ## architecture
 
@@ -32,7 +34,7 @@ a distributed, self-improving ai ecosystem powered by local ollama models. ayesh
        │              │  applets/       │      │  ayesha-bot-mobile   │
        │              │  └─ flora-cli   │      │  (expo / react       │
        │              └─────────────────┘      │   native chat client)│
-                                               └─────────┬────────────┘
+                                                └─────────┬────────────┘
        │                                                │
        │                    ┌───────────────────────────▼─────────────┐
        │                    │  hf space apullz/ayesha-bot             │
@@ -69,7 +71,7 @@ git clone https://github.com/apullz/ayesha-os.git
 cd ayesha-os
 ```
 
-already have it / got a release zip? just skip ahead.
+already have it / got a release zip? just skip ahead, senpai! (◕‿◕✿)
 
 ### step 1 — prerequisites
 
@@ -114,9 +116,7 @@ cd dist
 .\ayesha-os.exe
 ```
 
-`dist\ayesha-os.exe` (windows) and `dist/ayesha-os` (linux/termux) are the app — a
-self-contained build with config, models, and applets bundled in. no rust, no build
-tools needed.
+`dist\ayesha-os.exe` (windows) and `dist/ayesha-os` (linux/termux) are the app — a self-contained build with config, models, and applets bundled in. no rust, no build tools needed.
 
 > don't have `dist\`? rebuild it (developer path below) or grab a release.
 
@@ -147,31 +147,21 @@ on linux (and termux on android) the same engine builds to an elf:
 ./ayesha.sh                  # launch dist/ayesha-os
 ```
 
-or `cd dist && ./ayesha-os` directly — `dist/ayesha-os` is the linux app, a
-self-contained build with config, models, and applets bundled in, just like the
-exe on windows.
+or `cd dist && ./ayesha-os` directly — `dist/ayesha-os` is the linux app, a self-contained build with config, models, and applets bundled in, just like the exe on windows.
 
-termux prerequisites: `pkg install rust` (plus `nodejs` for flora-cli; hivebeat
-needs `python python-numpy pulseaudio` — run `bash applets/hivebeat/setup_termux.sh`
-for the audio setup, which the build script also reminds you about). clipboard
-tools (`read_clipboard`, ctrl+v vision) are no-ops on termux — there's no android
-clipboard backend — and `--headless` / `--selftest` run fine with no display.
+termux prerequisites: `pkg install rust` (plus `nodejs` for flora-cli; hivebeat needs `python python-numpy pulseaudio` — run `bash applets/hivebeat/setup_termux.sh` for the audio setup, which the build script also reminds you about). clipboard tools (`read_clipboard`, ctrl+v vision) are no-ops on termux — there's no android clipboard backend — and `--headless` / `--selftest` run fine with no display.
 
-for local models on termux either `pkg install ollama` (native aarch64) or point
-`ayesha.json`'s `ollama.endpoint` at a remote box (`"http://<host>:11434"`). cloud
-keys work the same as windows: `./scripts/setup-cloud.sh`.
+for local models on termux either `pkg install ollama` (native aarch64) or point `ayesha.json`'s `ollama.endpoint` at a remote box (`"http://<host>:11434"`). cloud keys work the same as windows: `./scripts/setup-cloud.sh`.
 
 ### step 4 — (optional) enable free cloud models
 
-cloud backends (openrouter, kilo gateway) are free and handy when local models are slow.
-set the keys once:
+cloud backends (openrouter, kilo gateway) are free and handy when local models are slow. set the keys once:
 
 ```powershell
 .\scripts\setup-cloud.ps1
 ```
 
-this writes `.env` with `OPENROUTER_API_KEY` (it opens the key
-pages in your browser for you). then, inside the engine:
+this writes `.env` with `OPENROUTER_API_KEY` (it opens the key pages in your browser for you). then, inside the engine:
 
 ```cmd
 fox> models                          # list everything (local + cloud)
@@ -327,7 +317,7 @@ drop a markdown guide in `skills/` and the engine will auto-discover it (parses 
 | `name <you>` | set your display name |
 | `/` | open command palette |
 
-**Tab** autocompletes slash commands and applet names (repeat to cycle, double-Tab lists all). **Ctrl+M** or **Ctrl+P** opens the interactive applet menu — navigate with **↑/↓**, type to filter, **Enter** to launch, **x** to stop the selected applet, **Esc** to exit. **Shift+Up/Down** cycles through applets.
+**tab** autocompletes slash commands and applet names (repeat to cycle, double-tab lists all). **ctrl+m** or **ctrl+p** opens the interactive applet menu — navigate with **↑/↓**, type to filter, **enter** to launch, **x** to stop the selected applet, **esc** to exit. **shift+up/down** cycles through applets.
 
 ### pixel striker (built-in sprite engine)
 
@@ -373,12 +363,12 @@ personality engine with three-layer response system (computer/otacon/win95) serv
 cd core && python ayesha_mobile_api.py
 ```
 
-REST API for mobile apps with:
+rest api for mobile apps with:
 - device registration + heartbeat
 - hive status broadcasting
 - personality config read/write
-- WebSocket real-time updates
-- Android-specific endpoints (`/api/android/init`, `/api/android/session`)
+- websocket real-time updates
+- android-specific endpoints (`/api/android/init`, `/api/android/session`)
 - tri-node mind integration — broadcasts fan out to all hivemind nodes
 - `/api/hive/*` — list active sisters, shared key/value config store
 - background 30s hive sync + heartbeat loop
@@ -415,7 +405,7 @@ or use the all-in-one script:
 
 ### flora-cli
 
-interactive TypeScript terminal for exploring scottish flora phylogeny. uses ollama for natural language queries about plant taxonomy.
+interactive typescript terminal for exploring scottish flora phylogeny. uses ollama for natural language queries about plant taxonomy.
 
 ### hivebeat
 
@@ -432,41 +422,41 @@ live audio streams to a bundled pulse-simple player (`hivepipe`) on termux/proot
 
 `ayesha-bot-mobile/` — an **expo / react-native** chat client for the ayesha bot:
 
-- pastel "magical chat" UI with 3 tabs: **Chat**, **Stars** (saved conversations), **Settings**
-- streams replies from the `apullz/ayesha-bot` hf space via gradio SSE v3 (`/gradio_api/call/respond`)
-- haptics on send, animated sparkles, on-device history via AsyncStorage (no accounts)
+- pastel "magical chat" ui with 3 tabs: **chat**, **stars** (saved conversations), **settings**
+- streams replies from the `apullz/ayesha-bot` hf space via gradio sse v3 (`/gradio_api/call/respond`)
+- haptics on send, animated sparkles, on-device history via asyncstorage (no accounts)
 - run with `npx expo start` inside `ayesha-bot-mobile/`
 
 ## hf bot space
 
 `_hf-ayesha-bot/` — the dockerized **`apullz/ayesha-bot`** huggingface space that powers the mobile app:
 
-- `FROM ollama/ollama:latest` — bakes `nemotron-3-nano:4b` in as the `ayesha` personality at image build time
-- gradio `ChatInterface` on port 7860 streaming via `/api/chat`, wrapped in a custom phone-frame overlay (`overlay.html` / `theme.css` / `chat.js`)
-- deploy with the `Dockerfile` + `Modelfile` in that folder
+- `from ollama/ollama:latest` — bakes `nemotron-3-nano:4b` in as the `ayesha` personality at image build time
+- gradio `chatinterface` on port 7860 streaming via `/api/chat`, wrapped in a custom phone-frame overlay (`overlay.html` / `theme.css` / `chat.js`)
+- deploy with the `dockerfile` + `modelfile` in that folder
 
 ## automation harness
 
 `.github/workflows/harness.yml` runs `scripts/automation_harness.py` in CI **every 10 minutes** (plus manual dispatch). the harness:
 
 - polls `.automation/tasks/` for `*.task.json` jobs and runs them non-interactively (command / sync / test / lint)
-- writes files atomically (temp → fsync → SHA-256 → rename) with backup/restore on failure
+- writes files atomically (temp → fsync → sha-256 → rename) with backup/restore on failure
 - lints changed files per language (`.py`, `.rs` via `cargo check`, `.ts/.tsx` via `tsc`, `.json`, `.toml`, `.ps1`, `.sh`)
 - auto-commits and pushes any results back as `chore(harness): ... [skip ci]`
 
 ## git middleware
 
-gitea webhook receiver with LLM-powered task execution:
+gitea webhook receiver with llm-powered task execution:
 
 | endpoint | description |
 |----------|-------------|
-| `POST /webhook/gitea` | receive push/PR/release webhooks |
-| `POST /task` | on-demand LLM task execution |
-| `POST /reload` | hot-reload `config.json` |
-| `GET /config` | router / model mapping summary |
-| `GET /health` | server health check |
+| `post /webhook/gitea` | receive push/pr/release webhooks |
+| `post /task` | on-demand llm task execution |
+| `post /reload` | hot-reload `config.json` |
+| `get /config` | router / model mapping summary |
+| `get /health` | server health check |
 
-tasks: code review, auto-summary, commit analysis, security scan. uses ollama with task-specific prompt templates. `python main.py test` runs a built-in test suite (router mapping, HMAC verification, webhook mapping).
+tasks: code review, auto-summary, commit analysis, security scan. uses ollama with task-specific prompt templates. `python main.py test` runs a built-in test suite (router mapping, hmac verification, webhook mapping).
 
 ## deployment
 
@@ -481,7 +471,7 @@ this monorepo lives at `github.com/apullz/ayesha-os`
 - **space**: `apullz/ayesha-bot` — dockerized chat backend powering the mobile app
 
 ```powershell
-$env:HF_TOKEN = "hf_..."
+$env:hf_token = "hf_..."
 .\scripts\sync-all.ps1
 ```
 
@@ -516,9 +506,7 @@ linux / termux (bash):
 ./scripts/build-linux.sh
 ```
 
-creates `dist/ayesha-os` with the same bundle — and when run inside termux it
-auto-detects `$TERMUX_VERSION` and installs the hivebeat audio player
-(`hivepipe`) into `$PREFIX/bin` for you.
+creates `dist/ayesha-os` with the same bundle — and when run inside termux it auto-detects `$termux_version` and installs the hivebeat audio player (`hivepipe`) into `$prefix/bin` for you.
 
 ## license
 
@@ -527,5 +515,5 @@ apache 2.0
 ---
 
 ```
-(๑蔷蔷๑)  kapoo! the hivemind is alive!!  (๑蔷蔷๑)
+(๑•᎑•๑)  kapoo! the hivemind is alive!!  (๑•᎑•๑)
 ```
