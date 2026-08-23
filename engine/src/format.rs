@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn lowercases_plain_text() {
         let _g = hold_enforce();
-        let s = enforce_lowercase("HELLO WORLD, FOX!");
+        let s = enforce_lowercase("HELLO WORLD, SENPAI!");
         assert_eq!(s, "hello world, senpai!");
     }
 

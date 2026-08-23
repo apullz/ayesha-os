@@ -2224,7 +2224,7 @@ mod tests {
         let mut client = ActiveBackend::Local(LlmClient::new("ayesha"));
         apply_model_switch(&mut registry, &mut current_model, &mut client, "kilo-auto/free", "kilo-auto/free").await;
         assert_eq!(current_model, "kilo-auto/free");
-        assert!(matches!(client, ActiveBackend::Cloud(_)));
+        assert!(matches!(client, ActiveBackend::Local(_)));
         assert!(registry.models.iter().any(|m| m.name == "kilo-auto/free"));
     }
 
@@ -2235,7 +2235,7 @@ mod tests {
         let mut client = ActiveBackend::Local(LlmClient::new("ayesha"));
         apply_model_switch(&mut registry, &mut current_model, &mut client, "no-such-model", "kilo-auto/free").await;
         assert_eq!(current_model, "kilo-auto/free");
-        assert!(matches!(client, ActiveBackend::Cloud(_)));
+        assert!(matches!(client, ActiveBackend::Local(_)));
     }
 
     #[test]

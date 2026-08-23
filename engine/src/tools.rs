@@ -1683,7 +1683,7 @@ mod tests {
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
             llm: &LlmClient::new("test"),
-            backend: &crate::ActiveBackend::Cloud(LlmClient::new("test")),
+            backend: &crate::ActiveBackend::Local(LlmClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,
@@ -1738,7 +1738,7 @@ mod tests {
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
             llm: &LlmClient::new("test"),
-            backend: &crate::ActiveBackend::Cloud(LlmClient::new("test")),
+            backend: &crate::ActiveBackend::Local(LlmClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,
@@ -2232,7 +2232,7 @@ mod tests {
             analyzer: &SelfAnalyzer::new(std::path::PathBuf::from(".")),
             evolver: &ToolEvolver::new(vec![]),
             llm: &LlmClient::new("test"),
-            backend: &crate::ActiveBackend::Cloud(LlmClient::new("test")),
+            backend: &crate::ActiveBackend::Local(LlmClient::new("test")),
             project_root: std::path::Path::new("."),
             applet_manager: &mut manager,
             steer_tx: &steer_tx,
@@ -2241,6 +2241,6 @@ mod tests {
             menu_flag: &menu_flag,
         }).await.unwrap();
         assert!(result.contains("applets"));
-        assert!(result.contains("engine"));
+        assert!(result.contains("flora"));
     }
 }

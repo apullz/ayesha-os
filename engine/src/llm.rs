@@ -368,7 +368,7 @@ mod prompt_tests {
     use super::*;
 
     fn prompt() -> String {
-        LlmClient::system_prompt("senpai", ".")
+        LlmClient::system_prompt("senpai", &std::env::current_dir().unwrap_or_default().display().to_string())
     }
 
     #[test]
