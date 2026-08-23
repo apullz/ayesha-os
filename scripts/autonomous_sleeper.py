@@ -38,8 +38,6 @@ def sweep():
         ("ollama_endpoint", "kilo_endpoint"),
         ("ollama pull", "kilo pull"),
         ("ollama create", "kilo create"),
-        ("apullz/ayesha-os", "ayesha-os/ayesha-os"),
-        ("apullz/ayesha", "ayesha-hivemind/ayesha"),
     ]
     exts = ["*.rs", "*.py", "*.ts", "*.tsx", "*.sh", "*.ps1", "*.md", "*.json", "*.toml"]
     changed = 0

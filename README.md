@@ -55,7 +55,7 @@ a distributed, self-improving ai ecosystem powered by kilo gateway models. ayesh
 ### step 0 — get the code
 
 ```cmd
-git clone https://github.com/ayesha-os/ayesha-os.git
+git clone https://github.com/apullz/ayesha-os.git
 cd ayesha-os
 ```
 
@@ -152,7 +152,7 @@ gitea webhook receiver with kilo-powered LLM task execution. tasks: code review,
 
 ### github
 
-`github.com/ayesha-os/ayesha-os`
+`github.com/apullz/ayesha-os`
 
 ### huggingface
 

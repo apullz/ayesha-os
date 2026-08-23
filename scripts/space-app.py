@@ -121,7 +121,7 @@ def build_footer():
     return gr.HTML(f"""
 <div style="text-align:center; margin-top:3rem; padding:1rem; border-top:1px solid var(--alt); color:var(--dim); font-size:0.75rem;">
   ayesha-os — kapoo!! the hivemind is alive!! :3<br>
-  <a href="https://github.com/ayesha-os/ayesha-os" target="_blank">github</a>
+  <a href="https://github.com/apullz/ayesha-os" target="_blank">github</a>
   &nbsp;·&nbsp;
   <a href="https://huggingface.co/ayesha-hivemind/ayesha" target="_blank">model</a>
   &nbsp;·&nbsp;
@@ -165,7 +165,7 @@ with gr.Blocks(theme=gr.themes.Base(), head=HEAD_HTML) as demo:
                 gr.Markdown("### ◆  connect")
                 gr.HTML("""
                 <div style="line-height:2">
-                  <a href="https://github.com/ayesha-os/ayesha-os" target="_blank">> github monorepo</a><br>
+                  <a href="https://github.com/apullz/ayesha-os" target="_blank">> github monorepo</a><br>
                   <a href="https://huggingface.co/ayesha-hivemind/ayesha" target="_blank">> hf model repo</a><br>
                   <a href="https://huggingface.co/spaces/ayesha-hivemind/ayesha-hivemind" target="_blank">> this space</a><br>
                 </div>
